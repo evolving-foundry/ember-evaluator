@@ -14,7 +14,7 @@ export default defineConfig({
     // bounded instead of scaling their startup cost with every host CPU.
     maxWorkers: 4,
     include: [
-      "tests/unit/**/*.test.ts",
+      "tests/unit/**/*.test.{ts,mjs}",
       "tests/integration/**/*.test.ts",
     ],
     passWithNoTests: false,
