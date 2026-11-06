@@ -23,7 +23,7 @@ ember-evaluator doctor playbook/deepswe/deepswe-simpleagent.yaml
 ember-evaluator run playbook/deepswe/deepswe-simpleagent.yaml
 ```
 
-Limit `run.maxTasks` initially. After checking images, model access, and verification, start a new full experiment. See the [profile](../../../src/plugins/benchmarks/profiles/deepswe.yaml) for default tasks, source, and version, and [daily operations](../usage.md) for selection and resume.
+Limit `run.maxTasks` initially. After checking images, model access, and verification, start a new full experiment. See the [profile](../../../src/plugins/benchmarks/agent-harness/profiles/deepswe.yaml) for default tasks, source, and version, and [daily operations](../usage.md) for selection and resume.
 
 ## Environment and Verification
 

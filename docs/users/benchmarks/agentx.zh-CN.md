@@ -224,7 +224,7 @@ vLLM 端点使用服务的 `/metrics`。报告包含 KV cache 使用率、运行
 这是可选的旧部署方式，常规 CLI 流程不依赖该 Worker。端点必须能从执行容器访问：AgentX Docker 的 host 网络可以访问裸机回环地址，其他网络方式需要明确可达的地址。若选择独立维护采样服务，可手动启动：
 
 ```bash
-python3 dist/adapters/harness/agentx/assets/ascend_metrics.py \
+python3 dist/runtimes/agentx/assets/ascend_metrics.py \
   --device-id 4 --chip-id 0 --host 127.0.0.1 --port 18095
 ```
 

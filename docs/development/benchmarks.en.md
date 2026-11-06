@@ -8,7 +8,7 @@ Obtain [task specifications](benchmark-evaluation-requirements.en.md#2-complete-
 
 ## Choose an Implementation Location
 
-Benchmarks organize task adaptation; download adapters organize external sources. Determine whether new behavior is record reading, task conversion, existing-protocol configuration, or a new protocol:
+Benchmarks are grouped by evaluation target: agent-harness, inference-engine and operator. All three use the existing engine and component contracts. Source clients organize external downloads. Determine whether new behavior is record reading, task conversion, existing-protocol configuration, or a new protocol:
 
 | Approach | Scope | Code changes |
 | --- | --- | --- |
@@ -20,17 +20,43 @@ Avoid benchmark-name branches in Engine/Solver. New sources should not duplicate
 
 | Directory | Responsibility |
 | --- | --- |
-| `src/plugins/benchmarks/definitions/` | Evaluator-defined task conversion/private answers/scoring, e.g. GSM8K |
-| `src/plugins/benchmarks/protocols/harbor/` | Harbor environments/artifacts/verifiers |
-| `src/plugins/benchmarks/index.ts` | Built-in benchmark export entry |
-| `src/plugins/benchmarks/profiles/` | Default combinations/sources/versions/scenarios |
-| `src/adapters/datasets/sources/` | HF/GitHub downloads/caches/locks |
-| `src/adapters/datasets/input-readers/` | JSONL/Parquet/CSV/Harbor TOML |
-| `src/adapters/datasets/cache.ts` | Shared content-addressed cache |
+| `src/plugins/benchmarks/agent-harness/definitions/` | Evaluator-defined task conversion/private answers/scoring, e.g. GSM8K |
+| `src/plugins/benchmarks/agent-harness/protocols/harbor/` | Harbor environments/artifacts/verifiers |
+| `src/plugins/benchmarks/index.ts` | Composes the three category registration functions; not an evidence import entry |
+| `src/plugins/benchmarks/inference-engine/agentx/` | Workloads, saved results, telemetry and statistical evidence |
+| `src/plugins/benchmarks/operator/kernel/` | Precision, timing, profiling, scoring and Python assets |
+| `src/plugins/benchmarks/<category>/profiles/` | Default combinations/sources/versions/scenarios |
+| `src/infrastructure/datasets/sources/` | HF/GitHub downloads/caches/locks |
+| `src/infrastructure/datasets/input-readers/` | JSONL/Parquet/CSV records; Harbor TOML and Compose semantics live in Harbor's readers directory |
+| `src/infrastructure/datasets/cache.ts` | Shared content-addressed cache |
 
 ![Adapters own sources/cache; benchmarks create public tasks/private verification; solvers never read hidden answers](../users/imgs/04-framework-benchmark-boundary.png)
 
 The fork marks delivery boundaries: public input reaches Solver; private materials remain for verification. `runTask` calls Benchmark.verify with solve results/declared state. Solvers do not invoke verifiers. Adapters own downloads, benchmarks own scoring.
+
+## Where to Add New Behavior
+
+| Requirement | Implementation and registration |
+| --- | --- |
+| Questions, choices, code tasks or custom scoring | agent-harness/definitions, source configuration, Profile and agent-harness/index.ts |
+| Harbor task set | agent-harness/profiles; change protocols/harbor only for protocol differences |
+| Independent Agent evaluation | A standalone Benchmark under agent-harness, with Solver/Verifier as needed; no requirement to extend DefinedBenchmark |
+| Inference engine workload | inference-engine Benchmark, workload Solver, evidence, metrics and Profile |
+| Operator evaluation | operator Benchmark, execution backend, precision/timing evidence, metrics and Profile |
+| Agent framework | Runtime installation/bridge code and its Solver |
+| Lifecycle phase or cross-task state | Design core/contracts first, then change execution, preparation, scheduling and recovery |
+
+Register Benchmarks and Profiles in each category's index.ts. Profiles retain the existing IDs, inheritance and cross-category duplicate checks. The root plugin entry only composes registration modules. Use shared only for existing reuse. Specialized Metrics/Reporters remain in their role directories and import explicit evidence modules.
+
+AgentX evidence processes saved output without loading installers, samplers or network probes. The Solver connects runtime output to evidence parsing. Runtime modules do not import Benchmarks; shared version constants live in a runtime leaf module without I/O.
+
+Put unit tests in tests/unit, component/registration/config/resume tests in tests/integration and reusable inputs in tests/fixtures. Cover success, failure, cancellation, cleanup and offline reporting. Record real Docker/Ray/NPU/model acceptance separately from controlled tests.
+
+## Limits for Future Memory Evaluation
+
+A possible sequence is environment ready → import history → ask → verify → clean up. Benchmark owns history interpretation, ordering and scoring; Solver receives public questions; core manages timeouts, cancellation, records and cleanup. Specify isolation and recovery separately for within-task history and cross-task shared state.
+
+Benchmark.prepare() runs before environment creation and cannot initialize a running memory service. Existing multi-step tasks also have the bash setup.sh initialization convention. New lifecycle stages require an explicit contract design before execution/scheduling changes. No placeholder hooks, workflow DSL or sample memory service are introduced for this future use case.
 
 ## Full Benchmark Interface
 
@@ -61,8 +87,8 @@ GSM8K example:
 
 1. `definitions/gsm8k.ts` defines question/answer conversion, prompts, extraction/comparison.
 2. `definitions/index.ts` associates it with `openai/gsm8k` file selection, owning download policy without I/O.
-3. `plugins/index.ts` imports benchmark exports/registers `gsm8k` through Cordis; factory injects `HuggingFaceFilesSource` into DefinedBenchmark.
-4. `adapters/datasets/sources/huggingface/` owns networking/HF_TOKEN/mirrors/cache/locks.
+3. `plugins/benchmarks/agent-harness/index.ts` registers `gsm8k` through Cordis; factory injects `HuggingFaceFilesSource` into DefinedBenchmark.
+4. `infrastructure/datasets/sources/huggingface/` owns networking/HF_TOKEN/mirrors/cache/locks.
 
 Other-source adapters reuse definitions without scoring/Engine changes. Third-party plugins import DefinedBenchmark/BenchmarkDefinition/DatasetRecordSource from the package root, register through Cordis, and load explicit patches. Registration/validation starts no downloads/evaluations. Public contracts/reusable capabilities are root exports.
 
@@ -133,7 +159,7 @@ export function apply(ctx) {
 
 ConfigProfile/UserConfig/ResolvedProfiles/resolveConfig are root exports. Profiles support versions/scenarios/defaultVersion/defaultScenario. `$default` marks verifier default service binding. Solver profiles use role:solver/plugin to select implementations. Explicit patches load modules; registration/validation allocates no evaluation resources.
 
-Built-ins live in src/plugins/benchmarks/profiles. Inheriting harbor YAML publishes compatible datasets without Loader/Engine edits. External plugins may read packaged YAML through readProfileDirectory/registerProfile. Duplicate IDs/cycles/missing parents fail. Ship files in packages/node digests; built-in YAML already ships.
+Built-ins live in each category’s profiles directory. Inheriting harbor YAML publishes compatible datasets without Loader/Engine edits. External plugins may read packaged YAML through readProfileDirectory/registerProfile. Duplicate IDs/cycles/missing parents fail. Ship files in packages/node digests; built-in YAML already ships.
 
 ## Three Runnable Integration Examples
 

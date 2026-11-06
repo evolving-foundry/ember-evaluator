@@ -6,43 +6,38 @@
 
 ```text
 src/
-├── cli.ts                  # CLI 参数、run/report 命令与退出码
-├── bootstrap.ts            # 初始化 Cordis、加载插件、创建组件及释放资源
-├── index.ts                # 对外公开的类型与 API
-├── evaluator.ts            # Node.js SDK 高层入口与异常
-├── run.ts                  # CLI 与 SDK 共用的实验执行、报告和资源释放
-├── report.ts               # 从已有结果离线重建指标和报告
-├── config/                 # YAML 解析、环境变量、参数校验、脱敏及插件 patch 加载
-├── core/                   # 与具体插件实现无关的评测流程
-│   ├── contracts/          # 八类组件接口、任务、结果、轨迹与产物契约
-│   ├── registry.ts         # Cordis evaluator 服务与组件注册表
-│   ├── engine.ts           # run 编排、来源锁定、选题与调度
-│   ├── run-task.ts         # 单个 attempt 的准备、求解、验证与收集
-│   ├── resume.ts           # 续跑校验与任务恢复策略
-│   └── …                   # manifest、内容摘要、产物与记录校验等通用逻辑
-├── plugins/                # 通过 Cordis 注册的内置组件
-│   ├── index.ts            # 内置插件注册入口
-│   ├── reporting.ts        # 内置指标与报告插件注册
-│   ├── benchmarks/         # Benchmark 能力与来源政策
-│   │   ├── definitions/   # Evaluator 自定义题目转换和评分
-│   │   ├── protocols/     # 按已有 Benchmark 协议执行，如 Harbor
-│   │   └── profiles/      # 默认组合、版本和场景配置元数据
-│   ├── verifiers/          # 可组合的私有验证与原始奖励证据
-│   ├── environments/       # local、Docker 环境、进程、工作区/补丁传输与模型网关
-│   ├── solvers/            # simpleagent 等 Agent 求解器
-│   ├── schedulers/         # local 并发调度和 Ray 分布式调度
-│   ├── stores/             # run/attempt 持久化、文件清单与分布式收集
-│   ├── metrics/            # 成功率、耗时、token usage 等指标
-│   └── reporters/          # Markdown 等报告格式
-└── adapters/               # 外部协议、SDK 和运行时适配
-    ├── datasets/          # 外部数据接入，不拥有 Benchmark 业务
-    │   ├── cache.ts       # 跨来源共享的内容缓存
-    │   ├── sources/       # 按 huggingface、github、local、http 分类的数据接入
-    │   └── input-readers/ # 记录与 Harbor 任务文件读取
-    ├── harness/pi/         # pi runner、进程协议、轨迹转换与运行时打包
-    ├── ray/                # Ray 客户端、节点 worker 与控制协议
-    │   └── python/         # Python Ray driver 及其依赖声明
-    └── transfer/           # HTTPS 产物上传、接收与传输协议
+├── index.ts                # 包根公开类型与 API
+├── cli.ts                  # 进程入口、信号和退出码
+├── cli/                    # 命令参数、终端输出与进度展示
+├── application/            # SDK、配置/插件装配、运行、报告、预热、补测与诊断
+│   ├── plugins/            # Cordis 注册表、插件发现与组件创建
+│   ├── retry-control/      # 请求文件事务、认领与 IPC 接入
+│   └── ray/                # Jobs、结果下载、worker 装配和进程入口
+├── config/                 # YAML 读取、展开、纯解析、校验和脱敏
+├── core/                   # 不依赖具体组件的公共契约和评测流程
+│   ├── contracts/          # 八类组件、任务、结果、工厂和配置契约
+│   ├── execution/          # run 编排、attempt 执行与队列
+│   ├── preparation/        # 准备轮次、依赖物化、时限和验证环境
+│   ├── selection/          # 选题、采样
+│   ├── recovery/           # 续跑、自动重试与补测资格
+│   ├── results/            # manifest、结果判定、来源与版本比较
+│   ├── artifacts/          # 文件清单、轨迹写入与产物收集
+│   └── …                   # progress、policies、validation、errors
+├── plugins/                # 八类 Cordis 组件，各角色入口负责注册
+│   ├── benchmarks/
+│   │   ├── agent-harness/ # definitions、Harbor 与本类 profiles
+│   │   ├── inference-engine/ # AgentX、离线 evidence 与 profiles
+│   │   ├── operator/      # Kernel 执行/分析/评分与 profiles
+│   │   └── shared/        # 已有跨类别复用的选题准备与来源配置
+│   ├── environments/      # local、Docker 准备和会话、共用环境逻辑
+│   ├── schedulers/        # local、Ray 与准备队列
+│   └── …                  # solvers、verifiers、stores、metrics、reporters
+├── runtimes/               # Pi、DSH、AgentBundle、AgentX 等桥接、安装描述与资源
+└── infrastructure/         # 进程、Shell、容器、网络、数据、文件、IPC、传输与摘要
+    ├── datasets/          # 来源下载、缓存和记录读取；不解析 Harbor 任务语义
+    ├── containers/        # Docker 命令、镜像、构建、进程和传输工具
+    ├── provenance/        # 包文件扫描和摘要验证
+    └── ray/               # Ray 客户端、编码和 Python driver
 tests/
 ├── unit/                   # 配置、算法、契约等单元测试
 ├── integration/            # 组件协作、CLI、持久化与运行时集成测试
@@ -68,7 +63,7 @@ docs/                       # 用户指南、设计、任务与经验记录，�
 | `.scratch/` / `.superpowers/` | 本地临时材料和工具工作文件，不提交 |
 | `.cache/` / `results/` / `coverage/` | 本地缓存、默认示例结果和覆盖率输出，不提交；实际结果路径由配置决定 |
 
-新增代码遵循现有分层：公共契约放 `core/contracts`，可替换组件放 `plugins`，第三方协议与 SDK 细节放 `adapters`。CLI 负责命令入口；核心流程通过契约调用组件，避免新增按具体插件名称分支的业务逻辑。
+公共契约放 `core/contracts`，可替换组件放 `plugins`，运行时安装与桥接放 `runtimes`，共用 I/O 工具放 `infrastructure`。应用层装配配置和插件；CLI 处理用户交互。core 只依赖 core；config 不导入 application、plugins、runtimes 或 infrastructure；infrastructure/runtimes/plugins 只能使用 config 中明确列出的纯解析模块。通过 `pnpm check:dependencies` 检查静态、类型、动态导入、再导出及执行循环，违规清单必须为空。核心执行流程不增加按 Benchmark 名称或类别分支的业务逻辑。
 
 ## 代码开发规范
 
@@ -84,6 +79,7 @@ docs/                       # 用户指南、设计、任务与经验记录，�
 使用 `package.json` 指定的 Node.js 和 pnpm 版本，通过 `pnpm install --frozen-lockfile` 安装本地依赖。Docker 内的 npm 和 `npm ci` 流程保持不变。常用验证命令：
 
 ```bash
+pnpm check:dependencies
 pnpm typecheck
 pnpm build
 pnpm test --run
@@ -111,7 +107,7 @@ pnpm test --run
 - 插件默认配置通过 `ctx.evaluator.registerProfile()` 注册声明式 Profile，类型从包根导入。Profile 属于配置元数据，不增加执行组件类别；继承、版本和场景由解析层展开，避免在 Loader 或 Engine 中新增按 Benchmark 名称分支的默认值。内置 Harbor Profile YAML 随构建发布并纳入摘要，外部 Profile 随显式 patch 插件发布。
 - 配置校验与实例创建分开。`validate` 校验类型、范围和未知字段，并给出明确错误；校验阶段不启动进程、访问模型或分配运行资源。模块导入和注册阶段也不启动评测工作。
 - 工厂通过 `(config, runtime)` 获取组件参数、模型和运行时认证，使用 `runtime.resolvePath()` 解析相对实验目录的路径。不要硬编码模型、key、用户目录或机器地址，也不要用全局可变状态串联实验。
-- 内置组件在 src/plugins/index.ts 或对应注册模块接入；外部插件由 run --patch <path> 显式加载，省略参数时不扫描默认文件，--dry-run 也使用相同参数。CLI 的 patch 路径相对当前工作目录解析；patch 的本地 JavaScript 模块路径和 npm 包从 patch 文件目录解析。当前 patch 仅支持 insert，条目使用 id 和 name；TypeScript 入口必须先编译。
+- 内置组件在对应角色的 index.ts 注册，Benchmark 在 agent-harness、inference-engine 或 operator 的 index.ts 注册，src/plugins/index.ts 只组合角色入口；外部插件由 run --patch <path> 显式加载，省略参数时不扫描默认文件，--dry-run 也使用相同参数。CLI 的 patch 路径相对当前工作目录解析；patch 的本地 JavaScript 模块路径和 npm 包从 patch 文件目录解析。当前 patch 仅支持 insert，条目使用 id 和 name；TypeScript 入口必须先编译。
 - Ray 节点不接收协调端的本机 patch 路径；节点配置通过 EVALUATOR_NODE_CONFIG 的 pluginPatchPath 指向节点本地预装 patch，并以 patch 内容摘要和插件版本校验一致性。Ray Jobs 协调端通过部署环境变量 EVALUATOR_PLUGIN_PATCH_PATH 加载容器内预装 patch。
 - 区分 patch 模块标识与组件注册名：patch 的 `id` 用于标识模块，patch 的 `name` 用于定位模块；实验中的 `{ name, config }` 选择组件并提供参数。不要为每个新插件增加专属 CLI 加载逻辑。
 - 遵循求解与验证边界：Solver 只接收公开任务和执行环境，不能读取答案、隐藏测试或 verifier 私有材料；Benchmark 负责准备与验证，Scheduler 负责调度，Store 负责持久化，Metrics/Reporter 基于已保存结果工作。

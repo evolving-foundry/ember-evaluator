@@ -8,7 +8,7 @@
 
 ## 选择代码实现位置
 
-Benchmark 按题目适配方式组织，数据下载 adapter 按外部来源组织。选择实现时先判断新增行为属于记录读取、题目转换、既有协议配置还是新的执行协议：
+Benchmark 一级目录按评测对象分为 Agent Harness、推理引擎性能和算子性能，三类共用现有执行框架、八类组件和 Profile 注册表。类别不出现在 YAML 中，也不改变评分流程。每类内部再按题目转换或协议组织代码；数据获取按外部来源组织：
 
 | 实现方式 | 适用范围 | 需要修改的代码 |
 | --- | --- | --- |
@@ -20,17 +20,43 @@ Benchmark 按题目适配方式组织，数据下载 adapter 按外部来源组�
 
 | 目录 | 职责 |
 | --- | --- |
-| `src/plugins/benchmarks/definitions/` | Evaluator 定义 GSM8K 等题库的题目转换、私有答案和评分规则 |
-| `src/plugins/benchmarks/protocols/harbor/` | 按 Harbor 任务协议组合环境、产物及 Verifier |
-| `src/plugins/benchmarks/index.ts` | 内置 Benchmark 能力的统一导出入口 |
-| `src/plugins/benchmarks/profiles/` | 内置默认组合、数据来源政策、版本和场景 |
-| `src/adapters/datasets/sources/` | 按 Hugging Face、GitHub 等来源实现下载、缓存和来源锁定 |
-| `src/adapters/datasets/input-readers/` | 读取 JSONL、Parquet、CSV、Harbor TOML 等格式 |
-| `src/adapters/datasets/cache.ts` | 不同数据来源共用的内容寻址缓存 |
+| `src/plugins/benchmarks/agent-harness/definitions/` | Evaluator 定义 GSM8K 等题库的题目转换、私有答案和评分规则 |
+| `src/plugins/benchmarks/agent-harness/protocols/harbor/` | 按 Harbor 任务协议组合环境、产物及 Verifier |
+| `src/plugins/benchmarks/index.ts` | 调用三类注册入口；不作为证据解析的导入入口 |
+| `src/plugins/benchmarks/inference-engine/agentx/` | 推理负载、保存结果、遥测和统计证据 |
+| `src/plugins/benchmarks/operator/kernel/` | 算子精度、计时、profiling、评分与 Python 资源 |
+| 各类别的 `profiles/` | 内置默认组合、数据来源政策、版本和场景 |
+| `src/infrastructure/datasets/sources/` | 按 Hugging Face、GitHub 等来源实现下载、缓存和来源锁定 |
+| `src/infrastructure/datasets/input-readers/` | 读取 JSONL、Parquet、CSV 等记录；Harbor TOML 与 Compose 语义在 Harbor 的 readers 目录 |
+| `src/infrastructure/datasets/cache.ts` | 不同数据来源共用的内容寻址缓存 |
 
 ![数据适配器负责来源和缓存，Benchmark 生成公开任务与私有验证材料，Solver 不读取隐藏答案](../users/imgs/04-framework-benchmark-boundary.png)
 
 图中的分叉表示材料的交付边界：公开输入传给 Solver，私有材料保留给验证流程；`runTask` 调用 `Benchmark.verify()`，并传入求解结果及按声明交付的状态。Solver 不直接调用验证器。下载来源和题目评分分别由 adapter 与 Benchmark 负责。
+
+## 新需求的修改入口
+
+| 需求 | 实现和注册位置 | 验证重点 |
+| --- | --- | --- |
+| 问答、选择题、代码题与自定义评分 | agent-harness/definitions、来源配置、Profile、agent-harness/index.ts | 公开输入与私有答案隔离、评分和来源恢复 |
+| Harbor 任务集 | agent-harness/profiles；协议差异才修改 protocols/harbor | 单步/多步、状态传输、验证资源与取消 |
+| 独立 Agent 测评 | agent-harness 下独立目录，实现 Benchmark，按需增加 Solver/Verifier | 当前准备/求解/验证契约能否表达流程；无需继承 DefinedBenchmark |
+| 推理引擎负载 | inference-engine 下的 Benchmark、负载 Solver、evidence 和 Profile | 测量条件、证据完整性、离线指标 |
+| 算子测评 | operator 下的 Benchmark、执行后端、精度/计时证据和 Profile | 错误分类、精度门槛、计时和 profiling |
+| 新 Agent 框架 | runtimes 下安装描述/桥接，以及对应 Solver | 进程协议、认证脱敏、取消和运行产物 |
+| 新生命周期或跨任务状态 | 先设计 core/contracts，再调整执行、准备、调度和恢复 | 并发隔离、重试、续跑和资源释放 |
+
+在所属类别的 index.ts 注册 Benchmark 与 Profile；新增 Profile 不改变原有 ID、继承和跨类别重名检查。根 plugins 入口只组合注册函数。只有已有多个调用方的功能才进入 shared。专属 Metrics/Reporter 保留在各自角色目录，直接引用明确的证据模块。
+
+AgentX 的 evidence 只读取保存结果，依赖链不加载安装器、采样进程或网络探测。Solver 调用 runtimes/agentx 后把原始输出交给 evidence。Runtime 不反向引用 Benchmark；双方共享的版本常量放在无 I/O 的 runtime 叶子模块。
+
+单元测试放 tests/unit，跨组件流程和注册/配置/续跑测试放 tests/integration，可复用输入放 tests/fixtures。至少验证正常、失败、取消、资源释放和离线报告；真实 Docker、Ray、NPU 或模型验收单独记录，不能用 Mock 结果代替。
+
+## 未来记忆评测的接口边界
+
+可能的流程是“环境就绪 → 写入历史 → 提问 → 验证 → 清理”。历史解释、写入顺序和评分属于 Benchmark，公开问题由 Solver 执行，核心负责超时、取消、记录与释放。样本内多轮状态和跨样本共享状态需要分别明确隔离与恢复要求。
+
+当前 Benchmark.prepare() 在环境创建前执行，不能直接初始化已经运行的记忆服务；现有多步任务还有 bash setup.sh 初始化约定。现有接口不能任意增加新的生命周期阶段。实际需求超出这些边界时，先设计明确的契约，再修改执行和调度流程。本仓库没有为未来记忆评测增加空 hook、通用工作流 DSL 或占位服务。
 
 ## 完整 Benchmark 接口
 
@@ -61,8 +87,8 @@ GSM8K 示例：
 
 1. `definitions/gsm8k.ts` 定义 `gsm8kDefinition`：转换 question/answer 字段、生成 Prompt、提取和比较答案。
 2. `definitions/index.ts` 的内置组合清单关联该 Definition 和 `openai/gsm8k` 的文件选择声明。此处维护下载哪些数据的政策，不执行下载。
-3. `plugins/index.ts` 通过统一 Benchmark 导出入口获得能力并通过 Cordis 注册 `gsm8k`。工厂创建 `HuggingFaceFilesSource`，将其注入 `DefinedBenchmark`。
-4. 实际网络访问、HF_TOKEN、镜像地址、内容缓存和来源锁均由 `adapters/datasets/sources/huggingface/` 实现。
+3. `plugins/benchmarks/agent-harness/index.ts` 通过 Cordis 注册 `gsm8k`。工厂创建 `HuggingFaceFilesSource`，将其注入 `DefinedBenchmark`。
+4. 实际网络访问、HF_TOKEN、镜像地址、内容缓存和来源锁均由 `infrastructure/datasets/sources/huggingface/` 实现。
 
 给其他来源实现 adapter 后，可以复用相同 Definition；不需要修改题目转换、评分或 Engine。第三方插件可从包根导入 `DefinedBenchmark`、`BenchmarkDefinition` 和 `DatasetRecordSource`，通过现有 Cordis 注册与显式 patch 加载。注册和校验阶段不能启动下载或评测。公共契约和复用能力由包根导出。
 
@@ -133,7 +159,7 @@ export function apply(ctx) {
 
 类型 ConfigProfile、UserConfig、ResolvedProfiles 与纯函数 resolveConfig 从包根导出。Profile 支持 versions、scenarios、defaultVersion、defaultScenario；Web 使用的 `$default` 是 verifier.service 的默认服务绑定标记。Solver Profile 使用 role: solver，并通过 plugin 选择真实 Solver。模块通过现有显式 --patch 加载，注册与校验阶段不得启动评测资源。
 
-内置声明位于 src/plugins/benchmarks/profiles。增加继承 harbor 的 YAML 即可发布使用相同协议的数据集，无需修改 Loader 或 Engine。外部插件可以用包根导出的 readProfileDirectory 读取自己的随包 YAML，再逐个 registerProfile。重复标识、继承环、缺失父项均报错。文件必须随包发布并纳入节点版本摘要；本仓库构建已经包含内置 Profile YAML。
+内置声明位于各类别的 profiles 目录。增加继承 harbor 的 YAML 即可发布使用相同协议的数据集，无需修改 Loader 或 Engine。外部插件可以用包根导出的 readProfileDirectory 读取自己的随包 YAML，再逐个 registerProfile。重复标识、继承环、缺失父项均报错。文件必须随包发布并纳入节点版本摘要；本仓库构建已经包含内置 Profile YAML。
 
 ## 三种可运行的接入示例
 

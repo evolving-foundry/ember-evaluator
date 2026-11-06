@@ -121,7 +121,7 @@ run:
 
 Pi / SimpleAgent 和内置 Judge 对显式 `base_url` 的 OpenAI Chat Completions 服务遵循同一输出规则：配置 `services.<服务>.maxTokens` 时发送该上限；省略时不发送 `max_tokens` 或 `max_completion_tokens`，由 API 服务决定回复上限。SDK 必需的模型预算仍用于本地上下文管理，不构成隐含的请求输出限制。通过已注册 Provider 使用模型时保留其 SDK 协议默认值；其他外部 Agent 保留各自的模型配置机制。
 
-Pi 的本地模型预算依次使用显式 `maxTokens`、随包发布的 [模型默认配置](../../src/adapters/harness/pi/model-defaults.json)、已注册模型参数，最后为 `128000`。默认配置支持模型 ID 或 `provider/模型 ID`，后者优先；配置参与运行时内容摘要。服务端仍可能因自身回复或上下文限制截断；Evaluator 会保留真实终止原因，不将截断回复当作合法评分。
+Pi 的本地模型预算依次使用显式 `maxTokens`、随包发布的 [模型默认配置](../../src/runtimes/pi/model-defaults.json)、已注册模型参数，最后为 `128000`。默认配置支持模型 ID 或 `provider/模型 ID`，后者优先；配置参与运行时内容摘要。服务端仍可能因自身回复或上下文限制截断；Evaluator 会保留真实终止原因，不将截断回复当作合法评分。
 
 ### 环境准备时限
 

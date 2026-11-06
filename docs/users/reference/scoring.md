@@ -44,7 +44,7 @@ MATH-500/SimpleQA/HealthBench templates/parsers follow [OpenAI simple-evals652c8
 
 OfficeQA `reward.py` SHA-256 is `0d91698c87df6d889339aac36f63ae0966607f169890b0bf8b472b26bfe8138f`. Full predictions go directly to `score_answer` for extraction/matching. Infrastructure failures produce no scores; answers are not packaged.
 
-Copied templates retain [MIT licensing](../../../src/plugins/benchmarks/definitions/scoring/LICENSE-MIT). OfficeQA [Apache license](../../../src/adapters/verifiers/officeqa/LICENSE-APACHE)/[NOTICE](../../../src/adapters/verifiers/officeqa/NOTICE) remain beside scripts and ship in builds.
+Copied templates retain [MIT licensing](../../../src/plugins/benchmarks/agent-harness/definitions/scoring/LICENSE-MIT). OfficeQA [Apache license](../../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/runtime/LICENSE-APACHE)/[NOTICE](../../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/runtime/NOTICE) remain beside scripts and ship in builds.
 
 ## MMLU Probability Scoring and Service Requirements
 

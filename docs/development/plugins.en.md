@@ -6,6 +6,18 @@ Covers eight component interfaces, runnable metric plugins, explicit patches, an
 
 [Project home](../../README.md) · [User guide](../users/README.md)
 
+## Source and Registration Locations
+
+Built-in components register in each role's index.ts. Benchmarks have three registration entries: agent-harness, inference-engine and operator. application/plugins owns Cordis, patch loading and component creation; config reads and validates configuration. External plugins continue importing public contracts from ember-evaluator. See [Benchmark development](benchmarks.en.md#where-to-add-new-behavior) for implementation locations and lifecycle limits.
+
+Run `pnpm check:dependencies` to check imports, boundary violations and executable module cycles. The migration exception list is empty. Core cannot import application/config/plugins/runtimes/infrastructure, and internal modules cannot bypass these rules through package-root imports.
+
+### Published Process Entries
+
+`pnpm build` generates the public package/CLI entries and the existing `dist/adapters/ray/{node-worker,jobs-entry,jobs-retry-entry,jobs-gateway}.js`, Ray `python/requirements.txt`, `dist/adapters/harness/pi/` standalone bundle and `dist/adapters/harness/agentx/assets/ascend_metrics.py`. These deployment paths remain available; internal code uses the new directories. Generated entries and assets are included in the package digest.
+
+After installing an actual packed package with runtime dependencies outside the checkout, run `node scripts/verify-distribution.mjs <installed-package-directory>` from the repository. The target must contain no src or scripts directory. This checks CLI, package-name SDK execution/reporting, Pi protocol, worker task/maintenance/version rejection, Jobs entry processing/gateway and AgentX Python startup. OpenSSL and Python may be selected using OPENSSL_BIN and PYTHON_BIN; unavailable tools are reported as skips. This controlled check does not replace real Docker/Ray/NPU/model acceptance.
+
 ## Component Types
 
 Components may report live activity. Solvers use `AttemptContext.activity?.({ message, lines, activity })`; Environment `materialize` argument4, `prepare` argument5, `installRuntime` argument4 accept the same callback. `onImageReady` retains position/meaning. Plugins without callbacks still work. ActivityListener/ComponentActivity are root exports.
@@ -26,7 +38,7 @@ Substeps may supply unique operationId/status started/updated/completed/failed/c
 
 Cordis loads modules; ctx.evaluator.register registers components. Modules may register several; experiment names select them.
 
-Record definitions live in `src/plugins/benchmarks/definitions/`: task files convert/select scoring; `records.ts` validates/builds; `prompts.ts` stores prompts. `scoring/` groups matching/generative-choice/probability/model-judge/code execution; complex DROP algorithms may be separate. Reuse scoring rather than requiring a new `*-score.ts` per dataset. Scoring remains benchmark business logic, not automatically a Verifier because of filenames.
+Record definitions live in `src/plugins/benchmarks/agent-harness/definitions/`: task files convert/select scoring; `records.ts` validates/builds; `prompts.ts` stores prompts. `scoring/` groups matching/generative-choice/probability/model-judge/code execution; complex DROP algorithms may be separate. Reuse scoring rather than requiring a new `*-score.ts` per dataset. Scoring remains benchmark business logic, not automatically a Verifier because of filenames.
 
 
 | Type | Responsibility/interface | Built-ins |

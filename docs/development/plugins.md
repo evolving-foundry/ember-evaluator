@@ -6,6 +6,18 @@
 
 [返回项目主页](../../README.zh-CN.md) · [用户手册](../users/README.zh-CN.md)
 
+## 源码与注册位置
+
+仓库内组件在各角色的 index.ts 注册；Benchmark 再分 agent-harness、inference-engine、operator 三个注册入口。application/plugins 负责 Cordis、patch 加载与组件创建，config 只读取与校验配置。外部插件仍从 ember-evaluator 包根导入公共接口，不依赖这些内部目录。新增 Benchmark 的具体位置和流程限制见[Benchmark 开发指南](benchmarks.md#新需求的修改入口)。
+
+运行 `pnpm check:dependencies` 检查导入、目录依赖和可执行模块循环。当前迁移违规清单为空。core 不得引用 application/config/plugins/runtimes/infrastructure，内部模块也不能通过包根导入绕过规则。
+
+### 发布进程入口
+
+`pnpm build` 生成包根与 CLI 入口，并保留 `dist/adapters/ray/{node-worker,jobs-entry,jobs-retry-entry,jobs-gateway}.js`、Ray 的 `python/requirements.txt`、`dist/adapters/harness/pi/` 独立运行包及 `dist/adapters/harness/agentx/assets/ascend_metrics.py`。现有部署路径仍可用，仓库内部引用改用新目录。生成的入口和资源均参与包摘要计算。
+
+将实际打包产物及运行依赖安装到 checkout 外的目录后，从仓库执行 `node scripts/verify-distribution.mjs <安装后的包目录>`。目标目录不能带 src 或 scripts。检查覆盖 CLI、包名导入的 SDK 执行/报告、Pi 协议、worker 任务/镜像维护/版本拒绝、Jobs 输入处理与 gateway、AgentX Python 启动。可通过 OPENSSL_BIN 和 PYTHON_BIN 指定工具；缺失工具会明确记为跳过。该受控检查不替代真实 Docker、Ray、NPU 和模型验收。
+
 ## 插件种类
 
 组件可选提供实时活动：Solver 通过 `AttemptContext.activity?.({ message, lines, activity })` 报告模型/工具活动；Environment 的 `materialize` 第四参数、`prepare` 第五参数和 `installRuntime` 第四参数提供相同回调。原 `onImageReady` 参数位置和语义不变；未实现回调的插件仍可运行。`ActivityListener`、`ComponentActivity` 从包根导出。
@@ -26,7 +38,7 @@ Benchmark 的 `resolveSource`、`enumerate` 第三参数及 `prepare`、`planRun
 
 Cordis 负责加载插件模块，模块通过 `ctx.evaluator.register()` 注册组件。一个模块可以注册多种组件，实验配置再按 `name` 选择使用哪一个。
 
-记录型 Benchmark 的定义放在 `src/plugins/benchmarks/definitions/`：各题库文件负责题目转换和选择评分入口，`records.ts` 负责记录校验与任务构造，`prompts.ts` 保存题目提示词。评分实现放在同目录的 `scoring/` 中，按答案匹配、生成式选择题、概率评分、模型裁判和代码执行划分；DROP 这类复杂算法可单独保留。新增题库时优先使用已有评分机制，不要求每个题库都新增一个 `*-score.ts`。评分属于 Benchmark 的业务规则，不因文件名含 score 就改成独立 Verifier 插件。
+记录型 Benchmark 的定义放在 `src/plugins/benchmarks/agent-harness/definitions/`：各题库文件负责题目转换和选择评分入口，`records.ts` 负责记录校验与任务构造，`prompts.ts` 保存题目提示词。评分实现放在同目录的 `scoring/` 中，按答案匹配、生成式选择题、概率评分、模型裁判和代码执行划分；DROP 这类复杂算法可单独保留。新增题库时优先使用已有评分机制，不要求每个题库都新增一个 `*-score.ts`。评分属于 Benchmark 的业务规则，不因文件名含 score 就改成独立 Verifier 插件。
 
 
 | 种类            | 职责与接口                                                                | 内置实现                                                                   |
