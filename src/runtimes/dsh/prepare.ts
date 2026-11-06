@@ -9,7 +9,7 @@ import { canonicalJson } from "../../core/results/run-manifest.js";
 import { AgentBundleError, cliJson, parseInstalledBundle, parseVerifiedBundle, type VerifiedBundle } from "../agentbundle/cli.js";
 import { DSH_VERSION } from "./runtime.js";
 
-import { DSH_AUTH_ENV, type DshPermissionMode, dshModelSettings, dshPermissionPatch } from "./model.js";
+import { DSH_AUTH_ENV, type DshPermissionMode, dshModelPatch, dshPermissionPatch } from "./model.js";
 import { consumeDsh } from "./protocol.js";
 
 import { acquireRuntimeLock } from "../../infrastructure/runtime-installation/lock.js";
@@ -43,17 +43,17 @@ export async function prepareDsh(
   // Isolated environments expose the model API at a mapped loopback endpoint;
   // the original configured endpoint stays authoritative in run records.
   const mapping = session.modelEndpoint;
-  const modelSettings =
+  const modelPatch =
     mapping && preparation.model.endpoint === mapping.originEndpoint
-      ? dshModelSettings({ ...preparation.model, endpoint: mapping.baseUrl })
-      : dshModelSettings(preparation.model);
+      ? dshModelPatch({ ...preparation.model, endpoint: mapping.baseUrl })
+      : dshModelPatch(preparation.model);
   // Preserve existing cache identities when the default profile is used.
   const identity = createHash("sha256")
     .update(
       canonicalJson({
         candidate,
         runtime: runtime.identity,
-        settings: modelSettings,
+        modelPatch,
         permissions: permissionPatch,
         ...(profile === "evaluator" ? {} : { profile }),
       }),
@@ -125,18 +125,19 @@ export async function prepareDsh(
     if (installed.home !== home || installed.profile !== profile)
       throw new AgentBundleError("SOLVER_PROTOCOL_INVALID", "CLI installed outside the requested home or profile");
     await mkdir(context.paths.agent, { recursive: true });
-    const settings = join(context.paths.agent, "model-settings.yaml");
+    const modelFile = join(context.paths.agent, "model.patch.yaml");
     const permissions = join(context.paths.agent, "permissions.patch.yaml");
-    await writeFile(settings, modelSettings, { mode: 0o600 });
+    await writeFile(modelFile, modelPatch, { mode: 0o600 });
     await writeFile(permissions, permissionPatch, { mode: 0o600 });
     const patch = path(state, "permissions.patch.yaml");
+    const modelOverlay = path(state, "model.patch.yaml");
     if (customHome) {
       // This user-selected host directory is outside the environment's
       // managed upload roots; only the local solver writes these two files.
-      await writeHomeConfig(path(home, "settings.yaml"), modelSettings);
+      await writeHomeConfig(modelOverlay, modelPatch);
       await writeHomeConfig(patch, permissionPatch);
     } else {
-      await session.upload(settings, path(home, "settings.yaml"), context.signal);
+      await session.upload(modelFile, modelOverlay, context.signal);
       await session.upload(permissions, patch, context.signal);
     }
     context.signal.throwIfAborted();
@@ -151,7 +152,8 @@ export async function prepareDsh(
         start(
           {
             executable: node,
-            args: [...(local && preparation.localDsh ? [] : ["--import", outputHook]), dsh, "--profile", profile, "--patch", patch, "--json"],
+            args: [...(local && preparation.localDsh ? [] : ["--import", outputHook]), dsh, "--profile", profile,
+              "--patch", modelOverlay, "--patch", patch, "--json"],
             cwd: session.workdir,
             env: { ...env, [DSH_AUTH_ENV]: preparation.auth.value, EVALUATOR_DSH_OUTPUT_DIR: session.agentOutputDir },
             inheritEnv: false,

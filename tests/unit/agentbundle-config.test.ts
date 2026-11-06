@@ -1,17 +1,17 @@
 import { expect, test } from "vitest";
 import { parseInstalledBundle } from "../../src/runtimes/agentbundle/cli.js";
 import { parse } from "yaml";
-import { dshModelSettings } from "../../src/runtimes/dsh/model.js";
+import { dshModelPatch } from "../../src/runtimes/dsh/model.js";
 import { agentBundleModel, parseAgentBundleConfig } from "../../src/plugins/solvers/agentbundle.js";
 
 const model = { name: "office-model", endpoint: "https://example.invalid/v1", provider: null, api: "openai-completions" };
 
-test("binds agentbundle.maxTokens into the DSH model settings", () => {
+test("binds agentbundle.maxTokens into the DSH provider patch", () => {
   const config = parseAgentBundleConfig({ path: "bundle", maxTokens: 131072 });
   expect(config).toEqual({ path: "bundle", maxTokens: 131072 });
 
-  const settings = parse(dshModelSettings(agentBundleModel(model, config.maxTokens, "default")));
-  expect(settings["llm-pi-ai"].providers["ember-evaluator"].models).toEqual([
+  const patch = parse(dshModelPatch(agentBundleModel(model, config.maxTokens, "default")));
+  expect(patch.find((entry: { id: string }) => entry.id === "llm-pi-ai").config.providers["ember-evaluator"].models).toEqual([
     { id: "office-model", maxTokens: 131072 },
   ]);
   expect(agentBundleModel(model, undefined, "default")).toBe(model);

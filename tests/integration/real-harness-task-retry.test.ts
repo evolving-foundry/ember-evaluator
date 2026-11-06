@@ -7,7 +7,7 @@ import { expect, test } from "vitest";
 import { runEngine } from "../../src/application/run-engine.js";
 import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
 import { consumeJiuwenswarm } from "../../src/runtimes/jiuwenswarm/protocol.js";
-import { dshModelSettings, dshPermissionPatch } from "../../src/runtimes/dsh/model.js";
+import { dshModelPatch, dshPermissionPatch } from "../../src/runtimes/dsh/model.js";
 import type { ProcessHandle } from "../../src/core/contracts/environment.js";
 import { harness } from "../fixtures/engine/fakes.js";
 
@@ -99,9 +99,10 @@ async function exercise(solver: Solver, fault: Fault) {
       await Promise.all([(async () => { for await (const _ of config.stdout) {} })(), (async () => { for await (const _ of config.stderr) {} })()]);
       expect((await config.done).code, setup.stderr).toBe(0);
       expect(setup.stdout).toContain("id: llm-retry");
-      await writeFile(join(home, "settings.yaml"), dshModelSettings({ name: "gpt-4.1", endpoint, provider: "openai", api: "openai-completions" }));
+      await writeFile(join(home, "model.patch.yaml"), dshModelPatch({ name: "gpt-4.1", endpoint, provider: "openai", api: "openai-completions" }));
       await writeFile(join(home, "permissions.yaml"), dshPermissionPatch("danger-full-access"));
-      handle = launch("docker", [...docker, "--import", "/tmp/evaluator-output-hook.mjs", cli, "--profile", "evaluator", "--patch", join(home, "permissions.yaml"), "--json"], session.workdir, env, "Respond FIXTURE_OK without tools.", capture);
+      handle = launch("docker", [...docker, "--import", "/tmp/evaluator-output-hook.mjs", cli, "--profile", "evaluator",
+        "--patch", join(home, "model.patch.yaml"), "--patch", join(home, "permissions.yaml"), "--json"], session.workdir, env, "Respond FIXTURE_OK without tools.", capture);
     }
     try {
       return await (solver === "jiuwenswarm" ? consumeJiuwenswarm(handle, context, "fixture-key")

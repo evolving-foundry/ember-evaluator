@@ -4,7 +4,7 @@ import { AgentBundleError } from "../agentbundle/cli.js";
 
 export const DSH_AUTH_ENV = "EMBER_EVALUATOR_API_KEY";
 
-export function dshModelSettings(model: ModelConfig): string {
+export function dshModelPatch(model: ModelConfig): string {
   if (model.endpoint === null && (model.provider === "amazon-bedrock" || model.provider === "azure-openai")) {
     throw new AgentBundleError(
       "CONFIG_INVALID",
@@ -15,13 +15,13 @@ export function dshModelSettings(model: ModelConfig): string {
     model.endpoint === null &&
     (model.provider === "deepseek-official" || (model.provider === "deepseek" && model.api === null))
   ) {
-    return stringify({
-      "agent-default-model": { provider: "deepseek-official", model: model.name },
-      "llm-deepseek": {
+    return stringify([
+      { id: "agent-default-model", config: { provider: "deepseek-official", model: model.name } },
+      { id: "llm-deepseek", config: {
         apiKeyEnv: DSH_AUTH_ENV,
         ...(model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens }),
-      },
-    });
+      } },
+    ]);
   }
   if (model.endpoint !== null) {
     const url = new URL(model.endpoint);
@@ -36,9 +36,9 @@ export function dshModelSettings(model: ModelConfig): string {
   } else if (!model.provider) throw new AgentBundleError("CONFIG_INVALID", "a provider is required without an endpoint");
   const provider = model.endpoint !== null ? "ember-evaluator" : model.provider;
   if (!provider) throw new AgentBundleError("CONFIG_INVALID", "a provider is required without an endpoint");
-  return stringify({
-    "agent-default-model": { provider, model: model.name },
-    "llm-pi-ai": {
+  return stringify([
+    { id: "agent-default-model", config: { provider, model: model.name } },
+    { id: "llm-pi-ai", config: {
       providers: {
         [provider]: {
           apiKeyEnv: DSH_AUTH_ENV,
@@ -47,8 +47,8 @@ export function dshModelSettings(model: ModelConfig): string {
           models: [{ id: model.name, ...(model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens }) }],
         },
       },
-    },
-  });
+    } },
+  ]);
 }
 
 export type DshPermissionMode = "workspace-write" | "danger-full-access";
