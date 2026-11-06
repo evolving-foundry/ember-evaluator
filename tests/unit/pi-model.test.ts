@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { expect, test } from "vitest";
-import { createHarnessModel, serviceOutputBudget } from "../../src/adapters/harness/pi/model.js";
+import { createHarnessModel, serviceOutputBudget } from "../../src/runtimes/pi/model.js";
 
 test("custom endpoints preserve recognized Harness model metadata", async () => {
   const runtime = await ModelRuntime.create({ credentials: new InMemoryCredentialStore(), modelsPath: null, refreshOnCreate: false });

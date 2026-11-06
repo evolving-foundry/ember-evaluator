@@ -1,4 +1,4 @@
-import { attemptTimeoutKind } from "../../src/core/evaluation-outcome.js";
+import { attemptTimeoutKind } from "../../src/core/results/evaluation-outcome.js";
 import { afterEach, expect, test, vi } from "vitest";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,22 +23,22 @@ vi.mock("node:fs", async importOriginal => {
   };
 });
 import { harness, source } from "../fixtures/engine/fakes.js";
-import { runTask } from "../../src/core/run-task.js";
-import { runEngine } from "../../src/core/engine.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { runEngine } from "../../src/application/run-engine.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
 import { VerificationError } from "../../src/index.js";
-import { consumeDsh } from "../../src/adapters/harness/dsh/protocol.js";
-import { planResume } from "../../src/core/resume.js";
+import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
+import { planResume } from "../../src/core/recovery/resume.js";
 import { QualityScoreMetrics } from "../../src/plugins/metrics/quality-score.js";
 import { HarborScoreMetrics } from "../../src/plugins/metrics/harbor-score.js";
 import { SuccessRateMetrics } from "../../src/plugins/metrics/success-rate.js";
 import { MarkdownReporter } from "../../src/plugins/reporters/markdown.js";
-import { scoreHarborEvidence } from "../../src/plugins/benchmarks/protocols/harbor/verify.js";
-import { saveReport } from "../../src/report.js";
+import { scoreHarborEvidence } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/verify.js";
+import { saveReport } from "../../src/application/report/index.js";
 
 const resources: { root: string; value: ReturnType<typeof harness> }[] = [];
 async function fixture(options: Parameters<typeof harness>[1] = {}) {

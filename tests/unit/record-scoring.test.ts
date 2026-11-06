@@ -1,17 +1,17 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { completeJudge } from "../../src/adapters/models/judge.js";
-import { simpleqaDefinition } from "../../src/plugins/benchmarks/definitions/simpleqa.js";
-import { healthbenchDefinition } from "../../src/plugins/benchmarks/definitions/healthbench.js";
-import { scoreDrop } from "../../src/plugins/benchmarks/definitions/scoring/drop.js";
-import { dropDefinition } from "../../src/plugins/benchmarks/definitions/drop.js";
-import { assertAttemptRecord, assertVerifyResult } from "../../src/core/record-validation.js";
-import { finalizeAttemptOutcome } from "../../src/core/evaluation-outcome.js";
+import { completeJudge } from "../../src/infrastructure/models/judge.js";
+import { simpleqaDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/simpleqa.js";
+import { healthbenchDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/healthbench.js";
+import { scoreDrop } from "../../src/plugins/benchmarks/agent-harness/definitions/scoring/drop.js";
+import { dropDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/drop.js";
+import { assertAttemptRecord, assertVerifyResult } from "../../src/core/results/record-validation.js";
+import { finalizeAttemptOutcome } from "../../src/core/results/evaluation-outcome.js";
 import { computeSuccessRate } from "../../src/plugins/metrics/success-rate.js";
 import { QualityScoreMetrics } from "../../src/plugins/metrics/quality-score.js";
 import { mixedSnapshot } from "../fixtures/results/mixed-run/fixture.js";
 import { VerificationError } from "../../src/index.js";
 
-vi.mock("../../src/adapters/models/judge.js", () => ({ completeJudge: vi.fn() }));
+vi.mock("../../src/infrastructure/models/judge.js", () => ({ completeJudge: vi.fn() }));
 beforeEach(() => vi.mocked(completeJudge).mockReset());
 const context = { dockerExecutable: "docker", judgeService: "judge", judge: {
   model: { name: "judge-model", endpoint: "https://judge.invalid", provider: null, api: "openai-completions" },

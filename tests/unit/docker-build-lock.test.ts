@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { DockerBuildCache } from "../../src/plugins/environments/docker-build-cache.js";
+import { DockerBuildCache } from "../../src/infrastructure/containers/build-cache.js";
 
 let root: string;
 beforeEach(async () => {

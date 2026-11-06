@@ -2,8 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { DockerEnvironment, runDockerCommand } from "../../src/plugins/environments/docker.js";
-import { PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
 
 test.skipIf(process.env.EVALUATOR_TEST_DOCKER !== "1").each(["solve", "verify"] as const)(
   "%s exposes the task CPU budget to nproc and Node, including children and restart",

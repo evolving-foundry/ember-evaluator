@@ -2,21 +2,22 @@ import { join, resolve } from "node:path";
 import { Context } from "@deepseek-ai/cordis";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { bootstrap } from "../../src/bootstrap.js";
-import { loadConfig as readConfig } from "../../src/config/load.js";
+import { bootstrap } from "../../src/application/plugins/bootstrap.js";
+import { loadConfig as readConfig } from "../../src/application/config.js";
 // These tests exercise assembly validation separately from structural configuration loading.
 const loadConfig = (path: string, overrides: Parameters<typeof readConfig>[1], env: Parameters<typeof readConfig>[2]) =>
   readConfig(path, overrides, { FIXTURE_KEY: "fixture-secret", ...env }, { validatePlugins: false });
 import { loadPluginPatch, resolvePlugin } from "../../src/config/plugin-patch.js";
-import { apply as registryPlugin } from "../../src/core/registry.js";
-import { LocalEnvironment } from "../../src/plugins/environments/local.js";
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
-import { PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
+import { apply as registryPlugin } from "../../src/application/plugins/registry.js";
+import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { SimpleAgentSolver } from "../../src/plugins/solvers/simpleagent.js";
-import { HarborBenchmark } from "../../src/plugins/benchmarks/protocols/harbor/index.js";
+import { HarborBenchmark } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/index.js";
 import { mixedSnapshot } from "../fixtures/results/mixed-run/fixture.js";
-import { PACKAGE_RUNTIME_ID, loadPackageDigest } from "../../src/core/package-provenance.js";
+import { PACKAGE_RUNTIME_ID } from "../../src/core/results/runtime-identity.js";
+import { loadPackageDigest } from "../../src/infrastructure/provenance/package.js";
 
 type FixtureState = {
   created: string[];

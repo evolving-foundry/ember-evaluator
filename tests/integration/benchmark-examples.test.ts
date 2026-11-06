@@ -1,13 +1,13 @@
-vi.mock("../../src/adapters/network/doctor.js", () => ({ diagnoseNetwork: async () => [] }));
+vi.mock("../../src/application/diagnostics/network.js", () => ({ diagnoseNetwork: async () => [] }));
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, test, vi } from "vitest";
 import { stringify } from "yaml";
-import { loadConfig } from "../../src/config/load.js";
-import { bootstrapBenchmark } from "../../src/bootstrap.js";
-import { runCli } from "../../src/cli.js";
+import { loadConfig } from "../../src/application/config.js";
+import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
+import { runCli } from "../../src/cli/main.js";
 import { assertSourceLock } from "../../src/index.js";
 
 const examples = fileURLToPath(new URL("../fixtures/benchmark-examples/", import.meta.url));

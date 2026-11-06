@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { runCli } from "../../src/cli.js";
+import { runCli } from "../../src/cli/main.js";
 
 test("cleanup loads only scheduler and environment, without dataset, Solver, model key or result allocation", async () => {
   const root = await mkdtemp(join(tmpdir(), "cleanup-cli-test-"));

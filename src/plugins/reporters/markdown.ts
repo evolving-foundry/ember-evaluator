@@ -1,14 +1,14 @@
 import type { Reporter, ReportContext, TaskReportTarget } from "../../core/contracts/reporter.js";
 import type { MetricResults } from "../../core/contracts/metrics.js";
 import type { ResultSnapshot } from "../../core/contracts/result.js";
-import { safeTaskKey } from "../../core/artifacts.js";
+import { safeTaskKey } from "../../core/artifacts/artifacts.js";
 import { redactSecrets } from "../../config/redact.js";
 import { selectedRecords } from "../metrics/records.js";
-import { attemptStatus, attemptTimeoutKind, evaluationScore, isAgentTimeout, isEvaluationComplete, isInvalidEvaluation, hasUnconfirmedCleanup } from "../../core/evaluation-outcome.js";
+import { attemptStatus, attemptTimeoutKind, evaluationScore, isAgentTimeout, isEvaluationComplete, isInvalidEvaluation, hasUnconfirmedCleanup } from "../../core/results/evaluation-outcome.js";
 import { renderAgentXTables } from "./agentx-tables.js";
 import { renderKernelTables } from "./kernel-tables.js";
-import { expectRecord } from "../../config/schema.js";
-import { parseAgentXSummary } from "../../adapters/harness/agentx/protocol.js";
+import { expectRecord } from "../../core/validation/input.js";
+import { parseAgentXSummary } from "../benchmarks/inference-engine/agentx/evidence/summary.js";
 import { escaped, readableDuration, renderMetrics } from "./fields.js";
 
 export function renderMarkdown(snapshot: ResultSnapshot, metrics: MetricResults, evidenceRoot = ""): string {

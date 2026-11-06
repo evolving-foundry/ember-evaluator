@@ -2,10 +2,10 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import type { RunComponents } from "../../../src/core/contracts/components.js";
-import type { LoadedConfig } from "../../../src/config/schema.js";
+import type { LoadedConfig } from "../../../src/config/loaded.js";
 import type { EnvironmentSession, PublicTask, SourceLock } from "../../../src/index.js";
 import { LocalRunStore } from "../../../src/plugins/stores/local.js";
-import { LocalScheduler } from "../../../src/plugins/schedulers/local.js";
+import { LocalScheduler } from "../../../src/plugins/schedulers/local/scheduler.js";
 import { trajectoryLines } from "../results/store-fixture.js";
 
 export const source: SourceLock = { source: "fixture", revision: "immutable", files: [], metadata: {} };

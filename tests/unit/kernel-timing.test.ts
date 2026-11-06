@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
-import { parseKernelTimingEvidence, auditKernelTimingSample } from "../../src/plugins/benchmarks/protocols/kernel/timing.js";
+import { parseKernelTimingEvidence, auditKernelTimingSample } from "../../src/plugins/benchmarks/operator/kernel/timing.js";
 
 const fixture = JSON.parse(readFileSync(new URL("../fixtures/kernel-timing-flow.json", import.meta.url), "utf8")) as { csv: string; trace: string; traceHostDirect: string; traceHostQueued: string };
 const hash = (bytes: string): string => createHash("sha256").update(bytes).digest("hex");

@@ -1,18 +1,19 @@
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { networkDocument } from "../../src/config/network.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { networkDocument } from "../../src/config/network-schema.js";
 import type { SpawnOptions } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 
-import { buildFileManifest } from "../../src/core/artifacts.js";
+import { buildFileManifest } from "../../src/core/artifacts/artifacts.js";
 import type { JsonValue } from "../../src/core/contracts/task.js";
-import { fingerprintConfig } from "../../src/core/run-manifest.js";
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
-import { DockerComposeProject } from "../../src/plugins/environments/docker-compose.js";
-import { DockerRuntime, PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
-import { readDirectoryModes } from "../../src/adapters/filesystem/directory-modes.js";
+import { fingerprintConfig } from "../../src/core/results/run-manifest.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { DockerComposeProject } from "../../src/infrastructure/containers/compose.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
+import { readDirectoryModes } from "../../src/infrastructure/filesystem/directory-modes.js";
 import { DocOpsDockerEnvironment, parseDocOpsDockerConfig } from "../../plugins/docops/index.js";
 
 // These cases spawn a real Node CLI for Docker queries, including ownership inspection.

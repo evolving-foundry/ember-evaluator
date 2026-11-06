@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { dockerImageUser } from "../../src/plugins/environments/docker-image-user.js";
+import { dockerImageUser } from "../../src/infrastructure/containers/image-user.js";
 
 test.each(["", "root", "nobody", "1001:1002", "app:workers"])("preserves the declared image USER %j", async user => {
   expect(await dockerImageUser(async () => ({ stdout: JSON.stringify(user), stderr: "" }), "sha256:fixture", "linux/amd64", AbortSignal.timeout(1000))).toBe(user || "0");

@@ -4,9 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { RuntimeInstallation } from "../../src/core/contracts/environment.js";
-import { DockerRuntime, PINNED_NODE_IMAGE, type DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { DockerSolverRuntime } from "../../src/plugins/environments/docker-solver-runtime.js";
-import { runDockerCommand } from "../../src/plugins/environments/docker.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { PINNED_NODE_IMAGE, type DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { DockerSolverRuntime } from "../../src/infrastructure/containers/solver-runtime.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
 
 test.skipIf(process.env.EVALUATOR_TEST_DOCKER !== "1")(
   "shared runtime permissions allow different task users to read, execute and write separate state",

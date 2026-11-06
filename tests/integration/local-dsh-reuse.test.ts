@@ -3,17 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { AgentBundleSolver } from "../../src/plugins/solvers/agentbundle.js";
-import { LocalEnvironment } from "../../src/plugins/environments/local.js";
+import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
 
 // The SDK boundary is controlled; environment, runtime resolution, subprocesses,
 // candidate installation and local runtime invocation are real.
 const fixture = vi.hoisted(() => ({ runner: "", version: "0.1.6-alpha.2" }));
-vi.mock("../../src/adapters/agentbundle/sdk.js", () => ({
+vi.mock("../../src/runtimes/agentbundle/sdk.js", () => ({
   AGENT_BUNDLE_CORE_VERSION: "fixture", agentBundleCoreRoot: "unused",
   assertHarnessVersionCompatible: (actual: string, range: string) => { if (actual !== range) throw Error("SOURCE_CHANGED"); },
   verifyBundleCandidate: async (root: string) => ({ digest: root, harness: { name: "dsh", versionRange: fixture.version } }),
 }));
-vi.mock("../../src/adapters/agentbundle/runtime-files.js", () => ({
+vi.mock("../../src/runtimes/agentbundle/runtime-files.js", () => ({
   agentBundleRuntimeFiles: async () => [{ source: fixture.runner, target: "agentbundle/run.mjs" }],
   agentBundleVersionProbe: () => ({ executable: "node", args: ["--eval", "process.exit(0)"] }),
   hashRuntimeSource: async (hash: { update(value: string): void }) => { hash.update("fixture-assets"); },

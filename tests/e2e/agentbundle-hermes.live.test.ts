@@ -3,9 +3,9 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
-import { LocalEnvironment } from "../../src/plugins/environments/local.js";
+import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
 import { AgentBundleSolver } from "../../src/plugins/solvers/agentbundle.js";
-import { validateSequence, type TrajectoryEvent } from "../../src/adapters/harness/pi/trajectory.js";
+import { validateSequence, type TrajectoryEvent } from "../../src/core/artifacts/trajectory.js";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
 
 const bundlePath = process.env.HERMES_BUNDLE_PATH ?? resolve("tests/fixtures/agentbundle/hermes");

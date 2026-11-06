@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
 import { loadNetworkConfig } from "../../src/config/network.js";
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
 
 test("downloads use the environment proxy instead of YAML routes and noProxy", async () => {
   const directory = await mkdtemp(join(tmpdir(), "network-env-proxy-"));

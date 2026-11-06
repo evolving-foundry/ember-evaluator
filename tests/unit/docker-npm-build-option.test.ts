@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { dockerBuildNetwork } from "../../src/adapters/containers/build-network.js";
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { networkDocument } from "../../src/config/network.js";
+import { dockerBuildNetwork } from "../../src/infrastructure/containers/build-network.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { networkDocument } from "../../src/config/network-schema.js";
 
 test("npm registry reaches package managers and participates in build identity", () => {
   const ordinary = dockerBuildNetwork(new NetworkRuntime(networkDocument({}, {})));

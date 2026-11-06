@@ -1,5 +1,5 @@
 import type { Context } from "@deepseek-ai/cordis";
-import { expectRecord, rejectUnknown } from "../config/schema.js";
+import { expectRecord, rejectUnknown } from "../core/validation/input.js";
 import { SuccessRateMetrics } from "./metrics/success-rate.js";
 import { DurationMetrics } from "./metrics/duration.js";
 import { UsageMetrics } from "./metrics/usage.js";

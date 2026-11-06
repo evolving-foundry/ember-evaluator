@@ -3,16 +3,16 @@ import { dirname, join, resolve } from "node:path";
 import { expect, test, vi } from "vitest";
 import { stringify } from "yaml";
 import { writeFile } from "node:fs/promises";
-import { startLocalProcess } from "../../src/plugins/environments/process.js";
-import { normalizeAgentXExport, parseAgentXSummary, parseWorkload } from "../../src/adapters/harness/agentx/protocol.js";
-import { loadConfig } from "../../src/config/load.js";
-import { bootstrap } from "../../src/bootstrap.js";
-import { runEngine } from "../../src/core/engine.js";
-import { rebuildReport, saveReport } from "../../src/report.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
-import { planResume } from "../../src/core/resume.js";
-import { normalizeTelemetry, parseTelemetryConfig } from "../../src/adapters/harness/agentx/telemetry.js";
-import { parseNetworkLatencyConfig } from "../../src/adapters/harness/agentx/network-latency.js";
+import { startLocalProcess } from "../../src/infrastructure/process/local.js";
+import { normalizeAgentXExport, parseAgentXSummary, parseWorkload } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/summary.js";
+import { loadConfig } from "../../src/application/config.js";
+import { bootstrap } from "../../src/application/plugins/bootstrap.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { rebuildReport, saveReport } from "../../src/application/report/index.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
+import { planResume } from "../../src/core/recovery/resume.js";
+import { normalizeTelemetry, parseTelemetryConfig } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/telemetry.js";
+import { parseNetworkLatencyConfig } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/network-latency.js";
 
 // Opt-in: default tests neither install Python packages nor download tokenizers.
 const python = process.env.AGENTX_TEST_PYTHON;
@@ -21,7 +21,7 @@ test.skipIf(!python).each(["automatic", "manual"])("real AgentX exports raw and 
   await mkdir(".scratch", { recursive: true });
   const root = await mkdtemp(resolve(".scratch/agentx-network-"));
   const handle = await startLocalProcess({ executable: python ?? "python", args: [resolve("tests/fixtures/agentx/check-bridge.py"),
-    root, resolve("src/adapters/harness/agentx/assets/runner.py"), `--network-${mode}`], cwd: resolve("."),
+    root, resolve("src/runtimes/agentx/assets/runner.py"), `--network-${mode}`], cwd: resolve("."),
     env: { PYTHONDONTWRITEBYTECODE: "1", PYTHONUNBUFFERED: "1", PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" }, input: null }, AbortSignal.timeout(120000));
   const collect = async (stream: AsyncIterable<Uint8Array>) => {
     const chunks: Buffer[] = []; for await (const bytes of stream) chunks.push(Buffer.from(bytes));
@@ -49,7 +49,7 @@ test.skipIf(!python).each([false, true])("real AgentX preserves phase metrics, c
   await mkdir(".scratch", { recursive: true });
   const root = await mkdtemp(resolve(".scratch/agentx-real-telemetry-"));
   const handle = await startLocalProcess({ executable: python ?? "python", args: [resolve("tests/fixtures/agentx/check-bridge.py"),
-    root, resolve("src/adapters/harness/agentx/assets/runner.py"), "--full-replay", "--telemetry", ...(failure ? ["--telemetry-error"] : [])], cwd: resolve("."),
+    root, resolve("src/runtimes/agentx/assets/runner.py"), "--full-replay", "--telemetry", ...(failure ? ["--telemetry-error"] : [])], cwd: resolve("."),
     env: { PYTHONDONTWRITEBYTECODE: "1", PYTHONIOENCODING: "utf-8" }, input: null }, AbortSignal.timeout(120000));
   const collect = async (stream: AsyncIterable<Uint8Array>) => {
     const chunks: Buffer[] = []; for await (const bytes of stream) chunks.push(Buffer.from(bytes));
@@ -78,7 +78,7 @@ test.skipIf(!python)("full replay covers the first selected traces and their chi
   await mkdir(".scratch", { recursive: true });
   const root = await mkdtemp(resolve(".scratch/agentx-full-replay-"));
   const handle = await startLocalProcess({ executable: python ?? "python", args: [resolve("tests/fixtures/agentx/check-bridge.py"),
-    root, resolve("src/adapters/harness/agentx/assets/runner.py"), "--full-replay"], cwd: resolve("."),
+    root, resolve("src/runtimes/agentx/assets/runner.py"), "--full-replay"], cwd: resolve("."),
     env: { PYTHONDONTWRITEBYTECODE: "1", PYTHONUNBUFFERED: "1", PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" }, input: null }, AbortSignal.timeout(120000));
   const collect = async (stream: AsyncIterable<Uint8Array>) => {
     const chunks: Buffer[] = []; for await (const bytes of stream) chunks.push(Buffer.from(bytes));
@@ -106,7 +106,7 @@ test.skipIf(!python).each([false, true])("real AgentX loads the locked corpus an
   await mkdir(".scratch", { recursive: true });
   const root = await mkdtemp(resolve(".scratch/agentx-real-"));
   const handle = await startLocalProcess({ executable: python ?? "python",
-    args: [resolve("tests/fixtures/agentx/check-bridge.py"), root, resolve("src/adapters/harness/agentx/assets/runner.py"), ...(concurrency ? ["--smoke-concurrency"] : [])],
+    args: [resolve("tests/fixtures/agentx/check-bridge.py"), root, resolve("src/runtimes/agentx/assets/runner.py"), ...(concurrency ? ["--smoke-concurrency"] : [])],
     cwd: resolve("."), env: { PYTHONDONTWRITEBYTECODE: "1", PYTHONUNBUFFERED: "1", PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" }, input: null }, AbortSignal.timeout(120000));
   const collect = async (stream: AsyncIterable<Uint8Array>) => {
     const chunks: Buffer[] = []; for await (const bytes of stream) chunks.push(Buffer.from(bytes));
@@ -133,7 +133,7 @@ test.skipIf(!python)("Evaluator runs a 60-second YAML window through the real Ha
   await mkdir(".scratch", { recursive: true });
   const root = await mkdtemp(resolve(".scratch/agentx-e2e-"));
   const helper = await startLocalProcess({ executable: python ?? "python", args: [resolve("tests/fixtures/agentx/check-bridge.py"),
-    root, resolve("src/adapters/harness/agentx/assets/runner.py"), "--serve", "--standard-duration"], cwd: resolve("."),
+    root, resolve("src/runtimes/agentx/assets/runner.py"), "--serve", "--standard-duration"], cwd: resolve("."),
     env: { PYTHONDONTWRITEBYTECODE: "1", PYTHONUNBUFFERED: "1", PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" }, input: null }, AbortSignal.timeout(120000));
   const diagnostics = (async () => { for await (const _chunk of helper.stderr) { /* Drain tokenizer diagnostics. */ } })();
   let components: Awaited<ReturnType<typeof bootstrap>> | undefined;
@@ -162,7 +162,7 @@ test.skipIf(!python)("Evaluator runs a 60-second YAML window through the real Ha
     // Use the already installed, pinned test interpreter. The real installer
     // recipe is exercised when preparing the validation environment separately.
     const runtime = join(root, "runtime"); await mkdir(runtime);
-    await cp(resolve("src/adapters/harness/agentx/assets"), join(runtime, "bridge"), { recursive: true });
+    await cp(resolve("src/runtimes/agentx/assets"), join(runtime, "bridge"), { recursive: true });
     await symlink(dirname(dirname(resolve(python ?? "python"))), join(runtime, "venv"), process.platform === "win32" ? "junction" : "dir");
     components.solver.runtimeInstallation = async () => ({ id: "agentx-controlled-runtime", files: [], commands: [], probes: [], localRoot: runtime });
     const snapshot = await runEngine({ components, config, signal: AbortSignal.timeout(90000) });

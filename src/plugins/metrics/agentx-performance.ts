@@ -1,9 +1,9 @@
 import type { Metrics } from "../../core/contracts/metrics.js";
 import type { ResultSnapshot } from "../../core/contracts/result.js";
 import type { JsonValue } from "../../core/contracts/task.js";
-import { parseAgentXSummary } from "../../adapters/harness/agentx/protocol.js";
+import { parseAgentXSummary } from "../benchmarks/inference-engine/agentx/evidence/summary.js";
 import { selectedRecords } from "./records.js";
-import { attemptStatus, isEvaluationComplete } from "../../core/evaluation-outcome.js";
+import { attemptStatus, isEvaluationComplete } from "../../core/results/evaluation-outcome.js";
 
 export class AgentXPerformanceMetrics implements Metrics {
   readonly name = "agentx-performance";

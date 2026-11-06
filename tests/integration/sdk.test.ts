@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { Evaluator, EvaluatorRunError, type EvaluatorRunOptions, type ProgressEvent } from "ember-evaluator";
-import { RayJobsDeployment } from "../../src/adapters/ray/deployment.js";
+import { RayJobsDeployment } from "../../src/application/ray/deployment.js";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
-import * as assembly from "../../src/bootstrap.js";
+import * as assembly from "../../src/application/plugins/bootstrap.js";
 
 const roots: string[] = [];
 afterEach(async () => {

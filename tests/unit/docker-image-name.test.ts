@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { dockerImageName } from "../../src/plugins/environments/docker-image-name.js";
+import { dockerImageName } from "../../src/infrastructure/containers/image-name.js";
 
 test("image names expose task, purpose and kind and stay stable across runs", () => {
   const scope = { taskId: "terminal-bench/atrx-vep-crispr", phase: "solve" as const };

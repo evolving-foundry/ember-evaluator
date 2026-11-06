@@ -4,18 +4,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, expect, test, vi } from "vitest";
-import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/definitions/officeqa-pro-v2/index.js";
-import { officeQAScoringProgram } from "../../src/adapters/verifiers/officeqa/runtime.js";
-import { HuggingFaceSnapshotSource } from "../../src/adapters/datasets/sources/huggingface/snapshot-source.js";
-import { OFFICEQA_DATASET_REVISION } from "../../src/plugins/benchmarks/definitions/officeqa-pro-v2/config.js";
+import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/index.js";
+import { officeQAScoringProgram } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/runtime/runtime.js";
+import { HuggingFaceSnapshotSource } from "../../src/infrastructure/datasets/sources/huggingface/snapshot-source.js";
+import { OFFICEQA_DATASET_REVISION } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/config.js";
 import { officeQAFiles, officeQAHub, fixtureCSV } from "../fixtures/officeqa.js";
-import { loadConfig, loadSavedConfig } from "../../src/config/load.js";
+import { loadConfig, loadSavedConfig } from "../../src/application/config.js";
 import { exportConfig } from "../../src/config/export.js";
 import { stringify } from "yaml";
-import { bootstrapBenchmark } from "../../src/bootstrap.js";
-import { runCli } from "../../src/cli.js";
-import { openPluginRegistry } from "../../src/plugin-runtime.js";
-import { localizePortableSelection, validatePortableSelection } from "../../src/adapters/ray/protocol.js";
+import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
+import { runCli } from "../../src/cli/main.js";
+import { openPluginRegistry } from "../../src/application/plugins/runtime.js";
+import { localizePortableSelection, validatePortableSelection } from "../../src/infrastructure/ray/protocol.js";
 
 const roots: string[] = [];
 const hubs: Awaited<ReturnType<typeof officeQAHub>>[] = [];
@@ -86,7 +86,7 @@ test("Ray nodes authenticate with their own fixed HF_TOKEN after explicit creden
   const registry = await openPluginRegistry();
   try {
     const lookup = (role: string, name: string) => registry.ctx.evaluator.configTransport(role, name);
-    const { projectPortableSelection } = await import("../../src/adapters/ray/protocol.js");
+    const { projectPortableSelection } = await import("../../src/infrastructure/ray/protocol.js");
     const portable = projectPortableSelection({ name: "officeqa-pro-v2", config: { hfToken: "coordinator-token" } }, "benchmark", lookup);
     const selection = localizePortableSelection(portable, "benchmark", { outputRoot: directory }, lookup);
     const config = parseOfficeQAProV2Config(selection.config);
@@ -111,7 +111,7 @@ test.each(["parsed-json", "pdf"] as const)("%s prepares all documents with stabl
   expect(JSON.stringify(task.input)).not.toContain("private-");
   expect(JSON.stringify(task.input)).not.toContain("21.58");
   const build = task.solveEnv.build!;
-  const { buildFileManifest } = await import("../../src/core/artifacts.js");
+  const { buildFileManifest } = await import("../../src/core/artifacts/artifacts.js");
   const manifest = await buildFileManifest(build.context, []);
   expect(manifest.files.map(file => file.path).sort()).toEqual(["Dockerfile", `corpus/public-a.${format === "pdf" ? "pdf" : "json"}`, `corpus/public-b.${format === "pdf" ? "pdf" : "json"}`].sort());
   expect(await readFile(join(build.context, "Dockerfile"), "utf8")).not.toMatch(/reward|csv|TOKEN|private-/);
@@ -198,7 +198,7 @@ test("OfficeQA is discoverable without network and Ray localizes node paths", as
     const lookup = (role: string, name: string) => registry.ctx.evaluator.configTransport(role, name);
     const selection = { name: "officeqa-pro-v2", config: { cacheDir: "/coordinator/cache", dockerExecutable: "/coordinator/docker", corpusFormat: "pdf", hfToken: "coordinator-secret" } };
     // Node-local fields are removed by projection before validation.
-    const { projectPortableSelection } = await import("../../src/adapters/ray/protocol.js");
+    const { projectPortableSelection } = await import("../../src/infrastructure/ray/protocol.js");
     const portable = projectPortableSelection(selection, "benchmark", lookup);
     validatePortableSelection(portable, "benchmark", lookup);
     expect(JSON.stringify(portable)).not.toContain("coordinator");

@@ -1,9 +1,9 @@
 import "../fixtures/network-fetch.js";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { afterEach, expect, test, vi } from "vitest";
-import { GitBlobCache } from "../../src/adapters/datasets/sources/github/blob-cache.js";
-import { loadHarborTrees, repositoryKey } from "../../src/adapters/datasets/sources/github/directories.js";
-import type { GitTreeEntry } from "../../src/adapters/datasets/sources/github/tree.js";
+import { GitBlobCache } from "../../src/infrastructure/datasets/sources/github/blob-cache.js";
+import { loadHarborTrees, repositoryKey } from "../../src/infrastructure/datasets/sources/github/directories.js";
+import type { GitTreeEntry } from "../../src/infrastructure/datasets/sources/github/tree.js";
 
 const directories: string[] = [];
 afterEach(async () => {

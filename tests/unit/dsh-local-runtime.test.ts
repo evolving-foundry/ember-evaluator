@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { inspectLocalDsh, selectLocalDsh } from "../../src/adapters/harness/dsh/local-runtime.js";
+import { inspectLocalDsh, selectLocalDsh } from "../../src/runtimes/dsh/local-runtime.js";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });

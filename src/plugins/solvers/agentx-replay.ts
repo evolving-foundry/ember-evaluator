@@ -1,18 +1,19 @@
 import { writeFile } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { expectNonEmptyString, expectPositiveNumber, expectRecord, rejectUnknown } from "../../config/schema.js";
+import { expectNonEmptyString, expectPositiveNumber, expectRecord, rejectUnknown } from "../../core/validation/input.js";
 import type { EnvironmentSession, RuntimeInstallation, RuntimeRequirement } from "../../core/contracts/environment.js";
 import type { SolveResult } from "../../core/contracts/result.js";
 import type { AttemptContext, PreparedSolver, Solver, SolverProvenance } from "../../core/contracts/solver.js";
 import type { PublicTask } from "../../core/contracts/task.js";
-import { bindSolverService, type ServiceBinding, type PluginFactoryContext } from "../../core/registry.js";
-import { redactDiagnostic } from "../../core/diagnostics.js";
+import { bindSolverService, type ServiceBinding, type PluginFactoryContext } from "../../core/contracts/plugin.js";
+import { redactDiagnostic } from "../../core/errors/diagnostics.js";
 import { StringDecoder } from "node:string_decoder";
-import { AGENTX_VERSION, agentXUsage, normalizeAgentXExport, parseWorkload } from "../../adapters/harness/agentx/protocol.js";
-import { normalizeTelemetry, parseTelemetryConfig, type AgentXTelemetryConfig } from "../../adapters/harness/agentx/telemetry.js";
-import { agentXBridgeDigest, agentXLocalInstallation, lockAgentXLexicon, resolveAgentXPython, type AgentXLexicon } from "../../adapters/harness/agentx/runtime.js";
-import { startHostTelemetry, type HostNpuSampling } from "../../adapters/harness/agentx/host-telemetry.js";
-import { parseNetworkLatencyConfig, type AgentXNetworkLatencyConfig } from "../../adapters/harness/agentx/network-latency.js";
+import { AGENTX_VERSION } from "../../runtimes/agentx/versions.js";
+import { agentXUsage, normalizeAgentXExport, parseWorkload } from "../benchmarks/inference-engine/agentx/evidence/summary.js";
+import { normalizeTelemetry, parseTelemetryConfig, type AgentXTelemetryConfig } from "../benchmarks/inference-engine/agentx/evidence/telemetry.js";
+import { agentXBridgeDigest, agentXLocalInstallation, lockAgentXLexicon, resolveAgentXPython, type AgentXLexicon } from "../../runtimes/agentx/runtime.js";
+import { startHostTelemetry, type HostNpuSampling } from "../../runtimes/agentx/host-telemetry.js";
+import { parseNetworkLatencyConfig, type AgentXNetworkLatencyConfig } from "../benchmarks/inference-engine/agentx/evidence/network-latency.js";
 
 export type AgentXReplayConfig = {
   tokenizer?: string;

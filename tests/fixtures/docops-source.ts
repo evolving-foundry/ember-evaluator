@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import { readFile, readdir } from "node:fs/promises";
 import { relative, resolve, sep } from "node:path";
 
-import { gitBlobHash } from "../../src/adapters/datasets/sources/github/blob-cache.js";
+import { gitBlobHash } from "../../src/infrastructure/datasets/sources/github/blob-cache.js";
 import type { DocOpsTransport } from "../../plugins/docops/index.js";
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";

@@ -8,11 +8,11 @@ import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vite
 import type { AttemptContext, AttemptKey, AttemptPaths, CommandSpec, EnvironmentSession, ProcessHandle } from "../../src/index.js";
 import { AgentBundleSolver } from "../../src/plugins/solvers/agentbundle.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
-import { verifyBundleCandidate } from "../../src/adapters/agentbundle/sdk.js";
+import { verifyBundleCandidate } from "../../src/runtimes/agentbundle/sdk.js";
 import { classifyError } from "../../src/core/errors/classify.js";
-import { formatError } from "../../src/core/diagnostics.js";
-import { bootstrap } from "../../src/bootstrap.js";
-import { loadConfig } from "../../src/config/load.js";
+import { formatError } from "../../src/core/errors/diagnostics.js";
+import { bootstrap } from "../../src/application/plugins/bootstrap.js";
+import { loadConfig } from "../../src/application/config.js";
 
 const API_KEY = "app-dify-service-key";
 const REPO_ROOT = resolve(import.meta.dirname ?? ".").includes("tests")
@@ -164,7 +164,7 @@ beforeAll(async () => {
   await startServer();
   runtimeRoot = join(root, "runtime");
   await mkdir(join(runtimeRoot, "dify"), { recursive: true });
-  await copyFile(join(REPO_ROOT, "src/adapters/harness/dify/assets/runner.mjs"), join(runtimeRoot, "dify/runner.mjs"));
+  await copyFile(join(REPO_ROOT, "src/runtimes/dify/assets/runner.mjs"), join(runtimeRoot, "dify/runner.mjs"));
 });
 
 afterEach(() => { requests = []; onImport = undefined; });

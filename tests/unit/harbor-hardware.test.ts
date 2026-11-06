@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { writeFixture } from "../fixtures/dataset-tasks.js";
-import { loadGenericHarborTask } from "../../src/plugins/benchmarks/protocols/harbor/task.js";
-import { parseHarborConfig } from "../../src/plugins/benchmarks/protocols/harbor/config.js";
-import { HarborBenchmark } from "../../src/plugins/benchmarks/protocols/harbor/harbor-benchmark.js";
+import { loadGenericHarborTask } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/task.js";
+import { parseHarborConfig } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/config.js";
+import { HarborBenchmark } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/harbor-benchmark.js";
 import { HarborShellVerifier } from "../../src/plugins/verifiers/shell.js";
 import type { HardwareKind } from "../../src/core/contracts/hardware.js";
 

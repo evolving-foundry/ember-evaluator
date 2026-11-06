@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
 import { mixedSnapshot } from "../fixtures/results/mixed-run/fixture.js";
-import { runCli } from "../../src/cli.js";
+import { runCli } from "../../src/cli/main.js";
 import { resolvePlugin } from "../../src/config/plugin-patch.js";
-import { rebuildDownloadedReport } from "../../src/adapters/ray/deployment.js";
+import { rebuildDownloadedReport } from "../../src/application/ray/deployment.js";
 import type { JsonValue, RunManifest } from "../../src/index.js";
 
 const roots: string[] = [];

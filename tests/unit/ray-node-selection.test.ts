@@ -3,17 +3,17 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test, vi } from "vitest";
-import { assertRayCapacity } from "../../src/plugins/schedulers/ray.js";
-import { parseRayConfig } from "../../src/plugins/schedulers/ray-config.js";
-import { parseJobsConfig } from "../../src/adapters/ray/jobs-client.js";
-import { JobsClient } from "../../src/adapters/ray/jobs-client.js";
-import { RayClient } from "../../src/adapters/ray/client.js";
-import { RayJobsDeployment } from "../../src/adapters/ray/deployment.js";
-import { assertJsonValue } from "../../src/config/schema.js";
+import { assertRayCapacity } from "../../src/plugins/schedulers/ray/scheduler.js";
+import { parseRayConfig } from "../../src/config/ray.js";
+import { parseJobsConfig } from "../../src/config/jobs.js";
+import { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
+import { RayClient } from "../../src/infrastructure/ray/client.js";
+import { RayJobsDeployment } from "../../src/application/ray/deployment.js";
+import { assertJsonValue } from "../../src/core/validation/input.js";
 
 test("Python driver selection excludes ineligible nodes and freezes a capacity-ordered subset", () => {
   expect(() => execFileSync(process.platform === "win32" ? "python" : "python3", [resolve("tests/fixtures/ray-node-selection-tests.py"),
-    resolve("src/adapters/ray/python/node_selection.py")], { stdio: "pipe", timeout: 10000 })).not.toThrow();
+    resolve("src/infrastructure/ray/python/node_selection.py")], { stdio: "pipe", timeout: 10000 })).not.toThrow();
 });
 
 test("insufficient capacity fails instead of silently lowering requested concurrency", () => {

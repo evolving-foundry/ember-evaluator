@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { crc32, deflateRawSync } from "node:zlib";
 import { afterEach, expect, test, vi } from "vitest";
-import { HttpZipJsonSource } from "../../src/adapters/datasets/sources/http/zip-json-source.js";
-import { readZipJson } from "../../src/adapters/datasets/input-readers/zip-json.js";
-import { LocalZipJsonSource } from "../../src/adapters/datasets/sources/local/zip-json-source.js";
+import { HttpZipJsonSource } from "../../src/infrastructure/datasets/sources/http/zip-json-source.js";
+import { readZipJson } from "../../src/infrastructure/datasets/input-readers/zip-json.js";
+import { LocalZipJsonSource } from "../../src/infrastructure/datasets/sources/local/zip-json-source.js";
 
 const roots: string[] = [];
 afterEach(async () => { vi.unstubAllGlobals(); await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true }))); });

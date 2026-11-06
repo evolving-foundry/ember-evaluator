@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import type { RuntimeInstallation } from "../../src/core/contracts/environment.js";
-import { prepareLocalRuntime } from "../../src/plugins/environments/runtime-installation.js";
+import { prepareLocalRuntime } from "../../src/infrastructure/runtime-installation/install.js";
 
 let python: string | undefined;
 if (process.platform === "win32") {

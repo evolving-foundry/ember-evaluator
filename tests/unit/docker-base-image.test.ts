@@ -2,8 +2,8 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { PINNED_NODE_IMAGE, type DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { resolvePinnedTaskImage } from "../../src/plugins/environments/docker-base-image.js";
+import { PINNED_NODE_IMAGE, type DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { resolvePinnedTaskImage } from "../../src/infrastructure/containers/base-image.js";
 
 const digest = `sha256:${"d".repeat(64)}`;
 const id = `sha256:${"a".repeat(64)}`;

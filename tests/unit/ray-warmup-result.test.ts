@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parseWarmupSummary } from "../../src/adapters/ray/warmup-result.js";
+import { parseWarmupSummary } from "../../src/application/ray/warmup-result.js";
 import { classifyError } from "../../src/core/errors/classify.js";
 
 const summary = { status: "ready", taskIds: ["a"], readyTaskIds: ["a"], failures: [], preparationRounds: [],

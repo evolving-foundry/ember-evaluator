@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
-import { LocalEnvironment } from "../../src/plugins/environments/local.js";
+import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
 import { AgentBundleSolver } from "../../src/plugins/solvers/agentbundle.js";
 
 // ── 可配置项（均可被环境变量覆盖，便于复用其它任务/模型）────────────────
@@ -48,8 +48,8 @@ async function dockerScore(workdir: string): Promise<number> {
       "-v", taskDir + "/tests:/tests",
       "-v", logs + ":/logs/verifier",
       "wb-office-task", "sleep", "infinity"]);
-    run("docker", ["cp", join(resolve("."), "src/adapters/workbuddy/python/score.py"), "wb-verify:/tests/evaluator-office-score.py"]);
-    run("docker", ["cp", join(resolve("."), "src/adapters/workbuddy/python/evaluator_failed_checks.py"), "wb-verify:/tests/evaluator_failed_checks.py"]);
+    run("docker", ["cp", join(resolve("."), "src/infrastructure/workbuddy/python/score.py"), "wb-verify:/tests/evaluator-office-score.py"]);
+    run("docker", ["cp", join(resolve("."), "src/infrastructure/workbuddy/python/evaluator_failed_checks.py"), "wb-verify:/tests/evaluator_failed_checks.py"]);
     const out = run("docker", ["exec", "-w", "/workspace", "wb-verify", "python", "-I", "/tests/evaluator-office-score.py"]);
     console.log("\n=== score.py 输出 ===\n" + out);
     const rewardText = run("docker", ["exec", "wb-verify", "cat", "/logs/verifier/reward.txt"]);

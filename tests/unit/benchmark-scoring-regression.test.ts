@@ -1,13 +1,13 @@
 import { expect, test } from "vitest";
-import { scoreChoice, scoreMmluPro } from "../../src/plugins/benchmarks/definitions/scoring/choices.js";
-import { scoreGsm8k, scoreTrivia } from "../../src/plugins/benchmarks/definitions/scoring/answers.js";
-import { scoreDrop, scoreDropCandidates } from "../../src/plugins/benchmarks/definitions/scoring/drop.js";
-import { mgsmDefinition } from "../../src/plugins/benchmarks/definitions/mgsm.js";
-import { mmluProDefinition } from "../../src/plugins/benchmarks/definitions/mmlu-pro.js";
-import { MGSM_ANSWER_PREFIXES } from "../../src/plugins/benchmarks/definitions/prompts.js";
-import { PythonRandom } from "../../src/plugins/benchmarks/definitions/python-random.js";
-import { gpqaDefinition } from "../../src/plugins/benchmarks/definitions/gpqa.js";
-import { triviaqaDefinition } from "../../src/plugins/benchmarks/definitions/triviaqa.js";
+import { scoreChoice, scoreMmluPro } from "../../src/plugins/benchmarks/agent-harness/definitions/scoring/choices.js";
+import { scoreGsm8k, scoreTrivia } from "../../src/plugins/benchmarks/agent-harness/definitions/scoring/answers.js";
+import { scoreDrop, scoreDropCandidates } from "../../src/plugins/benchmarks/agent-harness/definitions/scoring/drop.js";
+import { mgsmDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/mgsm.js";
+import { mmluProDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/mmlu-pro.js";
+import { MGSM_ANSWER_PREFIXES } from "../../src/plugins/benchmarks/agent-harness/definitions/prompts.js";
+import { PythonRandom } from "../../src/plugins/benchmarks/agent-harness/definitions/python-random.js";
+import { gpqaDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/gpqa.js";
+import { triviaqaDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/triviaqa.js";
 
 test.each([
   ["42", "#### 42", true], ["42", "The answer is 42", false],

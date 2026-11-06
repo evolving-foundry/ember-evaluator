@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { HERMES_PIN, HERMES_VERSION, hermesRuntimeInstallation } from "../../src/adapters/harness/hermes/runtime.js";
+import { HERMES_PIN, HERMES_VERSION, hermesRuntimeInstallation } from "../../src/runtimes/hermes/runtime.js";
 
 test.skipIf(process.platform === "win32")("provisions Hermes via git clone + setup-hermes.sh --runtime-only + mirror re-lock", async () => {
   const signal = new AbortController().signal;

@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { harness } from "../fixtures/engine/fakes.js";
-import { runEngine } from "../../src/core/engine.js";
+import { runEngine } from "../../src/application/run-engine.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
-import { planBenchmarkRun } from "../../src/plugins/benchmarks/plan-run.js";
+import { planBenchmarkRun } from "../../src/plugins/benchmarks/shared/plan-run.js";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanup.splice(0)) await close(); });

@@ -8,9 +8,9 @@ const harborScore = new HarborScoreMetrics({ dimensions: [] });
 import { aggregateMetrics } from "../../src/plugins/metrics/aggregate.js";
 import { renderMarkdown } from "../../src/plugins/reporters/markdown.js";
 import { mixedSnapshot } from "../fixtures/results/mixed-run/fixture.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
 import { classifyError } from "../../src/core/errors/classify.js";
-import { finalizeAttemptOutcome } from "../../src/core/evaluation-outcome.js";
+import { finalizeAttemptOutcome } from "../../src/core/results/evaluation-outcome.js";
 import type { PreparationRound } from "../../src/core/contracts/result.js";
 
 function preparationRound(id: string, startedAt = "2026-09-18T00:00:00.000Z"): PreparationRound {

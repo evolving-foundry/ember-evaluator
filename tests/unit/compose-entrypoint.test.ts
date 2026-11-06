@@ -2,10 +2,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { ComposeEntrypoint, composeEntrypointSource } from "../../src/plugins/environments/docker-compose-entrypoint.js";
-import { DockerComposeProject } from "../../src/plugins/environments/docker-compose.js";
+import { ComposeEntrypoint, composeEntrypointSource } from "../../src/infrastructure/containers/compose-entrypoint.js";
+import { DockerComposeProject } from "../../src/infrastructure/containers/compose.js";
 import type { JsonValue } from "../../src/core/contracts/task.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });

@@ -6,7 +6,7 @@ import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
-import { aptSourceInstructions } from "../../src/adapters/containers/apt-sources.js";
+import { aptSourceInstructions } from "../../src/infrastructure/containers/apt-sources.js";
 
 const execute = promisify(execFile);
 const enabled = process.platform === "linux" && process.env.EVALUATOR_APT_TESTS === "1";

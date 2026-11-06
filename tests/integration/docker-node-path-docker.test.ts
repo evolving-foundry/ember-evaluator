@@ -4,11 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
-import { DockerRuntime, EVALUATOR_NODE_EXECUTABLE, PROCESS_HELPER } from "../../src/plugins/environments/docker-runtime.js";
-import { DockerSolverRuntime } from "../../src/plugins/environments/docker-solver-runtime.js";
-import { startDockerProcess } from "../../src/plugins/environments/docker-process.js";
-import { runDockerCommand } from "../../src/plugins/environments/docker.js";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { EVALUATOR_NODE_EXECUTABLE, PROCESS_HELPER } from "../../src/infrastructure/containers/runtime-contract.js";
+import { DockerSolverRuntime } from "../../src/infrastructure/containers/solver-runtime.js";
+import { startDockerProcess } from "../../src/infrastructure/containers/process.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
 
 const exec = promisify(execFile);
 

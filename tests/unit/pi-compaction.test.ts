@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { COMPACTION_RESERVE_TOKENS, contextWindowFor, modelFor } from "../../src/adapters/harness/pi/runner.js";
-import type { RunnerInput } from "../../src/adapters/harness/pi/protocol.js";
-import type { RuntimeAuth } from "../../src/config/schema.js";
+import { COMPACTION_RESERVE_TOKENS, contextWindowFor, modelFor } from "../../src/runtimes/pi/runner.js";
+import type { RunnerInput } from "../../src/runtimes/pi/protocol.js";
+import type { RuntimeAuth } from "../../src/core/contracts/config.js";
 
 type RegisteredModel = { id: string; contextWindow: number; maxTokens: number };
 

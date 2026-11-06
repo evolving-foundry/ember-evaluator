@@ -4,16 +4,16 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { resolveResumeRun } from "../../src/core/resume.js";
+import { resolveResumeRun } from "../../src/core/recovery/resume.js";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
 import { storeKey, storeRecord, storeRun } from "../fixtures/results/store-fixture.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
-import { fingerprintConfig } from "../../src/core/run-manifest.js";
-import { runEngine } from "../../src/core/engine.js";
+import { fingerprintConfig } from "../../src/core/results/run-manifest.js";
+import { runEngine } from "../../src/application/run-engine.js";
 import type { SchedulerContext } from "../../src/core/contracts/scheduler.js";
-import { BUILTIN_RUNTIME_ID } from "../../src/core/builtin-runtime.js";
-import { PACKAGE_RUNTIME_ID } from "../../src/core/package-provenance.js";
-import { assertWorkerVersions } from "../../src/adapters/ray/protocol.js";
+import { BUILTIN_RUNTIME_ID } from "../../src/core/results/runtime-identity.js";
+import { PACKAGE_RUNTIME_ID } from "../../src/core/results/runtime-identity.js";
+import { assertWorkerVersions } from "../../src/infrastructure/ray/protocol.js";
 
 const roots: string[] = []; const stores: LocalRunStore[] = [];
 async function root() { const value = await mkdtemp(join(tmpdir(), "evaluator-resume-")); roots.push(value); return value; }

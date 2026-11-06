@@ -1,10 +1,12 @@
 import { basename, extname, join } from "node:path";
-import { DEFAULT_TASK_TIMEOUT_SECONDS } from "../core/timeouts.js";
+import { DEFAULT_TASK_TIMEOUT_SECONDS } from "../core/policies/timeouts.js";
 import { fileURLToPath } from "node:url";
 import { parseEffectiveConfig } from "./effective.js";
 import { parseDeployment } from "./deployment.js";
-import { profileChain, validateProfiles, type ProfileLayer, type ResolvedProfiles } from "./profiles.js";
-import { DEFAULT_LOCAL_CONCURRENCY, expectNonEmptyString, expectRecord, type CliOverrides, type EffectiveConfig, type Selection } from "./schema.js";
+import { profileChain, validateProfiles, type ProfileLayer, type ResolvedProfiles } from "./profile-schema.js";
+import { DEFAULT_LOCAL_CONCURRENCY } from "./defaults.js";
+import { expectNonEmptyString, expectRecord } from "../core/validation/input.js";
+import { type CliOverrides, type EffectiveConfig, type Selection } from "../core/contracts/config.js";
 import { normalizeComponentSelection, normalizeSelection, parseUserConfig, type UserConfig } from "./user-schema.js";
 
 export type ConfigOrigins = Record<string, string>;

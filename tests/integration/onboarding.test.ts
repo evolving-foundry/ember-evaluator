@@ -1,15 +1,15 @@
-vi.mock("../../src/adapters/network/doctor.js", () => ({ diagnoseNetwork: async () => [] }));
+vi.mock("../../src/application/diagnostics/network.js", () => ({ diagnoseNetwork: async () => [] }));
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { parse, stringify } from "yaml";
-import { runCli } from "../../src/cli.js";
-import { loadConfig } from "../../src/config/load.js";
-import { JobsClient } from "../../src/adapters/ray/jobs-client.js";
-import { diagnose } from "../../src/commands/doctor.js";
-import { benchmarkInfo } from "../../src/commands/benchmark.js";
-import { openPluginRegistry } from "../../src/plugin-runtime.js";
+import { runCli } from "../../src/cli/main.js";
+import { loadConfig } from "../../src/application/config.js";
+import { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
+import { diagnose } from "../../src/application/diagnostics/doctor.js";
+import { benchmarkInfo } from "../../src/application/benchmarks.js";
+import { openPluginRegistry } from "../../src/application/plugins/runtime.js";
 
 const roots: string[] = [];
 afterEach(async () => {

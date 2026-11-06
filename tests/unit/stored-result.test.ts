@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { upgradeStoredResult } from "../../src/core/stored-result.js";
-import { assertAttemptRecord } from "../../src/core/record-validation.js";
+import { upgradeStoredResult } from "../../src/core/results/stored-result.js";
+import { assertAttemptRecord } from "../../src/core/results/record-validation.js";
 import { fixtureFailure, storeRecord } from "../fixtures/results/store-fixture.js";
 import { classifyError } from "../../src/core/errors/classify.js";
 

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { afterEach, expect, test } from "vitest";
-import { fetchNetworkResponse, retryNetworkOperation } from "../../src/adapters/network/retry.js";
-import { completeJudge } from "../../src/adapters/models/judge.js";
+import { fetchNetworkResponse, retryNetworkOperation } from "../../src/infrastructure/network/retry.js";
+import { completeJudge } from "../../src/infrastructure/models/judge.js";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });

@@ -1,10 +1,10 @@
 import type { Solver, AttemptContext } from "../../core/contracts/solver.js";
 import type { PublicTask } from "../../core/contracts/task.js";
 import type { EnvironmentSession } from "../../core/contracts/environment.js";
-import { expectRecord } from "../../config/schema.js";
+import { expectRecord } from "../../core/validation/input.js";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { TrajectoryWriter } from "../../adapters/harness/pi/trajectory.js";
+import { TrajectoryWriter } from "../../core/artifacts/trajectory.js";
 
 /** 提交 Benchmark 已锁定的候选文件；不调用模型、不修改候选。 */
 export class KernelReplaySolver implements Solver {

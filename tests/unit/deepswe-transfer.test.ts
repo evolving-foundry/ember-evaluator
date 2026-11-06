@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { validateGitPatchSpec, GitPatchError } from "../../src/plugins/environments/git-patch.js";
-import { parseModelEndpointPolicy } from "../../src/plugins/environments/model-gateway.js";
+import { validateGitPatchSpec, GitPatchError } from "../../src/plugins/environments/shared/git-patch.js";
+import { parseModelEndpointPolicy } from "../../src/infrastructure/network/model-gateway.js";
 import type { TransferSpec } from "../../src/core/contracts/environment.js";
 
 const spec: TransferSpec = {

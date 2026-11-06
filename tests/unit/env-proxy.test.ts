@@ -5,9 +5,9 @@ import { connect, type Socket } from "node:net";
 import { getCACertificates, setDefaultCACertificates } from "node:tls";
 import { afterEach, expect, test, vi } from "vitest";
 import { getGlobalDispatcher, setGlobalDispatcher } from "undici";
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { networkDocument } from "../../src/config/network.js";
-import { installEnvProxy } from "../../src/adapters/net/env-proxy.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { networkDocument } from "../../src/config/network-schema.js";
+import { installEnvProxy } from "../../src/infrastructure/network/env-proxy.js";
 
 const originalFetch = globalThis.fetch;
 const originalDispatcher = getGlobalDispatcher();
@@ -90,7 +90,7 @@ async function checkProtocol(value: string | undefined, proxy: boolean, runner =
     cleanup.push(() => runtime.dispose());
   } else if (runner) {
     vi.resetModules();
-    await import("../../src/adapters/harness/pi/runner.js");
+    await import("../../src/runtimes/pi/runner.js");
   } else installEnvProxy();
   const response = await (network?.fetch ?? fetch)(`https://127.0.0.1:${address.port}`, { signal: AbortSignal.timeout(3000) });
   expect(await response.text()).toBe(value === "1" ? "2.0" : "1.1");

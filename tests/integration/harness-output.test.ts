@@ -5,8 +5,8 @@ import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, expect, test } from "vitest";
 import type { AttemptContext, ProcessHandle } from "../../src/index.js";
-import { consumeDsh } from "../../src/adapters/harness/dsh/protocol.js";
-import { consumeHermes } from "../../src/adapters/harness/hermes/protocol.js";
+import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
+import { consumeHermes } from "../../src/runtimes/hermes/protocol.js";
 
 const exec = promisify(execFile);
 const python = process.env.PYTHON_BIN ?? (process.platform === "win32" ? "python" : "python3");
@@ -36,7 +36,7 @@ def build_agent(middleware):
 `);
   // The real runner owns stdin; use a small Python launcher to supply it.
   const { stdout } = await exec(python, ["-c", "import io,runpy,sys;sys.stdin=io.StringIO('task');sys.argv=sys.argv[1:];runpy.run_path(sys.argv[0],run_name='__main__')",
-    resolve("src/adapters/harness/deepagents/assets/runner.py"), "--bundle-dir", value.paths.root],
+    resolve("src/runtimes/deepagents/assets/runner.py"), "--bundle-dir", value.paths.root],
   { cwd: value.paths.root, signal: value.signal, encoding: "utf8" });
   const warnings: unknown[] = [];
   const result = await consumeDsh(handle(stdout, 0), { ...value, warning: warning => warnings.push(warning) }, "", undefined, "DEEPAGENTS");
@@ -50,7 +50,7 @@ test.each(["length", "empty", "network", "no-reason", "auth", "cancelled", "cont
     const value = await context();
     const report = join(value.paths.agent, "usage.json");
     const { stdout } = await exec(python, [resolve("tests/fixtures/hermes-output-capture.py"),
-      resolve("src/adapters/harness/hermes/assets/runner.py"), report, scenario],
+      resolve("src/runtimes/hermes/assets/runner.py"), report, scenario],
     { signal: value.signal, env: { ...process.env, EMBER_EVALUATOR_API_KEY: "secret" } });
     const warnings: unknown[] = [];
     const consuming = consumeHermes(handle("native diagnostic text", 2), { ...value, warning: warning => warnings.push(warning) }, "secret", report);

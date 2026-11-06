@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
-import { parseDockerEmulation, resolveDockerPlatform, PlatformCapabilityDetector } from "../../src/plugins/environments/docker-platform.js";
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
+import { parseDockerEmulation, resolveDockerPlatform, PlatformCapabilityDetector } from "../../src/infrastructure/containers/platform.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
 
 test("native-only execution rejects task and YAML foreign platforms before emulation", () => {
   expect(() => resolveDockerPlatform("linux/arm64", "linux/amd64", "linux/arm64", false))

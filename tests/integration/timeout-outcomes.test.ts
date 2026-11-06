@@ -1,13 +1,13 @@
-import { attemptTimeoutKind } from "../../src/core/evaluation-outcome.js";
+import { attemptTimeoutKind } from "../../src/core/results/evaluation-outcome.js";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { setTimeout as delay } from "node:timers/promises";
-import { runEngine } from "../../src/core/engine.js";
-import { runTask } from "../../src/core/run-task.js";
-import { planResume } from "../../src/core/resume.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { planResume } from "../../src/core/recovery/resume.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { computeSuccessRate } from "../../src/plugins/metrics/success-rate.js";
 import { HarborScoreMetrics } from "../../src/plugins/metrics/harbor-score.js";
 const harborScore = new HarborScoreMetrics({ dimensions: [] });

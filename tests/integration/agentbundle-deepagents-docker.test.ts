@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { test, expect } from "vitest";
 
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
-import { buildFileManifest } from "../../src/core/artifacts.js";
-import { fingerprintConfig } from "../../src/core/run-manifest.js";
-import { deepagentsDockerRuntimeInstallation } from "../../src/adapters/harness/deepagents/runtime.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { buildFileManifest } from "../../src/core/artifacts/artifacts.js";
+import { fingerprintConfig } from "../../src/core/results/run-manifest.js";
+import { deepagentsDockerRuntimeInstallation } from "../../src/runtimes/deepagents/runtime.js";
 import { AgentBundleSolver } from "../../src/plugins/solvers/agentbundle.js";
 import type { JsonValue } from "../../src/core/contracts/task.js";
 

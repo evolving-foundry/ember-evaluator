@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { AttemptContext, ProcessHandle } from "../../src/index.js";
-import { consumeHermes } from "../../src/adapters/harness/hermes/protocol.js";
-import { validateSequence, type TrajectoryEvent } from "../../src/adapters/harness/pi/trajectory.js";
+import { consumeHermes } from "../../src/runtimes/hermes/protocol.js";
+import { validateSequence, type TrajectoryEvent } from "../../src/core/artifacts/trajectory.js";
 
 const roots: string[] = [];
 

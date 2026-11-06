@@ -1,13 +1,13 @@
 import { expect, test, vi, beforeEach } from "vitest";
-import { RayScheduler } from "../../src/plugins/schedulers/ray.js";
+import { RayScheduler } from "../../src/plugins/schedulers/ray/scheduler.js";
 import type { ImageCleanupNode } from "../../src/core/contracts/image-cleanup.js";
 
 const bridge = vi.hoisted(() => ({ cleanup: vi.fn(), start: vi.fn(), close: vi.fn(), options: {} as Record<string, unknown> }));
-vi.mock("../../src/adapters/ray/client.js", () => ({ RayClient: class {
+vi.mock("../../src/infrastructure/ray/client.js", () => ({ RayClient: class {
   constructor(options: Record<string, unknown>) { bridge.options = options; }
   nodes = ["node-a", "node-b"]; start = bridge.start; close = bridge.close; cleanupImages = bridge.cleanup;
 } }));
-vi.mock("../../src/core/package-provenance.js", () => ({ loadPackageDigest: async () => `sha256:${"a".repeat(64)}` }));
+vi.mock("../../src/infrastructure/provenance/package.js", () => ({ loadPackageDigest: async () => `sha256:${"a".repeat(64)}` }));
 beforeEach(() => { vi.clearAllMocks(); });
 function scheduler() {
   return new RayScheduler({ endpoint: "auto", pythonExecutable: "python", startupTimeoutMs: 1000,

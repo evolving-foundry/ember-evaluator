@@ -6,16 +6,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { RunComponents } from "../../src/core/contracts/components.js";
-import { runTask } from "../../src/core/run-task.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
-import { PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
 import { trajectoryLines } from "../fixtures/results/store-fixture.js";
-import { restoreLogOwnersSource } from "../../src/plugins/environments/docker-log-ownership.js";
-import { dshOutputRuntimeFile } from "../../src/adapters/harness/dsh/runtime.js";
+import { restoreLogOwnersSource } from "../../src/infrastructure/containers/log-ownership.js";
+import { dshOutputRuntimeFile } from "../../src/runtimes/dsh/runtime.js";
 
 const enabled = process.env.EVALUATOR_TEST_DOCKER === "1" && process.platform === "linux" && process.getuid?.() !== 0;
 

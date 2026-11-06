@@ -2,9 +2,9 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { buildFileManifest } from "../../src/core/artifacts.js";
-import { buildResumeSeed, downloadRunResults } from "../../src/adapters/ray/jobs-results.js";
-import type { JobsClient } from "../../src/adapters/ray/jobs-client.js";
+import { buildFileManifest } from "../../src/core/artifacts/artifacts.js";
+import { buildResumeSeed, downloadRunResults } from "../../src/application/ray/jobs-results.js";
+import type { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
 
 /** Serves a directory the way the jobs gateway does: manifest plus base64 chunks. */
 function fakeClient(remoteRoot: string): JobsClient {

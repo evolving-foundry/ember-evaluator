@@ -2,10 +2,10 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { DockerImageInventory } from "../../src/plugins/environments/docker-image-inventory.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { fingerprintImageConfig } from "../../src/core/image-config.js";
-import { parseImageCleanupRequest, parseImageCleanupSummary } from "../../src/adapters/ray/image-cleanup.js";
+import { DockerImageInventory } from "../../src/infrastructure/containers/image-inventory.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { fingerprintImageConfig } from "../../src/core/policies/image-config.js";
+import { parseImageCleanupRequest, parseImageCleanupSummary } from "../../src/infrastructure/ray/image-cleanup.js";
 
 const id = `sha256:${"a".repeat(64)}`, otherId = `sha256:${"b".repeat(64)}`;
 const source = "official/task:v1", base = "ember-evaluator/task:solve-base-a", agent = "ember-evaluator/task:solve-agent-a";

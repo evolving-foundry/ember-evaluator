@@ -4,10 +4,10 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
-import { runEngine } from "../../src/core/engine.js";
-import { consumeDsh } from "../../src/adapters/harness/dsh/protocol.js";
-import { consumeJiuwenswarm } from "../../src/adapters/harness/jiuwenswarm/protocol.js";
-import { dshModelSettings, dshPermissionPatch } from "../../src/adapters/harness/dsh/model.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
+import { consumeJiuwenswarm } from "../../src/runtimes/jiuwenswarm/protocol.js";
+import { dshModelSettings, dshPermissionPatch } from "../../src/runtimes/dsh/model.js";
 import type { ProcessHandle } from "../../src/core/contracts/environment.js";
 import { harness } from "../fixtures/engine/fakes.js";
 
@@ -80,7 +80,7 @@ async function exercise(solver: Solver, fault: Fault) {
     if (solver === "deepagents") {
       const bundle = join(home, "bundle"); await mkdir(bundle);
       await writeFile(join(bundle, "agent.py"), `import os\nfrom deepagents import create_deep_agent\nfrom langchain_openai import ChatOpenAI\ndef build_agent(middleware):\n    model = ChatOpenAI(model='gpt-4.1', base_url=os.environ['AGENT_MODEL_BASE_URL'], api_key=os.environ['AGENT_MODEL_API_KEY'], streaming=True, timeout=10)\n    return create_deep_agent(model=model, middleware=list(middleware))\n`);
-      handle = launch(join(runtime!, "deep-env/bin/python"), [resolve("src/adapters/harness/deepagents/assets/runner.py"), "--bundle-dir", bundle], session.workdir,
+      handle = launch(join(runtime!, "deep-env/bin/python"), [resolve("src/runtimes/deepagents/assets/runner.py"), "--bundle-dir", bundle], session.workdir,
         { ...env, AGENT_MODEL_NAME: "gpt-4.1", AGENT_MODEL_BASE_URL: endpoint, AGENT_MODEL_API_KEY: "fixture-key" }, "Respond FIXTURE_OK without tools.", capture);
     } else if (solver === "jiuwenswarm") {
       await mkdir(join(home, "config"));
@@ -90,7 +90,7 @@ async function exercise(solver: Solver, fault: Fault) {
     } else {
       const cli = "/opt/evaluator-agent/node_modules/@deepseek-ai/dsh/lib/bin.js";
       const docker = ["run", "--rm", "--network", "host", "--user", `${process.getuid!()}:${process.getgid!()}`, "-i", "-v", `${session.workdir}:${session.workdir}`, "-w", session.workdir,
-        "-v", `${resolve("src/adapters/harness/dsh/assets/output-hook.mjs")}:/tmp/evaluator-output-hook.mjs:ro`,
+        "-v", `${resolve("src/runtimes/dsh/assets/output-hook.mjs")}:/tmp/evaluator-output-hook.mjs:ro`,
         "-v", `${context.paths.agent}:${context.paths.agent}`, "-e", `EVALUATOR_DSH_OUTPUT_DIR=${context.paths.agent}`,
         "-e", `HOME=${home}`, "-e", `DSH_HOME=${home}`, "-e", "DSH_PERMISSION_MODE=danger-full-access", "-e", "EMBER_EVALUATOR_API_KEY=fixture-key", "-e", "DSH_TELEMETRY_DISABLED=1", "--entrypoint", "node", image!];
       const setup = { stdout: "", stderr: "" };

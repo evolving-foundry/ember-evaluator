@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
-import { runEngine } from "../../src/core/engine.js";
-import { runTask } from "../../src/core/run-task.js";
-import { planBenchmarkRun } from "../../src/plugins/benchmarks/plan-run.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { planBenchmarkRun } from "../../src/plugins/benchmarks/shared/plan-run.js";
 import type { VerificationRuntime, VerificationRuntimeSession } from "../../src/core/contracts/verification-runtime.js";
 import type { EnvironmentSpec } from "../../src/core/contracts/environment.js";
-import { createTaskPreparer } from "../../src/core/materialize-task.js";
+import { createTaskPreparer } from "../../src/core/preparation/materialize-task.js";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanup.splice(0)) await close(); });

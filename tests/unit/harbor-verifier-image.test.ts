@@ -1,14 +1,14 @@
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { networkDocument } from "../../src/config/network.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { networkDocument } from "../../src/config/network-schema.js";
 import { execFile, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 import { join, resolve } from "node:path";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { dockerBuildNetwork } from "../../src/adapters/containers/build-network.js";
-import { createPythonVerifierImage } from "../../src/adapters/verifiers/python/image.js";
-import { withDockerActivity } from "../../src/plugins/environments/docker-progress.js";
+import { dockerBuildNetwork } from "../../src/infrastructure/containers/build-network.js";
+import { createPythonVerifierImage } from "../../src/plugins/verifiers/python/runtime/image.js";
+import { withDockerActivity } from "../../src/infrastructure/containers/progress.js";
 
 let cache: string;
 beforeEach(async () => {
@@ -225,6 +225,6 @@ test("Docker connection errors are propagated without attempting a build", async
 const pythonExecutable = process.platform === "win32" ? "python" : "python3";
 const pythonAvailable = spawnSync(pythonExecutable, ["-c", "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)"], { timeout: 5000, windowsHide: true }).status === 0;
 test.skipIf(!pythonAvailable)("upstream checkout retries and frozen install preserve source and dependency pins", async () => {
-  const result = await promisify(execFile)(pythonExecutable, [resolve("tests/fixtures/harbor-verifier-build-tests.py"), resolve("src/adapters/verifiers/python/build-runtime.py")], { timeout: 10000, windowsHide: true });
+  const result = await promisify(execFile)(pythonExecutable, [resolve("tests/fixtures/harbor-verifier-build-tests.py"), resolve("src/plugins/verifiers/python/runtime/build-runtime.py")], { timeout: 10000, windowsHide: true });
   expect(result.stderr).toContain("Ran 7 tests"); expect(result.stderr).toContain("OK");
 });

@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, test } from "vitest";
 import { stringify } from "yaml";
-import { runCli } from "../../src/cli.js";
-import { bootstrap, bootstrapBenchmark } from "../../src/bootstrap.js";
-import { loadConfig } from "../../src/config/load.js";
+import { runCli } from "../../src/cli/main.js";
+import { bootstrap, bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
+import { loadConfig } from "../../src/application/config.js";
 
 test("Registry disposal releases a simpleagent's staged bundle", async () => {
   const root = await mkdtemp(join(tmpdir(), "staging-lifecycle-"));

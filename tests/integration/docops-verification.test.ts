@@ -5,12 +5,12 @@ import type { Server } from "node:http";
 import { afterEach, expect, test } from "vitest";
 
 import type { RunComponents } from "../../src/core/contracts/components.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
-import { runTask } from "../../src/core/run-task.js";
+import { runTask } from "../../src/core/execution/run-task.js";
 import { DocOpsBenchmark, DocOpsDockerEnvironment } from "../../plugins/docops/index.js";
 import { runDockerCommand } from "ember-evaluator";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
 import { storeRun, trajectoryLines } from "../fixtures/results/store-fixture.js";
 import { startDocOpsFixtureSource } from "../fixtures/docops-source.js";

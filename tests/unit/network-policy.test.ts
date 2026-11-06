@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { normalizeAllowedHosts, validateNetworkPolicy } from "../../src/core/network-policy.js";
+import { normalizeAllowedHosts, validateNetworkPolicy } from "../../src/core/policies/network-policy.js";
 
 test("normalizes explicit domains and subdomain rules without broadening the allowlist", () => {
   expect(normalizeAllowedHosts([" PyPI.org. ", "*.PyPI.org", "pypi.org"])).toEqual(["pypi.org", "*.pypi.org"]);

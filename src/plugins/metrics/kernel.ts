@@ -1,7 +1,7 @@
 import type { Metrics } from "../../core/contracts/metrics.js";
 import type { ResultSnapshot } from "../../core/contracts/result.js";
-import { isEvaluationComplete } from "../../core/evaluation-outcome.js";
-import { safeTaskKey } from "../../core/artifacts.js";
+import { isEvaluationComplete } from "../../core/results/evaluation-outcome.js";
+import { safeTaskKey } from "../../core/artifacts/artifacts.js";
 import type { JsonValue } from "../../core/contracts/task.js";
 import { selectedRecords } from "./records.js";
 

@@ -1,7 +1,7 @@
 import { createServer, type ServerResponse } from "node:http";
 import { expect, test } from "vitest";
 import { McpClient } from "@earendil-works/pi-mcp";
-import { TaskSseTransport } from "../../src/adapters/harness/pi/mcp.js";
+import { TaskSseTransport } from "../../src/runtimes/pi/mcp.js";
 
 test("task SSE MCP initializes, discovers and calls a tool, then closes without model I/O", async () => {
   let stream: ServerResponse | undefined;

@@ -1,15 +1,15 @@
-import { PhaseTimeoutError } from "../../src/core/phase-timeout.js";
-import { TaskQueue } from "../../src/core/task-queue.js";
+import { PhaseTimeoutError } from "../../src/core/policies/phase-timeout.js";
+import { TaskQueue } from "../../src/core/execution/task-queue.js";
 import { expect, test, vi } from "vitest";
 import { classifyError, declaredErrorCode, normalizeFailure, type ErrorContext } from "../../src/core/errors/classify.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
 import { validFailureMetadata } from "../../src/core/errors/validation.js";
 import { ERROR_CODES, type ErrorCode } from "../../src/core/errors/registry.js";
-import { failureDecision, requiresDispatchStop } from "../../src/core/error-policy.js";
-import { isManualRetryEligible } from "../../src/core/manual-retry.js";
-import { assertAttemptRecord } from "../../src/core/record-validation.js";
-import { assertPreparationDiagnostics } from "../../src/core/preparation-validation.js";
-import { finalizeAttemptOutcome, evaluationScore } from "../../src/core/evaluation-outcome.js";
+import { failureDecision, requiresDispatchStop } from "../../src/core/policies/error-policy.js";
+import { isManualRetryEligible } from "../../src/core/recovery/manual-retry.js";
+import { assertAttemptRecord } from "../../src/core/results/record-validation.js";
+import { assertPreparationDiagnostics } from "../../src/core/preparation/preparation-validation.js";
+import { finalizeAttemptOutcome, evaluationScore } from "../../src/core/results/evaluation-outcome.js";
 import { storeRecord } from "../fixtures/results/store-fixture.js";
 
 const coded = (code: string, message = code) => Object.assign(new Error(message), { code });

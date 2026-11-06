@@ -1,9 +1,9 @@
-import { PhaseTimeoutError } from "../../src/core/phase-timeout.js";
+import { PhaseTimeoutError } from "../../src/core/policies/phase-timeout.js";
 import { expect, test } from "vitest";
-import { isManualRetryEligible } from "../../src/core/manual-retry.js";
-import { isStreamTaskRetryEligible } from "../../src/core/automatic-task-retry.js";
+import { isManualRetryEligible } from "../../src/core/recovery/manual-retry.js";
+import { isStreamTaskRetryEligible } from "../../src/core/recovery/automatic-task-retry.js";
 import { classifyError } from "../../src/core/errors/classify.js";
-import { TaskQueue } from "../../src/core/task-queue.js";
+import { TaskQueue } from "../../src/core/execution/task-queue.js";
 import { storeRecord } from "../fixtures/results/store-fixture.js";
 const job = { runId: "run-1", taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" }, configFingerprint: "config" };
 const failure = (error: unknown, context: Parameters<typeof classifyError>[1] = { phase: "solve" }) => ({

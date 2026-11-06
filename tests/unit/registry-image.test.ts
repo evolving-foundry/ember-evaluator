@@ -1,5 +1,5 @@
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { networkDocument, parseNetworkSettings } from "../../src/config/network.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { networkDocument, parseNetworkSettings } from "../../src/config/network-schema.js";
 import { afterEach, expect, test, vi } from "vitest";
 import { mkdtemp, readFile, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,8 +7,8 @@ import { join } from "node:path";
 import { createServer } from "node:net";
 import { getGlobalDispatcher } from "undici";
 import { extract } from "tar";
-import { downloadRegistryImage } from "../../src/adapters/containers/registry-image.js";
-import { dockerRegistryCredential } from "../../src/adapters/containers/registry-auth.js";
+import { downloadRegistryImage } from "../../src/infrastructure/containers/registry-image.js";
+import { dockerRegistryCredential } from "../../src/infrastructure/containers/registry-auth.js";
 import { registryProxyFixture } from "../fixtures/registry-proxy.js";
 
 const cleanup: (() => Promise<unknown>)[] = [];

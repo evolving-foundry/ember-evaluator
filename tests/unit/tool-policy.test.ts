@@ -5,7 +5,7 @@ import {
   enforceShellTimeout,
   parseShellToolPolicy,
   resolveShellTimeout,
-} from "../../src/adapters/harness/pi/tool-policy.js";
+} from "../../src/runtimes/pi/tool-policy.js";
 
 test("resolveShellTimeout applies the default and clamps model-requested timeouts", () => {
   const policy = { shellTimeoutSeconds: 180, shellMaxTimeoutSeconds: 600 };

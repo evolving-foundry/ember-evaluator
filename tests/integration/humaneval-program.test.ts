@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { expect, test } from "vitest";
-import { humanevalProgram } from "../../src/plugins/benchmarks/definitions/scoring/code-execution.js";
+import { humanevalProgram } from "../../src/plugins/benchmarks/agent-harness/definitions/scoring/code-execution.js";
 
 const available = spawnSync("python", ["--version"], { windowsHide: true }).status === 0;
 const marker = "HUMANEVAL_COMPLETED_controlled_test";

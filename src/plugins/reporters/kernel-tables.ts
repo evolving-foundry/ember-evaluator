@@ -1,5 +1,5 @@
 import type { JsonValue } from "../../core/contracts/task.js";
-import { expectRecord } from "../../config/schema.js";
+import { expectRecord } from "../../core/validation/input.js";
 
 const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
   .replace(/[\\`*_\[\]()|~]/gu, "\\$&").replace(/\r?\n/gu, " ");

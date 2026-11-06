@@ -1,6 +1,6 @@
 import type { Metrics } from "../../core/contracts/metrics.js";
 import type { ResultSnapshot } from "../../core/contracts/result.js";
-import { expectRecord, rejectUnknown } from "../../config/schema.js";
+import { expectRecord, rejectUnknown } from "../../core/validation/input.js";
 import { scoringRecords } from "./records.js";
 
 export function parseHarborScoreConfig(value: unknown): { dimensions: string[] } {

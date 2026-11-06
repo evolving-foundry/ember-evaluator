@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { join, resolve } from "node:path";
 import { t as listTar } from "tar";
 import { afterEach, expect, test } from "vitest";
-import { LocalEnvironment } from "../../src/plugins/environments/local.js";
+import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
 
 const fixtures: { root: string; session: EnvironmentSession }[] = [];

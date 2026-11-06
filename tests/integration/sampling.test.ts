@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { stringify } from "yaml";
-import { loadConfig } from "../../src/config/load.js";
-import { runEngine } from "../../src/core/engine.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
+import { loadConfig } from "../../src/application/config.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { harness } from "../fixtures/engine/fakes.js";
 
 const roots: string[] = [];

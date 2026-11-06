@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { kernelProfileVerdict } from "../../src/plugins/benchmarks/protocols/kernel/result.js";
+import { kernelProfileVerdict } from "../../src/plugins/benchmarks/operator/kernel/result.js";
 
 function fixture(collection: "Default" | "PipeTimeline,Default" = "Default") {
   const candidate = "a".repeat(64);

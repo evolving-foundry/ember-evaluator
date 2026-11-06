@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
-import { PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
-import { consumeDsh } from "../../src/adapters/harness/dsh/protocol.js";
-import { dshOutputRuntimeFile } from "../../src/adapters/harness/dsh/runtime.js";
-import { buildFileManifest } from "../../src/core/artifacts.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
+import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
+import { dshOutputRuntimeFile } from "../../src/runtimes/dsh/runtime.js";
+import { buildFileManifest } from "../../src/core/artifacts/artifacts.js";
 
 const enabled = process.env.EVALUATOR_TEST_DOCKER === "1" && process.platform === "linux" && process.getuid?.() !== 0;
 

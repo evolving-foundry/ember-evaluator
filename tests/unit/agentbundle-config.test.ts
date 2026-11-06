@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { parseInstalledBundle } from "../../src/adapters/agentbundle/cli.js";
+import { parseInstalledBundle } from "../../src/runtimes/agentbundle/cli.js";
 import { parse } from "yaml";
-import { dshModelSettings } from "../../src/adapters/harness/dsh/model.js";
+import { dshModelSettings } from "../../src/runtimes/dsh/model.js";
 import { agentBundleModel, parseAgentBundleConfig } from "../../src/plugins/solvers/agentbundle.js";
 
 const model = { name: "office-model", endpoint: "https://example.invalid/v1", provider: null, api: "openai-completions" };

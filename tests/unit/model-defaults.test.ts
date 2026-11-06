@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parseModelDefaults, outputLimitFor } from "../../src/adapters/harness/pi/model-defaults.js";
+import { parseModelDefaults, outputLimitFor } from "../../src/runtimes/pi/model-defaults.js";
 
 const defaults = parseModelDefaults({ fallback: { maxTokens: 128000 }, models: {
   "example": { maxTokens: 64000 }, "provider/example": { maxTokens: 96000 },

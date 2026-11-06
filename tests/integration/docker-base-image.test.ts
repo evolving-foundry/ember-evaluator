@@ -4,9 +4,9 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
-import { runDockerCommand } from "../../src/plugins/environments/docker.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { resolvePinnedTaskImage } from "../../src/plugins/environments/docker-base-image.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { resolvePinnedTaskImage } from "../../src/infrastructure/containers/base-image.js";
 
 test.skipIf(process.env.EVALUATOR_TEST_DOCKER !== "1")(
   "pinned sources disappear and Evaluator names remain usable with the registry offline",

@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-path = Path(__file__).resolve().parents[2] / "src/adapters/kernel/timing_evidence.py"
+path = Path(__file__).resolve().parents[2] / "src/plugins/benchmarks/operator/kernel/runtime/timing_evidence.py"
 spec = importlib.util.spec_from_file_location("timing_evidence", path)
 timing = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(timing)

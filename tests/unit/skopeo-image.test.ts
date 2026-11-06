@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { registryProxyFixture } from "../fixtures/registry-proxy.js";
-import { downloadSkopeoImage } from "../../src/adapters/containers/skopeo-image.js";
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { networkDocument } from "../../src/config/network.js";
-import { networkCommand } from "../../src/adapters/network/command.js";
+import { downloadSkopeoImage } from "../../src/infrastructure/containers/skopeo-image.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { networkDocument } from "../../src/config/network-schema.js";
+import { networkCommand } from "../../src/infrastructure/network/command.js";
 
-vi.mock("../../src/adapters/network/command.js", () => ({ networkCommand: vi.fn() }));
+vi.mock("../../src/infrastructure/network/command.js", () => ({ networkCommand: vi.fn() }));
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => { vi.unstubAllEnvs(); vi.mocked(networkCommand).mockReset(); for (const fn of cleanup.splice(0).reverse()) await fn(); });
 

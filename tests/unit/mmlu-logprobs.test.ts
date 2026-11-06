@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "vitest";
-import { scoreMmluLogprobs } from "../../src/plugins/benchmarks/definitions/scoring/logprobs.js";
-import { mmluDefinition } from "../../src/plugins/benchmarks/definitions/mmlu.js";
-import { DefinedBenchmark } from "../../src/plugins/benchmarks/definitions/defined-benchmark.js";
-import { object, required } from "../../src/plugins/benchmarks/definitions/records.js";
-import type { DatasetRecordSource } from "../../src/adapters/datasets/record-source.js";
-import type { ChatLogprobsEvidence, TokenLogprob } from "../../src/adapters/models/chat-logprobs.js";
+import { scoreMmluLogprobs } from "../../src/plugins/benchmarks/agent-harness/definitions/scoring/logprobs.js";
+import { mmluDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/mmlu.js";
+import { DefinedBenchmark } from "../../src/plugins/benchmarks/agent-harness/definitions/defined-benchmark.js";
+import { object, required } from "../../src/plugins/benchmarks/agent-harness/definitions/records.js";
+import type { DatasetRecordSource } from "../../src/infrastructure/datasets/record-source.js";
+import type { ChatLogprobsEvidence, TokenLogprob } from "../../src/infrastructure/models/chat-logprobs.js";
 import { parseChoiceLogprobsConfig } from "../../src/plugins/solvers/choice-logprobs.js";
 
 const digest = createHash("sha256").update("prompt").digest("hex");

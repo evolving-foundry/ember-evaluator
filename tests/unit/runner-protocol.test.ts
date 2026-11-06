@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parseRunnerOutput } from "../../src/adapters/harness/pi/protocol.js";
+import { parseRunnerOutput } from "../../src/runtimes/pi/protocol.js";
 
 test.each(["error", "warning"])("runner %s accepts registered codes", type => {
   const output = { schemaVersion: 1, type, code: "SOLVER_OUTPUT_LIMIT", message: "response truncated" };

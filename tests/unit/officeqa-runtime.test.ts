@@ -1,10 +1,10 @@
 import { PassThrough } from "node:stream";
 import { afterEach, expect, test, vi } from "vitest";
-import { officeQAVerificationRuntime } from "../../src/adapters/verifiers/officeqa/runtime.js";
+import { officeQAVerificationRuntime } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/runtime/runtime.js";
 import type { PreparedTask } from "../../src/core/contracts/task.js";
 
 const mocks = vi.hoisted(() => ({ output: '{"score":1}', code: 0, create: vi.fn(), dispose: vi.fn(), input: "", command: [] as string[], cancelled: false }));
-vi.mock("../../src/adapters/verifiers/container.js", () => ({
+vi.mock("../../src/plugins/verifiers/shared/container.js", () => ({
   materializeVerifierImage: async () => `sha256:${"a".repeat(64)}`,
   recoverVerifierContainers: vi.fn(),
   createVerifierContainer: async (...args: unknown[]) => {

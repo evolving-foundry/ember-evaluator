@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { Context } from "@deepseek-ai/cordis";
-import { apply as registryPlugin } from "../../src/core/registry.js";
-import { localizePortableSelection, projectPortableSelection, validatePortableSelection } from "../../src/adapters/ray/protocol.js";
-import { harborConfigTransport } from "../../src/plugins/benchmarks/protocols/harbor/config-transport.js";
+import { apply as registryPlugin } from "../../src/application/plugins/registry.js";
+import { localizePortableSelection, projectPortableSelection, validatePortableSelection } from "../../src/infrastructure/ray/protocol.js";
+import { harborConfigTransport } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/config-transport.js";
 
 test("an external benchmark declares its own host fields without a Ray name list", async () => {
   const ctx = new Context();

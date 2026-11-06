@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Header } from "tar";
 import { afterEach, expect, test, vi } from "vitest";
-import { materializeDirectory } from "../../src/adapters/datasets/sources/directory.js";
-import { readDirectoryModes } from "../../src/adapters/filesystem/directory-modes.js";
-import { writeGitFile } from "../../src/adapters/datasets/sources/github/files.js";
+import { materializeDirectory } from "../../src/infrastructure/datasets/sources/directory.js";
+import { readDirectoryModes } from "../../src/infrastructure/filesystem/directory-modes.js";
+import { writeGitFile } from "../../src/infrastructure/datasets/sources/github/files.js";
 
 const roots: string[] = [];
 const signal = () => new AbortController().signal;

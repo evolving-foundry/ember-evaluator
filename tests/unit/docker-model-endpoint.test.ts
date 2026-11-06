@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dockerHostModelEndpoint } from "../../src/plugins/environments/model-gateway.js";
+import { dockerHostModelEndpoint } from "../../src/infrastructure/network/model-gateway.js";
 
 describe("Docker host model endpoints", () => {
   it.each(["127.0.0.1", "localhost", "[::1]"])("maps host loopback %s while retaining the API path and port", host => {

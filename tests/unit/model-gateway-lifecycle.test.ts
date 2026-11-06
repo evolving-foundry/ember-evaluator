@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { createModelGateway, startModelForwarder } from "../../src/plugins/environments/model-gateway.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { createModelGateway, startModelForwarder } from "../../src/infrastructure/network/model-gateway.js";
 const id = "a".repeat(64);
 const output = { stdout: "", stderr: "" };
 afterEach(() => vi.useRealTimers());

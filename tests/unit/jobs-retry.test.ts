@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { RayJobsDeployment } from "../../src/adapters/ray/deployment.js";
+import { RayJobsDeployment } from "../../src/application/ray/deployment.js";
 const remote = vi.hoisted(() => ({ call: vi.fn(), attach: vi.fn() }));
-vi.mock("../../src/adapters/ray/jobs-client.js", () => ({ JobsClient: { create: async () => remote } }));
+vi.mock("../../src/infrastructure/ray/jobs-client.js", () => ({ JobsClient: { create: async () => remote } }));
 beforeEach(() => vi.clearAllMocks());
 const model = { name: "fixture", endpoint: null, api: "openai-completions", provider: null };
 function scheduler() {

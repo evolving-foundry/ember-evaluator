@@ -1,5 +1,6 @@
 import type { JsonValue } from "../core/contracts/task.js";
-import { assertJsonValue, expectRecord, type LoadedConfig } from "./schema.js";
+import { assertJsonValue, expectRecord } from "../core/validation/input.js";
+import { type LoadedConfig } from "./loaded.js";
 
 /** Export only current public YAML. Saved execution metadata has a separate reader. */
 export function exportConfig(config: LoadedConfig): JsonValue {

@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { AttemptContext, ProcessHandle } from "../../src/index.js";
-import { validateSequence, type TrajectoryEvent } from "../../src/adapters/harness/pi/trajectory.js";
-import { consumeJiuwenswarm, parseJiuwenswarmEnvelope } from "../../src/adapters/harness/jiuwenswarm/protocol.js";
+import { validateSequence, type TrajectoryEvent } from "../../src/core/artifacts/trajectory.js";
+import { consumeJiuwenswarm, parseJiuwenswarmEnvelope } from "../../src/runtimes/jiuwenswarm/protocol.js";
 
 const roots: string[] = [];
 

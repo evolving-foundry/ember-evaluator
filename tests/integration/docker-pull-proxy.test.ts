@@ -1,14 +1,14 @@
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { networkDocument, parseNetworkSettings } from "../../src/config/network.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { networkDocument, parseNetworkSettings } from "../../src/config/network-schema.js";
 import { expect, test, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runDockerCommand } from "../../src/plugins/environments/docker.js";
-import { createDockerImagePuller } from "../../src/plugins/environments/docker-image-pull.js";
-import { platformImageCommand } from "../../src/plugins/environments/docker-image-inspect.js";
-import { resolvePinnedTaskImage } from "../../src/plugins/environments/docker-base-image.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
+import { createDockerImagePuller } from "../../src/infrastructure/containers/image-pull.js";
+import { platformImageCommand } from "../../src/infrastructure/containers/image-inspect.js";
+import { resolvePinnedTaskImage } from "../../src/infrastructure/containers/base-image.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 import { registryProxyFixture } from "../fixtures/registry-proxy.js";
 
 test.skipIf(process.env.EVALUATOR_TEST_DOCKER !== "1")("proxy-only registry images import with pinned provenance and remain reusable offline", async () => {

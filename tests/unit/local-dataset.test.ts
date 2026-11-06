@@ -3,17 +3,17 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, test, vi } from "vitest";
-import { LocalFileSource, LocalRecordSource } from "../../src/adapters/datasets/sources/local/files-source.js";
-import { LocalZipJsonSource } from "../../src/adapters/datasets/sources/local/zip-json-source.js";
-import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/definitions/index.js";
-import { openPluginRegistry } from "../../src/plugin-runtime.js";
-import { bootstrapBenchmark } from "../../src/bootstrap.js";
-import { loadConfig } from "../../src/config/load.js";
+import { LocalFileSource, LocalRecordSource } from "../../src/infrastructure/datasets/sources/local/files-source.js";
+import { LocalZipJsonSource } from "../../src/infrastructure/datasets/sources/local/zip-json-source.js";
+import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/agent-harness/definitions/index.js";
+import { openPluginRegistry } from "../../src/application/plugins/runtime.js";
+import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
+import { loadConfig } from "../../src/application/config.js";
 import { stringify } from "yaml";
-import { projectPortableSelection } from "../../src/adapters/ray/protocol.js";
-import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/definitions/officeqa-pro-v2/index.js";
-import { AgentXBenchmark, parseAgentXConfig } from "../../src/plugins/benchmarks/protocols/agentx/agentx-benchmark.js";
-import { parseWorkload } from "../../src/adapters/harness/agentx/protocol.js";
+import { projectPortableSelection } from "../../src/infrastructure/ray/protocol.js";
+import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/index.js";
+import { AgentXBenchmark, parseAgentXConfig } from "../../src/plugins/benchmarks/inference-engine/agentx/agentx-benchmark.js";
+import { parseWorkload } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/summary.js";
 import { officeQAFiles } from "../fixtures/officeqa.js";
 
 async function collect<T>(values: AsyncIterable<T>): Promise<T[]> { const rows: T[] = []; for await (const row of values) rows.push(row); return rows; }

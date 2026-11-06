@@ -4,8 +4,9 @@ import { readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DockerRuntime, PINNED_NODE_IMAGE, type DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { DockerSolverRuntime } from "../../src/plugins/environments/docker-solver-runtime.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { PINNED_NODE_IMAGE, type DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { DockerSolverRuntime } from "../../src/infrastructure/containers/solver-runtime.js";
 
 type Build = { image: string; args: string[]; dockerfile: string; installation: { commands: unknown[]; probes: unknown[] } };
 const roots: string[] = [];

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AttemptContext, ProcessHandle } from "../../src/index.js";
-import { consumeDsh } from "../../src/adapters/harness/dsh/protocol.js";
+import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
 
 const roots: string[] = [];
 async function context(): Promise<AttemptContext> {

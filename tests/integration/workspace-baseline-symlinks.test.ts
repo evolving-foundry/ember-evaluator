@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { expect, test } from "vitest";
-import { workspaceHelperSource } from "../../src/plugins/environments/workspace-transfer.js";
+import { workspaceHelperSource } from "../../src/infrastructure/filesystem/workspace-transfer.js";
 
 test.skipIf(process.env.EVALUATOR_TEST_DOCKER !== "1")(
   "restores unchanged baseline symlinks without introducing new or changed unsafe links",

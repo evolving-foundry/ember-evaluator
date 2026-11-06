@@ -1,4 +1,4 @@
-import type { AgentXWorkload } from "../../../src/adapters/harness/agentx/protocol.js";
+import type { AgentXWorkload } from "../../../src/plugins/benchmarks/inference-engine/agentx/evidence/summary.js";
 
 export const workload: AgentXWorkload = {
   schemaVersion: 1, kind: "agentx", mode: "standard", variant: "256k", concurrency: 1,

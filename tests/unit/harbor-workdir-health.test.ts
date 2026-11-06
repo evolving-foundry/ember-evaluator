@@ -1,9 +1,9 @@
 import { expect, test, vi } from "vitest";
-import { inferDockerWorkdir } from "../../src/plugins/benchmarks/protocols/harbor/workdir.js";
-import { waitTaskHealth } from "../../src/plugins/environments/docker-healthcheck.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { validateStateProfile } from "../../src/plugins/benchmarks/protocols/harbor/compatibility.js";
-import { validateTransferSpec } from "../../src/plugins/environments/workspace-transfer.js";
+import { inferDockerWorkdir } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/workdir.js";
+import { waitTaskHealth } from "../../src/infrastructure/containers/healthcheck.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { validateStateProfile } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/compatibility.js";
+import { validateTransferSpec } from "../../src/infrastructure/filesystem/workspace-transfer.js";
 
 test("a runtime ancestor can be a cwd but cannot be an archive root", () => {
   expect(inferDockerWorkdir("FROM fixture\nWORKDIR /opt\n")).toBe("/opt");

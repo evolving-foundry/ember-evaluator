@@ -2,17 +2,18 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { RayJobsDeployment } from "../../src/adapters/ray/deployment.js";
-import { JobsClient, parseJobsConfig } from "../../src/adapters/ray/jobs-client.js";
-import { downloadRunResults, localizeRunPluginRuntime } from "../../src/adapters/ray/jobs-results.js";
-import { rebuildReport } from "../../src/report.js";
-import type { PluginFactoryContext } from "../../src/core/registry.js";
+import { RayJobsDeployment } from "../../src/application/ray/deployment.js";
+import { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
+import { parseJobsConfig } from "../../src/config/jobs.js";
+import { downloadRunResults, localizeRunPluginRuntime } from "../../src/application/ray/jobs-results.js";
+import { rebuildReport } from "../../src/application/report/index.js";
+import type { PluginFactoryContext } from "../../src/core/contracts/plugin.js";
 import type { PluginConfigTransport } from "../../src/core/contracts/config-transport.js";
-import { localizePortableSelection } from "../../src/adapters/ray/protocol.js";
+import { localizePortableSelection } from "../../src/infrastructure/ray/protocol.js";
 import { classifyError } from "../../src/core/errors/classify.js";
 
-vi.mock("../../src/adapters/ray/jobs-results.js", () => ({ downloadRunResults: vi.fn(), localizeRunPluginRuntime: vi.fn(), buildResumeSeed: vi.fn() }));
-vi.mock("../../src/report.js", () => ({ rebuildReport: vi.fn() }));
+vi.mock("../../src/application/ray/jobs-results.js", () => ({ downloadRunResults: vi.fn(), localizeRunPluginRuntime: vi.fn(), buildResumeSeed: vi.fn() }));
+vi.mock("../../src/application/report/index.js", () => ({ rebuildReport: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
 
 test.each([false, true])("Jobs image cleanup returns maintenance results without model auth: execute=%s", async execute => {

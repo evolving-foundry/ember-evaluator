@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test, vi } from "vitest";
 import { constrainDockerCpus, cpuBudgetNodeOptions, cpuCountForBudget, CPU_VIEW_PATH,
-  nodeCpuViewSource, parseCpuList, selectCpuSet } from "../../src/plugins/environments/docker-cpu.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+  nodeCpuViewSource, parseCpuList, selectCpuSet } from "../../src/infrastructure/containers/cpu.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 
 const signal = () => new AbortController().signal;
 

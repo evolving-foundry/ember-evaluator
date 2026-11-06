@@ -11,8 +11,8 @@ vi.mock("node:child_process", async importOriginal => {
     execFile: Object.assign(vi.fn(), { [Symbol.for("nodejs.util.promisify.custom")]: probe }),
   };
 });
-import { resolveLinuxUvBinary } from "../../src/adapters/harness/uv-binary.js";
-import { PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
+import { resolveLinuxUvBinary } from "../../src/infrastructure/runtime-installation/uv-binary.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
 
 const originalEnv = { ...process.env };
 const temporary: string[] = [];

@@ -4,13 +4,13 @@ import { resolve, join } from "node:path";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { afterEach, expect, test, vi } from "vitest";
-import { checkHostTelemetry, startHostTelemetry } from "../../src/adapters/harness/agentx/host-telemetry.js";
+import { checkHostTelemetry, startHostTelemetry } from "../../src/runtimes/agentx/host-telemetry.js";
 import { AgentXReplaySolver, parseAgentXReplayConfig } from "../../src/plugins/solvers/agentx-replay.js";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
 import { workload, profileExport } from "../fixtures/agentx/export.js";
 import { serverMetricsEvidence, telemetryConfig } from "../fixtures/agentx/server-metrics.js";
-import { diagnose } from "../../src/commands/doctor.js";
-import { loadConfig } from "../../src/config/load.js";
+import { diagnose } from "../../src/application/diagnostics/doctor.js";
+import { loadConfig } from "../../src/application/config.js";
 import { stringify } from "yaml";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -18,7 +18,7 @@ const python = process.platform === "win32" ? "python" : "python3";
 const available = spawnSync(python, ["-c", "import sys; assert sys.version_info >= (3,9)"], { windowsHide: true }).status === 0;
 
 test.skipIf(!available)("host protocol enforces read-only commands, explicit cards and connection-owned sampling", () => {
-  const result = spawnSync(python, ["-B", resolve("tests/fixtures/agentx/check-host-telemetry.py"), resolve("src/adapters/harness/agentx/assets")],
+  const result = spawnSync(python, ["-B", resolve("tests/fixtures/agentx/check-host-telemetry.py"), resolve("src/runtimes/agentx/assets")],
     { encoding: "utf8", windowsHide: true, timeout: 20000, env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
   expect(result.status, result.stderr).toBe(0);
   expect(result.stderr).toContain("Ran 6 tests");

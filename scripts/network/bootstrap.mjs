@@ -7366,7 +7366,7 @@ var require_dist = __commonJS({
   }
 });
 
-// src/adapters/network/package-manager.ts
+// src/infrastructure/network/package-manager.ts
 import { lstat, realpath } from "node:fs/promises";
 import { delimiter, dirname, join } from "node:path";
 async function packageManagerCli(name) {
@@ -7387,7 +7387,7 @@ async function packageManagerCli(name) {
   throw new Error(`Cannot locate installed ${name} beside Node or on PATH`);
 }
 
-// src/adapters/network/bootstrap.ts
+// src/application/network/bootstrap.ts
 import { spawn } from "node:child_process";
 
 // src/config/network.ts
@@ -7395,7 +7395,10 @@ import { link, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname as dirname2, join as join2, resolve } from "node:path";
 import { homedir } from "node:os";
 var import_yaml = __toESM(require_dist(), 1);
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+
+// src/config/network-schema.ts
+import { createHash } from "node:crypto";
 var locations = ["host", "daemon", "build", "runtime"];
 var aptKeys = ["debian", "debianSecurity", "ubuntu", "ubuntuSecurity", "ubuntuPorts"];
 function record(value, keys, label) {
@@ -7520,14 +7523,14 @@ function parseNetworkSettings(value) {
     git: { ssh: { route } }
   };
 }
-function expand(value, env2) {
+function expandNetworkTemplate(value, env2) {
   if (typeof value === "string") return value.replace(/\$\{([A-Za-z_]\w*)\}/gu, (_match, key) => {
     if (env2[key] === void 0) throw new TypeError(`Network configuration references missing environment variable ${key}`);
     return env2[key];
   });
   if (value === null || typeof value === "boolean" || typeof value === "number" && Number.isFinite(value)) return value;
-  if (Array.isArray(value)) return value.map((item) => expand(item, env2));
-  if (typeof value === "object" && value !== null) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, expand(item, env2)]));
+  if (Array.isArray(value)) return value.map((item) => expandNetworkTemplate(item, env2));
+  if (typeof value === "object" && value !== null) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, expandNetworkTemplate(item, env2)]));
   throw new TypeError("Network configuration must contain JSON-compatible values");
 }
 function mergeNetworkTemplate(base, overrides, label = "network") {
@@ -7590,7 +7593,7 @@ function applyNetworkEnvironment(template, env2) {
 }
 function networkDocument(template, env2, origin = "template") {
   template = applyNetworkEnvironment(template, env2);
-  const settings = parseNetworkSettings(expand(template, env2));
+  const settings = parseNetworkSettings(expandNetworkTemplate(template, env2));
   return {
     template: structuredClone(template),
     settings,
@@ -7598,6 +7601,26 @@ function networkDocument(template, env2, origin = "template") {
     digest: createHash("sha256").update(JSON.stringify(redactNetwork(settings))).digest("hex")
   };
 }
+function redactNetwork(value) {
+  if (typeof value === "string") {
+    try {
+      const parsed = new URL(value);
+      if (parsed.username || parsed.password) {
+        parsed.username = "redacted";
+        parsed.password = "redacted";
+        return parsed.href;
+      }
+    } catch {
+    }
+    return value;
+  }
+  if (value === null || typeof value === "boolean" || typeof value === "number") return value;
+  if (Array.isArray(value)) return value.map(redactNetwork);
+  if (typeof value === "object" && value !== null) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactNetwork(item)]));
+  return null;
+}
+
+// src/config/network.ts
 async function loadNetworkConfig(path, env2 = process.env) {
   const selected = path ?? env2.EVALUATOR_NETWORK_CONFIG;
   const absolute = selected ? resolve(selected) : defaultNetworkConfigPath();
@@ -7621,31 +7644,13 @@ async function loadNetworkConfig(path, env2 = process.env) {
     content = await readFile(absolute, "utf8");
   }
   const template = (0, import_yaml.parse)(content, { maxAliasCount: 50, uniqueKeys: true }) ?? {};
-  return networkDocument(expand(template, new Proxy({}, { get: (_target, key) => typeof key === "string" ? `\${${key}}` : void 0 })), env2, absolute);
+  return networkDocument(expandNetworkTemplate(template, new Proxy({}, { get: (_target, key) => typeof key === "string" ? `\${${key}}` : void 0 })), env2, absolute);
 }
 function defaultNetworkConfigPath() {
   return join2(homedir(), ".ember-evaluator", "network.yaml");
 }
-function redactNetwork(value) {
-  if (typeof value === "string") {
-    try {
-      const parsed = new URL(value);
-      if (parsed.username || parsed.password) {
-        parsed.username = "redacted";
-        parsed.password = "redacted";
-        return parsed.href;
-      }
-    } catch {
-    }
-    return value;
-  }
-  if (value === null || typeof value === "boolean" || typeof value === "number") return value;
-  if (Array.isArray(value)) return value.map(redactNetwork);
-  if (typeof value === "object" && value !== null) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactNetwork(item)]));
-  return null;
-}
 
-// src/adapters/network/environment.ts
+// src/infrastructure/network/environment.ts
 import { fileURLToPath } from "node:url";
 var controlled = /^(?:https?_proxy|all_proxy|no_proxy|hf_endpoint|git_ssh_command|evaluator_ssh_proxy|pip_(?:index_url|extra_index_url|trusted_host|config_file)|uv_(?:default_index|index_url|extra_index_url|index|python_install_mirror)|npm_config_(?:registry|proxy|https_proxy|noproxy)|corepack_npm_registry|evaluator_(?:debian_mirror|github_mirror|node_mirror|node_image_mirror|docker_build_network|network_config))$/iu;
 function networkEnvironment(settings, location, base = {}, target = location === "build" ? "container" : "host") {
@@ -7685,7 +7690,7 @@ function networkEnvironment(settings, location, base = {}, target = location ===
   return env2;
 }
 
-// src/adapters/network/bootstrap.ts
+// src/application/network/bootstrap.ts
 var args = process.argv.slice(2);
 var separator = args.indexOf("--");
 if (separator < 0 || !args[separator + 1] || separator !== 0 && (separator !== 2 || args[0] !== "--network"))

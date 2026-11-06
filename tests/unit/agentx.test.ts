@@ -1,16 +1,16 @@
 import { expect, test } from "vitest";
-import { normalizeAgentXExport, parseAgentXSummary, parseWorkload, agentXUsage } from "../../src/adapters/harness/agentx/protocol.js";
-import { parseAgentXConfig, AgentXBenchmark } from "../../src/plugins/benchmarks/protocols/agentx/agentx-benchmark.js";
+import { normalizeAgentXExport, parseAgentXSummary, parseWorkload, agentXUsage } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/summary.js";
+import { parseAgentXConfig, AgentXBenchmark } from "../../src/plugins/benchmarks/inference-engine/agentx/agentx-benchmark.js";
 import { agentXEndpoint, parseAgentXReplayConfig } from "../../src/plugins/solvers/agentx-replay.js";
-import { readProfileDirectory } from "../../src/config/profiles.js";
+import { readProfileDirectory } from "../../src/infrastructure/profiles/read.js";
 import { resolveInput } from "../../src/config/resolve.js";
-import { assertAttemptRecord, assertVerifyResult } from "../../src/core/record-validation.js";
-import { finalizeAttemptOutcome, evaluationScore, isEvaluationComplete } from "../../src/core/evaluation-outcome.js";
+import { assertAttemptRecord, assertVerifyResult } from "../../src/core/results/record-validation.js";
+import { finalizeAttemptOutcome, evaluationScore, isEvaluationComplete } from "../../src/core/results/evaluation-outcome.js";
 import { computeSuccessRate } from "../../src/plugins/metrics/success-rate.js";
 import { HarborScoreMetrics } from "../../src/plugins/metrics/harbor-score.js";
 import { AgentXPerformanceMetrics } from "../../src/plugins/metrics/agentx-performance.js";
 import { renderMarkdown } from "../../src/plugins/reporters/markdown.js";
-import type { EffectiveConfig } from "../../src/config/schema.js";
+import type { EffectiveConfig } from "../../src/core/contracts/config.js";
 import type { ResultSnapshot } from "../../src/core/contracts/result.js";
 import { storeRecord, storeRun } from "../fixtures/results/store-fixture.js";
 import { workload, lexicon, profileExport } from "../fixtures/agentx/export.js";
@@ -28,7 +28,7 @@ function snapshot(): ResultSnapshot {
 }
 
 test("AgentX profile exposes standard and replay, and rejects the removed smoke scenario", async () => {
-  const profiles = await readProfileDirectory(new URL("../../src/plugins/benchmarks/profiles/", import.meta.url));
+  const profiles = await readProfileDirectory(new URL("../../src/plugins/benchmarks/inference-engine/profiles/", import.meta.url));
   const source = { services: { default: { model: "fixture/model", base_url: "http://localhost:8000/v1" } }, benchmark: { name: "agentx" } };
   const standard = resolveInput("experiment.yaml", source, profiles).source;
   expect(standard.solver).toMatchObject({ name: "agentx-replay" });

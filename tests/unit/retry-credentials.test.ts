@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { retryRun } from "../../src/retry.js";
+import { retryRun } from "../../src/application/retry.js";
 
 test.each(["solver", "verifier", "benchmark-judge"])("retry rejects runtime-only %s authentication before admitting an Attempt", async role => {
   const root = await mkdtemp(join(tmpdir(), "retry-credentials-"));

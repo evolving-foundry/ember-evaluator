@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { assertAttemptRecord } from "../../src/core/record-validation.js";
+import { assertAttemptRecord } from "../../src/core/results/record-validation.js";
 import { fixtureFailure, storeRecord } from "../fixtures/results/store-fixture.js";
 
 test("accepts a disclosed prompt without requiring a textual answer", () => {

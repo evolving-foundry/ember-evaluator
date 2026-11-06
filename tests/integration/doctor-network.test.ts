@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse } from "yaml";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { runCli, parseArgs } from "../../src/cli.js";
-import { diagnoseNetwork } from "../../src/adapters/network/doctor.js";
+import { runCli, parseArgs } from "../../src/cli/main.js";
+import { diagnoseNetwork } from "../../src/application/diagnostics/network.js";
 import { defaultNetworkConfigPath } from "../../src/config/network.js";
 
-vi.mock("../../src/adapters/network/doctor.js", () => ({ diagnoseNetwork: vi.fn() }));
+vi.mock("../../src/application/diagnostics/network.js", () => ({ diagnoseNetwork: vi.fn() }));
 const roots: string[] = [];
 beforeEach(() => vi.stubEnv("TEST_KEY", "fixture-secret"));
 afterEach(async () => { vi.resetAllMocks(); vi.unstubAllEnvs(); await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true }))); });

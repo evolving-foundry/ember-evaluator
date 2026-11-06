@@ -4,10 +4,11 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
-import { PlatformCapabilityDetector } from "../../src/plugins/environments/docker-platform.js";
+import { PlatformCapabilityDetector } from "../../src/infrastructure/containers/platform.js";
 import { createHash } from "node:crypto";
-import { DockerRuntime, DOCKER_PLATFORM, PINNED_NODE_IMAGE, type DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { DockerEnvironment, parseDockerContainerEnv, parseDockerImageOverrides } from "../../src/plugins/environments/docker.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { DOCKER_PLATFORM, PINNED_NODE_IMAGE, type DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { DockerEnvironment, parseDockerContainerEnv, parseDockerImageOverrides } from "../../src/plugins/environments/docker/environment.js";
 import { redactConfig, redactSecrets } from "../../src/config/redact.js";
 
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { CommandSpec, EnvironmentSession, ProcessHandle } from "../../src/core/contracts/environment.js";
 import type { AttemptContext } from "../../src/core/contracts/solver.js";
-import { verifyBundleCandidate } from "../../src/adapters/agentbundle/sdk.js";
+import { verifyBundleCandidate } from "../../src/runtimes/agentbundle/sdk.js";
 import { AgentBundleSolver } from "../../src/plugins/solvers/agentbundle.js";
 
 const fixtureBundle = join(import.meta.dirname, "..", "fixtures", "agentbundle", "deepagents");

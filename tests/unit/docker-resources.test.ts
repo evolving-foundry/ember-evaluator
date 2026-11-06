@@ -1,8 +1,8 @@
 import { expect, test, vi } from "vitest";
-import { assertDockerCapacity, readDockerCapacity } from "../../src/plugins/environments/docker-resources.js";
+import { assertDockerCapacity, readDockerCapacity } from "../../src/infrastructure/containers/resources.js";
 import { classifyError } from "../../src/core/errors/classify.js";
-import { failureDecision } from "../../src/core/error-policy.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import { failureDecision } from "../../src/core/policies/error-policy.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 
 test("Docker capacity rejects oversized tasks without declaring the node exhausted", async () => {
   const command = vi.fn<DockerCommand>().mockResolvedValue({ stdout: '{"NCPU":4,"MemTotal":8589934592}', stderr: "" });

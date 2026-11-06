@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, vi } from "vitest";
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
 
 // Existing protocol fixtures mock web fetch; route only test-owned instances through that fixture.
 let restore: (() => void) | undefined;

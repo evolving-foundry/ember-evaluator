@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, vi } from "vitest";
 import { stringify } from "yaml";
-import { runCli } from "../../src/cli.js";
+import { runCli } from "../../src/cli/main.js";
 import { defaultNetworkConfigPath, loadNetworkConfig } from "../../src/config/network.js";
 
 test("retry reads the edited default network YAML after the original source download failed", async () => {

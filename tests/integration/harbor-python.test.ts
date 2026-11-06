@@ -3,11 +3,11 @@ import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { preparePythonVerifier } from "../../src/adapters/verifiers/python/bridge.js";
+import { preparePythonVerifier } from "../../src/plugins/verifiers/python/runtime/bridge.js";
 import type { VerificationTask } from "../../src/core/contracts/verifier.js";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
-import type { PluginFactoryContext } from "../../src/core/registry.js";
-import { HarborPythonVerifier, parsePythonVerifierConfig } from "../../src/plugins/verifiers/python.js";
+import type { PluginFactoryContext } from "../../src/core/contracts/plugin.js";
+import { HarborPythonVerifier, parsePythonVerifierConfig } from "../../src/plugins/verifiers/python/index.js";
 import { VerificationError } from "../../src/core/errors/verification-error.js";
 
 const fixtureWorker = String.raw`

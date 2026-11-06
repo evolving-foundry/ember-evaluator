@@ -3,10 +3,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { LiveOperation } from "../../src/core/live-progress.js";
-import type { ProgressEvent } from "../../src/core/progress.js";
-import { runDockerCommand } from "../../src/plugins/environments/docker.js";
-import { observeDockerCommand, withDockerActivity } from "../../src/plugins/environments/docker-progress.js";
+import { LiveOperation } from "../../src/core/progress/live-progress.js";
+import type { ProgressEvent } from "../../src/core/progress/progress.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
+import { observeDockerCommand, withDockerActivity } from "../../src/infrastructure/containers/progress.js";
 
 test.skipIf(process.env.EVALUATOR_LIVE_PROGRESS_DOCKER_TESTS !== "1")("real BuildKit output arrives before completion and failed builds retain their last operation", async () => {
   const root = await mkdtemp(join(tmpdir(), "live-buildkit-"));

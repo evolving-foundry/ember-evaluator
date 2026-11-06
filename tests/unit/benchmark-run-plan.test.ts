@@ -1,9 +1,9 @@
 import { expect, test, vi } from "vitest";
-import { planBenchmarkRun } from "../../src/plugins/benchmarks/plan-run.js";
-import { parseHarborConfig } from "../../src/plugins/benchmarks/protocols/harbor/index.js";
+import { planBenchmarkRun } from "../../src/plugins/benchmarks/shared/plan-run.js";
+import { parseHarborConfig } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/index.js";
 import type { PreparedTask, TaskRef } from "../../src/core/contracts/task.js";
 import type { SourceLock } from "../../src/core/contracts/task.js";
-import { HarborTaskError } from "../../src/plugins/benchmarks/protocols/harbor/compatibility.js";
+import { HarborTaskError } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/compatibility.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
 
 const source: SourceLock = { source: "test", revision: "1", files: [], metadata: null };

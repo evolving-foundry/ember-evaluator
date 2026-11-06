@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Context } from "@deepseek-ai/cordis";
 import { expect, test, vi } from "vitest";
-import { apply as registerEvaluator } from "../../src/core/registry.js";
+import { apply as registerEvaluator } from "../../src/application/plugins/registry.js";
 import * as builtins from "../../src/plugins/index.js";
-import { DefinedBenchmark } from "../../src/plugins/benchmarks/definitions/defined-benchmark.js";
-import { completeJudge } from "../../src/adapters/models/judge.js";
+import { DefinedBenchmark } from "../../src/plugins/benchmarks/agent-harness/definitions/defined-benchmark.js";
+import { completeJudge } from "../../src/infrastructure/models/judge.js";
 
-vi.mock("../../src/adapters/models/judge.js", () => ({ completeJudge: vi.fn() }));
+vi.mock("../../src/infrastructure/models/judge.js", () => ({ completeJudge: vi.fn() }));
 
 test("DefinedBenchmark loads locked JSONL tasks, scores answers, and resumes from cache", async () => {
   vi.stubEnv("HF_ENDPOINT", "https://hf-mirror.com");

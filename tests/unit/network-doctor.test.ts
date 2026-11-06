@@ -1,16 +1,16 @@
 import { expect, test, vi, afterEach } from "vitest";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { networkDocument } from "../../src/config/network.js";
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { diagnoseNetwork } from "../../src/adapters/network/doctor.js";
-import { networkCommand } from "../../src/adapters/network/command.js";
-import { runDockerCommand } from "../../src/plugins/environments/docker.js";
+import { networkDocument } from "../../src/config/network-schema.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { diagnoseNetwork } from "../../src/application/diagnostics/network.js";
+import { networkCommand } from "../../src/infrastructure/network/command.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
 
-vi.mock("../../src/adapters/network/command.js", () => ({ networkCommand: vi.fn() }));
-vi.mock("../../src/adapters/network/package-manager.js", () => ({ packageManagerCli: async (name: string) => `/fixture/${name}.js` }));
-vi.mock("../../src/plugins/environments/docker.js", () => ({ runDockerCommand: vi.fn() }));
-vi.mock("../../src/plugins/environments/docker-platform.js", () => ({ PlatformCapabilityDetector: class {
+vi.mock("../../src/infrastructure/network/command.js", () => ({ networkCommand: vi.fn() }));
+vi.mock("../../src/infrastructure/network/package-manager.js", () => ({ packageManagerCli: async (name: string) => `/fixture/${name}.js` }));
+vi.mock("../../src/infrastructure/containers/command.js", () => ({ runDockerCommand: vi.fn() }));
+vi.mock("../../src/infrastructure/containers/platform.js", () => ({ PlatformCapabilityDetector: class {
   async nativePlatform() { return "linux/amd64"; }
 } }));
 afterEach(() => vi.restoreAllMocks());

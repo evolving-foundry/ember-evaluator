@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterAll, expect, test } from "vitest";
 
-import { disposePiBundle, PiBundleError, stagePiBundle, type StagedPiBundle } from "../../src/adapters/harness/pi/bundle.js";
-import { disposePiBundleRuntime } from "../../src/adapters/harness/pi/agentbundle-runtime.js";
-import { parseRunnerInput, projectRunnerInput } from "../../src/adapters/harness/pi/protocol.js";
+import { disposePiBundle, PiBundleError, stagePiBundle, type StagedPiBundle } from "../../src/runtimes/pi/bundle.js";
+import { disposePiBundleRuntime } from "../../src/runtimes/pi/agentbundle-runtime.js";
+import { parseRunnerInput, projectRunnerInput } from "../../src/runtimes/pi/protocol.js";
 import { parseSimpleAgentConfig } from "../../src/plugins/solvers/simpleagent.js";
 
 const fixtureBundle = resolve("tests/fixtures/pi-bundle");

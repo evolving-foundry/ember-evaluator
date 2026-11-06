@@ -5,9 +5,9 @@ import { dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parse } from "yaml";
 
-import { expectNonEmptyString, expectRecord, rejectUnknown } from "./schema.js";
-import { BUILTIN_RUNTIME_ID } from "../core/builtin-runtime.js";
-import { PACKAGE_RUNTIME_ID } from "../core/package-provenance.js";
+import { expectNonEmptyString, expectRecord, rejectUnknown } from "../core/validation/input.js";
+import { BUILTIN_RUNTIME_ID } from "../core/results/runtime-identity.js";
+import { PACKAGE_RUNTIME_ID } from "../core/results/runtime-identity.js";
 
 export type PluginPatchEntry = {
   id: string;

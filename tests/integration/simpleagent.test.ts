@@ -7,14 +7,14 @@ import { mkdtemp, mkdir, rm, cp } from "node:fs/promises";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 
 import type { AttemptContext, AttemptKey, AttemptPaths, ComponentActivity, EnvironmentSession, ProcessHandle, PublicTask, RuntimeInstallation } from "../../src/index.js";
-import { packageManagerCli } from "../../src/adapters/network/package-manager.js";
-import { LocalEnvironment } from "../../src/plugins/environments/local.js";
-import { parseRunnerInput, projectRunnerInput } from "../../src/adapters/harness/pi/protocol.js";
-import { run } from "../../src/adapters/harness/pi/runner.js";
-import { TrajectoryWriter, validateSequence, type TrajectoryEvent } from "../../src/adapters/harness/pi/trajectory.js";
+import { packageManagerCli } from "../../src/infrastructure/network/package-manager.js";
+import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
+import { parseRunnerInput, projectRunnerInput } from "../../src/runtimes/pi/protocol.js";
+import { run } from "../../src/runtimes/pi/runner.js";
+import { TrajectoryWriter, validateSequence, type TrajectoryEvent } from "../../src/core/artifacts/trajectory.js";
 import { SimpleAgentSolver } from "../../src/plugins/solvers/simpleagent.js";
-import { loadConfig } from "../../src/config/load.js";
-import { loadBuiltinRuntimeDigest } from "../../src/core/builtin-runtime.js";
+import { loadConfig } from "../../src/application/config.js";
+import { loadBuiltinRuntimeDigest } from "../../src/infrastructure/provenance/builtin-runtime.js";
 import { taskMcpServer } from "../fixtures/task-mcp-server.js";
 
 const fixtureRoot = resolve("tests/fixtures");
@@ -453,7 +453,7 @@ describe("simpleagent runner", () => {
     })).resolves.toMatchObject({ finalText: "done" });
     expect(uploads).toEqual([]);
     expect(commands).toHaveLength(1);
-    expect(commands[0]?.args).toEqual(["/opt/evaluator-agent/dist/adapters/harness/pi/runner.js"]);
+    expect(commands[0]?.args).toEqual(["/opt/evaluator-agent/dist/runtimes/pi/runner.js"]);
     expect(commands[0]?.env).toEqual({});
   });
 
@@ -482,9 +482,9 @@ describe("simpleagent runner", () => {
     const installation = await solver.runtimeInstallation!(new AbortController().signal);
     expect(installation.id).toBe(await loadBuiltinRuntimeDigest());
     expect(installation.files).toEqual([
-      { source: resolve("dist/adapters/harness/pi/runtime-package.json"), target: "package.json" },
-      { source: resolve("dist/adapters/harness/pi/runtime-lock.json"), target: "package-lock.json" },
-      { source: resolve("dist/adapters/harness/pi"), target: "dist/adapters/harness/pi" },
+      { source: resolve("dist/runtimes/pi/runtime-package.json"), target: "package.json" },
+      { source: resolve("dist/runtimes/pi/runtime-lock.json"), target: "package-lock.json" },
+      { source: resolve("dist/runtimes/pi"), target: "dist/runtimes/pi" },
     ]);
     expect(installation.commands).toEqual([{
       executable: "npm",
@@ -494,8 +494,8 @@ describe("simpleagent runner", () => {
     expect(JSON.stringify(installation.probes)).not.toMatch(/(?:src\/|tsx|ts-node|pnpm)/u);
     expect(JSON.stringify(installation)).not.toContain("secret-token");
     expect(installation.localRoot).toBe(resolve("."));
-    const runtimeManifest = JSON.parse(await readFile(resolve("dist/adapters/harness/pi/runtime-package.json"), "utf8"));
-    const runtimeLock = JSON.parse(await readFile(resolve("dist/adapters/harness/pi/runtime-lock.json"), "utf8"));
+    const runtimeManifest = JSON.parse(await readFile(resolve("dist/runtimes/pi/runtime-package.json"), "utf8"));
+    const runtimeLock = JSON.parse(await readFile(resolve("dist/runtimes/pi/runtime-lock.json"), "utf8"));
     expect(runtimeManifest.dependencies).not.toHaveProperty("agent-bundle-core");
     expect(runtimeLock.packages[""].dependencies).not.toHaveProperty("agent-bundle-core");
     expect(runtimeLock.packages).not.toHaveProperty("node_modules/agent-bundle-core");
