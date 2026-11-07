@@ -1,4 +1,4 @@
-import type { RetryControlService, RetryController } from "../contracts/retry-control.js";
+import type { RetryControlService, RetryController, RetryRequest, RetryAdmission } from "../contracts/retry-control.js";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import type { RunComponents } from "../contracts/components.js";
@@ -13,7 +13,6 @@ import { preparationConcurrency } from "../preparation/preparation-timeout.js";
 import type { PreparationPipeline } from "../contracts/preparation.js";
 import { prepareDispatch } from "../preparation/prepare-dispatch.js";
 
-import { type RetryAdmission } from "../contracts/retry-control.js";
 import { resolveRunStatus } from "../results/task-result-resolver.js";
 import { TaskQueue } from "./task-queue.js";
 import { isManualRetryEligible } from "../recovery/manual-retry.js";
@@ -24,7 +23,7 @@ import { enumerateSelectedTasks } from "../selection/task-selection.js";
 import { assertResumeSolverProvenance, resolveSolverProvenance } from "../results/solver-provenance.js";
 import type { ProgressListener } from "../progress/progress.js";
 import { progressOperation } from "../progress/progress-operation.js";
-import type { SourceLock } from "../contracts/task.js";
+import type { SourceLock, PreparedTask } from "../contracts/task.js";
 import { attemptStatus, attemptTimeoutKind, evaluationScore, hasUnconfirmedCleanup, isAgentTimeout, isEvaluationComplete } from "../results/evaluation-outcome.js";
 import { formatError, redactDiagnostic } from "../errors/diagnostics.js";
 import { classifyError, failureMessage } from "../errors/classify.js";
@@ -45,6 +44,86 @@ export type EngineExecutionInput = {
 function warnRetryControl(input: EngineExecutionInput, error: unknown): void {
   input.onProgress?.({ phase: "retry", warning: true,
     message: `Manual retry control failed; evaluation continues. ${redactDiagnostic(formatError(error), Object.values(input.config.auths).map(auth => auth.value))}` });
+}
+
+async function admitRetryRequests(
+  requests: RetryRequest[],
+  store: RunComponents["store"],
+  originals: ReadonlyMap<string, TaskJob>,
+  queue: TaskQueue,
+): Promise<RetryAdmission> {
+  const reservations: RetryAdmission[] = [];
+  try {
+    const records = (await store.snapshot()).records;
+    for (const request of requests) {
+      for (const record of records.filter(item => isManualRetryEligible(item) && (!request.taskIds.length || request.taskIds.includes(item.key.taskId)))) {
+        const original = originals.get(record.key.taskId);
+        const reservation = original ? queue.reserve({ ...original, attemptId: randomUUID() }, record.key.attemptId) : undefined;
+        if (reservation) {
+          reservations.push(reservation);
+          request.bindings = { ...request.bindings, [record.key.taskId]: record.key.attemptId };
+        }
+      }
+      request.status = Object.keys(request.bindings).length ? "accepted" : "rejected";
+      request.message = request.status === "rejected" ? "No eligible idle network failures" : "Admitted by coordinator";
+    }
+    return {
+      commit: () => {
+        for (const item of reservations) item.commit();
+      },
+      release: () => {
+        for (const item of reservations) item.release();
+      },
+    };
+  } catch (error) {
+    for (const item of reservations) item.release();
+    throw error;
+  }
+}
+
+type RetryPreparation = { task?: PreparedTask; failure?: Failure };
+
+async function prepareRetryTask(
+  job: TaskJob,
+  initialAttemptId: string | undefined,
+  { components, source, signal, run, sensitiveValues, onProgress }: {
+    components: RunComponents;
+    source: SourceLock;
+    signal: AbortSignal;
+    run: ExecutionConfig["experiment"]["run"];
+    sensitiveValues: readonly string[];
+    onProgress: ProgressListener;
+  },
+): Promise<RetryPreparation | undefined> {
+  if (initialAttemptId === job.attemptId || !components.benchmark.planRun) return undefined;
+  const planRun = components.benchmark.planRun.bind(components.benchmark);
+  const plan = await progressOperation(onProgress, {
+    phase: "prepare", message: "Replanning task environments", taskId: job.taskId, attemptId: job.attemptId,
+  }, signal, activity => planRun([job.ref], source, signal, activity));
+  const rejected = plan.preparationFailures?.find(item => item.taskId === job.taskId);
+  if (rejected) return { failure: rejected.failure };
+  try {
+    const history = (await components.store.snapshot()).run.preparationRounds ?? [];
+    if (!components.scheduler.prepareTasks) throw new Error("Scheduler must implement prepareTasks() for planned retries");
+    const prepared = await components.scheduler.prepareTasks([job], plan, {
+      previous: history,
+      settings: { mode: "batch", concurrency: 1,
+        ...(run.preparation?.environmentTimeoutSeconds === undefined ? {} : { environmentTimeoutSeconds: run.preparation.environmentTimeoutSeconds }),
+        ...(run.preparation?.roundTimeoutSeconds === undefined ? {} : { roundTimeoutSeconds: run.preparation.roundTimeoutSeconds }) },
+      sensitiveValues, onProgress, store: components.store,
+      prepareTask: createTaskPreparer(components, { sensitiveValues, onProgress }),
+    }, signal);
+    if (prepared.pipeline) {
+      prepared.pipeline.cancel(new Error("Retry preparation requires a batch barrier"));
+      await prepared.pipeline.completion;
+      throw new Error("Scheduler returned streaming preparation for a batch retry");
+    }
+    const task = prepared.tasks[0];
+    const failure = plan.preparationFailures?.find(item => item.taskId === job.taskId)?.failure;
+    return { ...(task ? { task } : {}), ...(failure ? { failure } : {}) };
+  } catch (error) {
+    return { failure: classifyError(error, { phase: "prepare", component: "environment", secrets: sensitiveValues }) };
+  }
 }
 
 export async function executeEngine({
@@ -311,61 +390,12 @@ export async function executeEngine({
       retry.initialComplete();
     }
     try {
-      await control?.setAdmission(async requests => {
-        const reservations: RetryAdmission[] = [];
-        try {
-          const records = (await components.store.snapshot()).records;
-          for (const request of requests) {
-            for (const record of records.filter(item => isManualRetryEligible(item) && (!request.taskIds.length || request.taskIds.includes(item.key.taskId)))) {
-              const original = originals.get(record.key.taskId);
-              const reservation = original ? retry.reserve({ ...original, attemptId: randomUUID() }, record.key.attemptId) : undefined;
-              if (reservation) {
-                reservations.push(reservation);
-                request.bindings = { ...request.bindings, [record.key.taskId]: record.key.attemptId };
-              }
-            }
-            request.status = Object.keys(request.bindings).length ? "accepted" : "rejected";
-            request.message = request.status === "rejected" ? "No eligible idle network failures" : "Admitted by coordinator";
-          }
-          return { commit: () => { for (const item of reservations) item.commit(); }, release: () => { for (const item of reservations) item.release(); } };
-        } catch (error) { for (const item of reservations) item.release(); throw error; }
-      });
-    } catch (error) { warnControl(error); }
+      await control?.setAdmission(requests => admitRetryRequests(requests, components.store, originals, retry));
+    } catch (error) {
+      warnControl(error);
+    }
     const recoveryPreparation = new AbortController();
     const recoverySignal = AbortSignal.any([schedulerSignal, recoveryPreparation.signal]);
-    const prepareRetry = async (job: TaskJob): Promise<TaskJob> => {
-      const initial = originals.get(job.taskId);
-      if (initial?.attemptId === job.attemptId || !components.benchmark.planRun) return job;
-      plannedTasks.delete(job.taskId); preparationFailures.delete(job.taskId); readiness.delete(job.taskId);
-      const plan = await progressOperation(taskProgress, { phase: "prepare", message: "Replanning task environments", taskId: job.taskId, attemptId: job.attemptId }, recoverySignal,
-        activity => components.benchmark.planRun!([job.ref], source, recoverySignal, activity));
-      const rejected = plan.preparationFailures?.find(item => item.taskId === job.taskId);
-      if (rejected) preparationFailures.set(job.taskId, rejected.failure);
-      else {
-        try {
-          const history = (await components.store.snapshot()).run.preparationRounds ?? [];
-          if (!components.scheduler.prepareTasks) throw new Error("Scheduler must implement prepareTasks() for planned retries");
-          const prepared = await components.scheduler.prepareTasks([job], plan, {
-            previous: history, settings: { mode: "batch", concurrency: 1,
-              ...(config.experiment.run.preparation?.environmentTimeoutSeconds === undefined ? {} : { environmentTimeoutSeconds: config.experiment.run.preparation.environmentTimeoutSeconds }),
-              ...(config.experiment.run.preparation?.roundTimeoutSeconds === undefined ? {} : { roundTimeoutSeconds: config.experiment.run.preparation.roundTimeoutSeconds }) }, sensitiveValues,
-            onProgress: taskProgress, store: components.store,
-            prepareTask: createTaskPreparer(components, { sensitiveValues, onProgress: taskProgress }),
-          }, recoverySignal);
-          if (prepared.pipeline) {
-            prepared.pipeline.cancel(new Error("Retry preparation requires a batch barrier"));
-            await prepared.pipeline.completion;
-            throw new Error("Scheduler returned streaming preparation for a batch retry");
-          }
-          const tasks = prepared.tasks;
-          if (tasks[0]) plannedTasks.set(job.taskId, tasks[0]);
-          const rejected = plan.preparationFailures?.find(item => item.taskId === job.taskId);
-          if (rejected) preparationFailures.set(job.taskId, rejected.failure);
-        } catch (error) { preparationFailures.set(job.taskId, classifyError(error, { phase: "prepare", component: "environment", secrets: sensitiveValues })); }
-      }
-      const failedPreparation = preparationFailures.get(job.taskId);
-      return failedPreparation ? { ...job, preparationFailure: failedPreparation } : job;
-    };
     const recoveryProducer = (async function* () {
       for await (const job of retry) {
         const expected = retry.expectedFailure(job.attemptId);
@@ -374,7 +404,17 @@ export async function executeEngine({
             : (await components.store.snapshot()).records.find(record => record.key.taskId === job.taskId);
           if (!current || current.key.attemptId !== expected || !isManualRetryEligible(current)) { retry.discard(job); continue; }
         }
-        yield await prepareRetry(job);
+        const prepared = await prepareRetryTask(job, originals.get(job.taskId)?.attemptId, {
+          components, source, signal: recoverySignal, run: config.experiment.run, sensitiveValues, onProgress: taskProgress,
+        });
+        if (prepared) {
+          plannedTasks.delete(job.taskId);
+          preparationFailures.delete(job.taskId);
+          readiness.delete(job.taskId);
+          if (prepared.task) plannedTasks.set(job.taskId, prepared.task);
+          if (prepared.failure) preparationFailures.set(job.taskId, prepared.failure);
+        }
+        yield prepared?.failure ? { ...job, preparationFailure: prepared.failure } : job;
       }
     })();
     const dynamicJobs: AsyncIterable<TaskJob> = { [Symbol.asyncIterator]: () => ({

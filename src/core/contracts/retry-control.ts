@@ -1,7 +1,23 @@
-export type RetryRequest = { requestId: string; taskIds: string[]; reason: string; status: "pending" | "accepted" | "completed" | "rejected";
-  bindings: Record<string, string>; message?: string };
-export type RetryInput = { requestId?: string; taskIds: string[]; reason?: string };
-export type RetryAdmission = { commit(): void; release(): void };
+export type RetryRequest = {
+  requestId: string;
+  taskIds: string[];
+  reason: string;
+  status: "pending" | "accepted" | "completed" | "rejected";
+  bindings: Record<string, string>;
+  message?: string;
+};
+
+export type RetryInput = {
+  requestId?: string;
+  taskIds: string[];
+  reason?: string;
+};
+
+export type RetryAdmission = {
+  commit(): void;
+  release(): void;
+};
+
 export type RetryAdmit = (requests: RetryRequest[]) => Promise<RetryAdmission>;
 
 export interface RetryController {

@@ -6,8 +6,19 @@ import { setTimeout as delay } from "node:timers/promises";
 import { callControlChannel, openControlChannel } from "../../infrastructure/ipc/control-channel.js";
 
 import type { RetryRequest, RetryInput, RetryAdmission, RetryAdmit, RetryController } from "../../core/contracts/retry-control.js";
-type State = { accepting: boolean; pid: number; host: string; requests: RetryRequest[]; recoveryJobId?: string; endpoint?: string };
-type Submission = { active: boolean; request: RetryRequest };
+type State = {
+  accepting: boolean;
+  pid: number;
+  host: string;
+  requests: RetryRequest[];
+  recoveryJobId?: string;
+  endpoint?: string;
+};
+
+type Submission = {
+  active: boolean;
+  request: RetryRequest;
+};
 type CoordinatorOwner = Pick<State, "pid" | "host" | "endpoint" | "recoveryJobId">;
 import { atomic, fileRetry } from "../../infrastructure/filesystem/atomic-json.js";
 import { safeId } from "../../infrastructure/filesystem/run-index.js";
@@ -137,9 +148,11 @@ export class RetryControl implements RetryController {
   private admit: RetryAdmit | undefined;
   private stopping: Promise<void> | undefined;
   private closing: Promise<void> | undefined;
-  private constructor(private readonly directory: string,
+  private constructor(
+    private readonly directory: string,
     private readonly channel: Awaited<ReturnType<typeof openControlChannel>>,
-    private readonly warn: (error: unknown) => void) {}
+    private readonly warn: (error: unknown) => void,
+  ) {}
 
   static async start(directory: string, warn: (error: unknown) => void): Promise<RetryControl> {
     let control: RetryControl;
@@ -147,16 +160,24 @@ export class RetryControl implements RetryController {
     control = new RetryControl(directory, channel, warn);
     try {
       await controlTransaction(directory, async state => {
-        state.accepting = true; state.pid = process.pid; state.host = hostname(); state.endpoint = channel.endpoint;
+        state.accepting = true;
+        state.pid = process.pid;
+        state.host = hostname();
+        state.endpoint = channel.endpoint;
       }, { onCleanupError: warn });
       return control;
-    } catch (error) { await channel.close(); throw error; }
+    } catch (error) {
+      await channel.close();
+      throw error;
+    }
   }
+
   async setAdmission(admit: RetryAdmit): Promise<void> {
     this.admit = admit;
     // Requests received during source/environment preparation were acknowledged as pending.
     await this.receive();
   }
+
   private async receive(input?: Required<RetryInput>): Promise<Submission | undefined> {
     let admission: RetryAdmission | undefined;
     try {
@@ -164,16 +185,25 @@ export class RetryControl implements RetryController {
         if (!this.accepting || !state.accepting || state.endpoint !== this.channel.endpoint)
           throw new Error("Retry coordinator is closing; resubmit the same request ID after it ends");
         const request = input ? appendRequest(state, input) : undefined;
-        const pending = request ? request.status === "pending" ? [request] : [] : state.requests.filter(item => item.status === "pending");
+        let pending: RetryRequest[];
+        if (request) {
+          pending = request.status === "pending" ? [request] : [];
+        } else {
+          pending = state.requests.filter(item => item.status === "pending");
+        }
         if (pending.length && this.admit) admission = await this.admit(pending);
         return request ? { active: true, request: structuredClone(request) } : undefined;
       }, { afterCommit: () => admission?.commit(), onCleanupError: this.warn });
-    } finally { admission?.release(); }
+    } finally {
+      admission?.release();
+    }
   }
+
   stopAccepting(): Promise<void> {
     this.accepting = false;
     return this.stopping ??= this.finish();
   }
+
   private async finish(): Promise<void> {
     try {
       await controlTransaction(this.directory, async state => {
@@ -181,11 +211,17 @@ export class RetryControl implements RetryController {
         delete state.endpoint;
         for (const request of state.requests) {
           if (request.status === "accepted") request.status = "completed";
-          else if (request.status === "pending") { request.status = "rejected"; request.message = "Coordinator ended before admission"; }
+          else if (request.status === "pending") {
+            request.status = "rejected";
+            request.message = "Coordinator ended before admission";
+          }
         }
       }, { onCleanupError: this.warn });
-    } catch (error) { this.warn(error); }
+    } catch (error) {
+      this.warn(error);
+    }
   }
+
   close(): Promise<void> {
     return this.closing ??= this.stopAccepting().then(() => this.channel.close());
   }
