@@ -4,7 +4,7 @@ import { loadConfig } from "./config.js";
 import type { LoadedConfig } from "../config/loaded.js";
 import type { ImageCleanupSummary, ImageCleanupRequest } from "../core/contracts/image-cleanup.js";
 import { fingerprintImageConfig } from "../core/policies/image-config.js";
-import { openPluginRegistry, type PluginRegistry } from "./plugins/runtime.js";
+import { openPluginRegistry, type PluginRegistry } from "./plugins/open-registry.js";
 
 export type CleanupOptions = { file?: string; all: boolean; execute: boolean; patchPath?: string;
   signal: AbortSignal; execution?: { config: LoadedConfig; registry: PluginRegistry }; onLoaded?: (config: LoadedConfig) => void };

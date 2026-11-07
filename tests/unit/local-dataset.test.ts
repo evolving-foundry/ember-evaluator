@@ -6,7 +6,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { LocalFileSource, LocalRecordSource } from "../../src/infrastructure/datasets/sources/local/files-source.js";
 import { LocalZipJsonSource } from "../../src/infrastructure/datasets/sources/local/zip-json-source.js";
 import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/agent-harness/definitions/index.js";
-import { openPluginRegistry } from "../../src/application/plugins/runtime.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
 import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
 import { loadConfig } from "../../src/application/config.js";
 import { stringify } from "yaml";

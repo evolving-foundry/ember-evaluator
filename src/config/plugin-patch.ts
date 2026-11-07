@@ -1,13 +1,10 @@
 import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
-import { dirname, extname, isAbsolute, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 import { parse } from "yaml";
 
 import { expectNonEmptyString, expectRecord, rejectUnknown } from "../core/validation/input.js";
-import { BUILTIN_RUNTIME_ID } from "../core/results/runtime-identity.js";
-import { PACKAGE_RUNTIME_ID } from "../core/results/runtime-identity.js";
+import { BUILTIN_RUNTIME_ID, PACKAGE_RUNTIME_ID } from "../core/results/runtime-identity.js";
 
 export type PluginPatchEntry = {
   id: string;
@@ -20,21 +17,7 @@ export type LoadedPluginPatch = {
   patchPath: string | null;
 };
 
-export type ResolvedPlugin = {
-  id: string;
-  plugin: unknown;
-  version: string;
-};
-
 export const PATCH_METADATA_ID = "cordis.patch.yaml";
-
-function digest(content: string | Uint8Array): string {
-  return `sha256:${createHash("sha256").update(content).digest("hex")}`;
-}
-
-function isPathSpecifier(specifier: string): boolean {
-  return specifier.startsWith("./") || specifier.startsWith("../") || isAbsolute(specifier);
-}
 
 function parsePatch(value: unknown): PluginPatchEntry[] {
   if (!Array.isArray(value)) throw new TypeError("cordis.patch.yaml must contain a list");
@@ -71,51 +54,7 @@ export async function loadPluginPatch(path?: string): Promise<LoadedPluginPatch>
   const raw = await readFile(patchPath, "utf8");
   return {
     entries: parsePatch(parse(raw, { maxAliasCount: 100 }) as unknown),
-    patchDigest: digest(raw),
+    patchDigest: `sha256:${createHash("sha256").update(raw).digest("hex")}`,
     patchPath,
   };
-}
-
-async function packageVersion(modulePath: string): Promise<string | null> {
-  let directory = dirname(modulePath);
-  while (true) {
-    try {
-      const pkg = JSON.parse(await readFile(join(directory, "package.json"), "utf8")) as {
-        version?: unknown;
-      };
-      if (typeof pkg.version === "string") return pkg.version;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    }
-    const parent = dirname(directory);
-    if (parent === directory) return null;
-    directory = parent;
-  }
-}
-
-export async function resolvePlugin(
-  entry: PluginPatchEntry,
-  patchPath: string,
-): Promise<ResolvedPlugin> {
-  let modulePath: string;
-  let version: string;
-  if (isPathSpecifier(entry.name)) {
-    modulePath = isAbsolute(entry.name) ? entry.name : resolve(dirname(patchPath), entry.name);
-    if (extname(modulePath).toLowerCase() === ".ts") {
-      throw new TypeError(`plugin ${entry.id} must be compiled to JavaScript`);
-    }
-    const content = await readFile(modulePath);
-    version = digest(content);
-  } else {
-    const require = createRequire(join(dirname(resolve(patchPath)), "package.json"));
-    modulePath = require.resolve(entry.name);
-    if (extname(modulePath).toLowerCase() === ".ts") {
-      throw new TypeError(`plugin ${entry.id} resolved to uncompiled TypeScript`);
-    }
-    version = (await packageVersion(modulePath)) ?? digest(await readFile(modulePath));
-  }
-
-  const namespace = (await import(pathToFileURL(modulePath).href)) as Record<string, unknown>;
-  const plugin = namespace.default ?? namespace;
-  return { id: entry.id, plugin, version };
 }

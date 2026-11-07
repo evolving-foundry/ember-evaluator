@@ -26,7 +26,7 @@ test("benchmark list JSON retains version aliases and matches info", async () =>
 });
 
 test("inherited version differences are not collapsed into aliases", async () => {
-  const { openPluginRegistry } = await import("../../src/application/plugins/runtime.js");
+  const { openPluginRegistry } = await import("../../src/application/plugins/open-registry.js");
   const { benchmarkList } = await import("../../src/application/benchmarks.js");
   const registry = await openPluginRegistry();
   try {

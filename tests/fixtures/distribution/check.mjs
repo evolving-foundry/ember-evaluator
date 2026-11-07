@@ -8,7 +8,7 @@ import { request } from "node:https";
 import { createServer } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
 import * as api from "ember-evaluator";
-import { openPluginRegistry } from "./dist/application/plugins/runtime.js";
+import { openPluginRegistry } from "./dist/application/plugins/open-registry.js";
 import { verifyPackageDirectory } from "./dist/infrastructure/provenance/package.js";
 import { createPiRuntimeInstallation } from "./dist/runtimes/pi/package-runtime.js";
 import { piAgentBundleRuntimeInstallation } from "./dist/runtimes/pi/agentbundle-runtime.js";

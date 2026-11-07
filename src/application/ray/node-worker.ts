@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { bootstrap } from "../plugins/bootstrap.js";
-import { openPluginRegistry, type PluginRegistry } from "../plugins/runtime.js";
+import { openPluginRegistry, type PluginRegistry } from "../plugins/open-registry.js";
 import { DEFAULT_METRICS } from "../../config/defaults.js";
 import { type LoadedConfig } from "../../config/loaded.js";
 import { PACKAGE_RUNTIME_ID } from "../../core/results/runtime-identity.js";

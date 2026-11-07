@@ -14,7 +14,7 @@ import { exportConfig } from "../../src/config/export.js";
 import { stringify } from "yaml";
 import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
 import { runCli } from "../../src/cli/main.js";
-import { openPluginRegistry } from "../../src/application/plugins/runtime.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
 import { localizePortableSelection, validatePortableSelection } from "../../src/infrastructure/ray/protocol.js";
 
 const roots: string[] = [];

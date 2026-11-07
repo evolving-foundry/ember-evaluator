@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { stringify } from "yaml";
 import { afterEach, expect, test, vi } from "vitest";
 import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/agent-harness/definitions/index.js";
-import { openPluginRegistry } from "../../src/application/plugins/runtime.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
 import { loadConfig, loadSavedConfig } from "../../src/application/config.js";
 import { exportConfig } from "../../src/config/export.js";
 import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";

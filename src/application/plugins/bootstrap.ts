@@ -1,13 +1,13 @@
 import { NetworkRuntime } from "../../infrastructure/network/runtime.js";
 import { resolve } from "node:path";
 
-import { openPluginRegistry } from "./runtime.js";
+import { openPluginRegistry } from "./open-registry.js";
 import { assertServiceBindings } from "../../core/policies/service-bindings.js";
 import { type LoadedConfig } from "../../config/loaded.js";
 import type { Benchmark } from "../../core/contracts/benchmark.js";
 import type { Metrics } from "../../core/contracts/metrics.js";
 import type { RunComponents, BenchmarkComponents } from "../../core/contracts/components.js";
-import type { PluginRegistry } from "./runtime.js";
+import type { PluginRegistry } from "./open-registry.js";
 import type { PluginFactoryContext } from "../../core/contracts/plugin.js";
 import { fingerprintImageConfig } from "../../core/policies/image-config.js";
 import type { ConfigTransportLookup } from "../../core/contracts/config-transport.js";

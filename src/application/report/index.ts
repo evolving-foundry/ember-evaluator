@@ -9,7 +9,7 @@ import type { RunStore } from "../../core/contracts/run-store.js";
 import type { RunManifest } from "../../core/contracts/result.js";
 import { DEFAULT_METRICS } from "../../config/defaults.js";
 import { expectRecord, parseSelection } from "../../core/validation/input.js";
-import { resolvePlugin } from "../../config/plugin-patch.js";
+import { loadPluginModule } from "../plugins/load-module.js";
 import { apply as registry } from "../plugins/registry.js";
 import * as metricsPlugin from "../../plugins/metrics/index.js";
 import * as reportersPlugin from "../../plugins/reporters/index.js";
@@ -69,7 +69,7 @@ async function loadReporting(manifest: RunManifest, runDir: string) {
     for (const id of providers) {
       const entry = manifest.pluginRuntime?.entries.find(entry => entry.id === id);
       if (!entry) throw new Error(`Missing reporting plugin entry: ${id}`);
-      const plugin = await resolvePlugin(entry, patchPath);
+      const plugin = await loadPluginModule(entry, patchPath);
       if (manifest.pluginVersions[entry.id] !== plugin.version)
         throw new Error(`Plugin version differs from saved run: ${entry.id}`);
       await ctx.plugin(plugin.plugin as Plugin);

@@ -15,7 +15,7 @@ import type { ProgressEvent, ProgressListener } from "../core/progress/progress.
 import { LiveOperation, safeProgress } from "../core/progress/live-progress.js";
 import { resolveResumeRun } from "../core/recovery/resume.js";
 import { ResumeError } from "../core/recovery/resume-error.js";
-import { openPluginRegistry, type PluginRegistry } from "./plugins/runtime.js";
+import { openPluginRegistry, type PluginRegistry } from "./plugins/open-registry.js";
 import { saveReport } from "./report/index.js";
 import type { JobsExperimentResult } from "./ray/deployment.js";
 

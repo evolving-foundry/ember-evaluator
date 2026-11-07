@@ -3,7 +3,7 @@ import { completeJudge } from "../../src/infrastructure/models/judge.js";
 import { math500Definition } from "../../src/plugins/benchmarks/agent-harness/definitions/math500.js";
 import { MATH_QUERY_TEMPLATE } from "../../src/plugins/benchmarks/agent-harness/definitions/prompts.js";
 import { MATH_EQUALITY_TEMPLATE } from "../../src/plugins/benchmarks/agent-harness/definitions/scoring/judge-prompts.js";
-import { openPluginRegistry } from "../../src/application/plugins/runtime.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
 import { loadConfig } from "../../src/application/config.js";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";

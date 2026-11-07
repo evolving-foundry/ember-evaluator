@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { stringify } from "yaml";
-import type { PluginRegistry } from "./plugins/runtime.js";
+import type { PluginRegistry } from "./plugins/open-registry.js";
 import { profileChain } from "../config/profile-schema.js";
 import { resolveInput } from "../config/resolve.js";
 import type { UserConfig } from "../config/user-schema.js";

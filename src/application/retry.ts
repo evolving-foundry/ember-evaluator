@@ -1,5 +1,5 @@
 import { expectRecord } from "../core/validation/input.js";
-import { openPluginRegistry } from "./plugins/runtime.js";
+import { openPluginRegistry } from "./plugins/open-registry.js";
 import { fingerprintConfig, fingerprintResumeConfig } from "../core/results/run-manifest.js";
 import { redactDiagnostic } from "../core/errors/diagnostics.js";
 import { readFile } from "node:fs/promises";

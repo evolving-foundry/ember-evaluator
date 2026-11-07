@@ -7,7 +7,8 @@ import { loadConfig as readConfig } from "../../src/application/config.js";
 // These tests exercise assembly validation separately from structural configuration loading.
 const loadConfig = (path: string, overrides: Parameters<typeof readConfig>[1], env: Parameters<typeof readConfig>[2]) =>
   readConfig(path, overrides, { FIXTURE_KEY: "fixture-secret", ...env }, { validatePlugins: false });
-import { loadPluginPatch, resolvePlugin } from "../../src/config/plugin-patch.js";
+import { loadPluginPatch } from "../../src/config/plugin-patch.js";
+import { loadPluginModule } from "../../src/application/plugins/load-module.js";
 import { apply as registryPlugin } from "../../src/application/plugins/registry.js";
 import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
 import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
@@ -378,7 +379,7 @@ describe("bootstrap", () => {
   });
 
   test("resolves npm package entries from the patch project", async () => {
-    const resolved = await resolvePlugin(
+    const resolved = await loadPluginModule(
       { id: "yaml-package", name: "yaml" },
       fixture("valid", "cordis.patch.yaml"),
     );

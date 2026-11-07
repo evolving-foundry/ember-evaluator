@@ -9,7 +9,7 @@ import { loadConfig } from "../../src/application/config.js";
 import { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
 import { diagnose } from "../../src/application/diagnostics/doctor.js";
 import { benchmarkInfo } from "../../src/application/benchmarks.js";
-import { openPluginRegistry } from "../../src/application/plugins/runtime.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
 
 const roots: string[] = [];
 afterEach(async () => {

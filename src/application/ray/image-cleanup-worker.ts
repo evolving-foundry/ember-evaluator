@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { openPluginRegistry } from "../plugins/runtime.js";
+import { openPluginRegistry } from "../plugins/open-registry.js";
 import { loadPackageDigest } from "../../infrastructure/provenance/package.js";
 import { assertWorkerVersions, localizePortableSelection } from "../../infrastructure/ray/protocol.js";
 import type { NodeConfig } from "../../infrastructure/ray/node-config.js";

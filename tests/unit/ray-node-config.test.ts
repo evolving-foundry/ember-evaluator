@@ -5,7 +5,7 @@ import {
   resolvePluginPatchPath,
 } from "../../src/infrastructure/ray/node-config.js";
 import { localizePortableSelection, projectRemoteJob, validateRemoteJob } from "../../src/infrastructure/ray/protocol.js";
-import { openPluginRegistry, type PluginRegistry } from "../../src/application/plugins/runtime.js";
+import { openPluginRegistry, type PluginRegistry } from "../../src/application/plugins/open-registry.js";
 import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/agent-harness/definitions/index.js";
 import { resolveConfig } from "../../src/config/resolve.js";
 import { mixedSnapshot } from "../fixtures/results/mixed-run/fixture.js";

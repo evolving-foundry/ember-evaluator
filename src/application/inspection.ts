@@ -1,6 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { loadConfig } from "./config.js";
-import { openPluginRegistry } from "./plugins/runtime.js";
+import { openPluginRegistry } from "./plugins/open-registry.js";
 import { bootstrapBenchmark } from "./plugins/bootstrap.js";
 import { exportConfig } from "../config/export.js";
 import { redactNetwork } from "../config/network-schema.js";

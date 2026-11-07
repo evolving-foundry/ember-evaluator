@@ -5,7 +5,7 @@ import { executeWarmup } from "../../../../dist/application/warmup.js";
 import { cleanupImages } from "../../../../dist/application/cleanup.js";
 import { createJobsProgressPublisher } from "../../../../dist/infrastructure/ray/jobs-progress.js";
 import { loadSavedConfig } from "../../../../dist/application/config.js";
-import { openPluginRegistry } from "../../../../dist/application/plugins/runtime.js";
+import { openPluginRegistry } from "../../../../dist/application/plugins/open-registry.js";
 import { assertWorkerVersions, localizePortableSelection } from "../../../../dist/infrastructure/ray/protocol.js";
 import { PACKAGE_RUNTIME_ID } from "../../../../dist/core/results/runtime-identity.js";
 import { resolvePluginPatchPath } from "../../../../dist/infrastructure/ray/node-config.js";

@@ -15,7 +15,7 @@ import { progressOperation } from "../core/progress/progress-operation.js";
 import { safeProgress } from "../core/progress/live-progress.js";
 import { normalizeFailure } from "../core/errors/classify.js";
 import type { ProgressListener } from "../core/progress/progress.js";
-import { openPluginRegistry, type PluginRegistry } from "./plugins/runtime.js";
+import { openPluginRegistry, type PluginRegistry } from "./plugins/open-registry.js";
 import { resolveSolverProvenance } from "../core/results/solver-provenance.js";
 import { assertJsonValue } from "../core/validation/input.js";
 

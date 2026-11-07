@@ -1,12 +1,12 @@
 import { Context, type Plugin } from "@deepseek-ai/cordis";
-import { loadPluginPatch, PATCH_METADATA_ID, resolvePlugin } from "../../config/plugin-patch.js";
-import { BUILTIN_RUNTIME_ID } from "../../core/results/runtime-identity.js";
+import { loadPluginPatch, PATCH_METADATA_ID } from "../../config/plugin-patch.js";
+import { BUILTIN_RUNTIME_ID, PACKAGE_RUNTIME_ID } from "../../core/results/runtime-identity.js";
 import { loadBuiltinRuntimeDigest } from "../../infrastructure/provenance/builtin-runtime.js";
-import { PACKAGE_RUNTIME_ID } from "../../core/results/runtime-identity.js";
 import { loadPackageDigest } from "../../infrastructure/provenance/package.js";
 import { apply as registryPlugin } from "./registry.js";
 import * as builtins from "../../plugins/index.js";
 import { validateProfiles } from "../../config/profile-schema.js";
+import { loadPluginModule } from "./load-module.js";
 
 async function loadExperimentPlugins(
   ctx: Context,
@@ -25,13 +25,14 @@ async function loadExperimentPlugins(
   for (const entry of patch.entries) {
     const previous = new Set(ctx.evaluator.entries().map(entry => `${entry.role}:${entry.name}`));
     if (patch.patchPath === null) throw new TypeError("plugin patch entries require an explicit patch path");
-    const resolved = await resolvePlugin(entry, patch.patchPath);
-    pluginVersions[resolved.id] = resolved.version;
-    await ctx.plugin(asCordisPlugin(resolved.plugin, resolved.id));
-    for (const selection of ctx.evaluator.entries())
+    const loaded = await loadPluginModule(entry, patch.patchPath);
+    pluginVersions[loaded.id] = loaded.version;
+    await ctx.plugin(asCordisPlugin(loaded.plugin, loaded.id));
+    for (const selection of ctx.evaluator.entries()) {
       if ((selection.role === "metrics" || selection.role === "reporter") && !previous.has(`${selection.role}:${selection.name}`)) {
         reportingProviders[`${selection.role}:${selection.name}`] = entry.id;
       }
+    }
   }
   return { patch, pluginVersions, reportingProviders };
 }
@@ -52,11 +53,15 @@ export async function openPluginRegistry(patchPath?: string) {
     const metadata = await loadExperimentPlugins(ctx, patchPath);
     validateProfiles(ctx.evaluator.profiles());
     let disposed = false;
-    return { ctx, ...metadata, async dispose() {
-      if (disposed) return;
-      disposed = true;
-      await ctx.fiber.dispose();
-    } };
+    return {
+      ctx,
+      ...metadata,
+      async dispose() {
+        if (disposed) return;
+        disposed = true;
+        await ctx.fiber.dispose();
+      },
+    };
   } catch (error) {
     await ctx.fiber.dispose();
     throw error;

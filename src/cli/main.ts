@@ -6,7 +6,7 @@ import type { LoadedExecution } from "../application/run.js";
 import { rebuildReport } from "../application/report/index.js";
 import { formatError, redactDiagnostic, summarizeDiagnostic } from "../core/errors/diagnostics.js";
 import type { ProgressEvent } from "../core/progress/progress.js";
-import { openPluginRegistry, type PluginRegistry } from "../application/plugins/runtime.js";
+import { openPluginRegistry, type PluginRegistry } from "../application/plugins/open-registry.js";
 import { classifyError, normalizeFailure } from "../core/errors/classify.js";
 import type { Phase } from "../core/contracts/result.js";
 import { CliLiveProgress, type ProgressMode } from "./live-progress.js";

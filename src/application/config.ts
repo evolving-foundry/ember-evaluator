@@ -1,6 +1,6 @@
 import { networkSecrets } from "../config/network-schema.js";
 import { readConfig, readSavedConfig, type ConfigReadOptions } from "../config/load.js";
-import { openPluginRegistry, type PluginRegistry } from "./plugins/runtime.js";
+import { openPluginRegistry, type PluginRegistry } from "./plugins/open-registry.js";
 import type { LoadedConfig } from "../config/loaded.js";
 import type { CliOverrides } from "../core/contracts/config.js";
 

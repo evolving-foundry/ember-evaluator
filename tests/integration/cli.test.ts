@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
 import { mixedSnapshot } from "../fixtures/results/mixed-run/fixture.js";
 import { runCli } from "../../src/cli/main.js";
-import { resolvePlugin } from "../../src/config/plugin-patch.js";
+import { loadPluginModule } from "../../src/application/plugins/load-module.js";
 import { rebuildDownloadedReport } from "../../src/application/ray/deployment.js";
 import type { JsonValue, RunManifest } from "../../src/index.js";
 
@@ -74,7 +74,7 @@ test("help does not bootstrap an experiment", async () => {
 test("offline third-party reporting loads only selected report factories and checks locked versions", async () => {
   const directory = join(import.meta.dirname, "../fixtures/plugins/valid");
   const entry = { id: "fixture-seven-roles", name: "./plugin.mjs" };
-  const resolved = await resolvePlugin(entry, join(directory, "cordis.patch.yaml"));
+  const resolved = await loadPluginModule(entry, join(directory, "cordis.patch.yaml"));
   const manifest: RunManifest = { ...mixedSnapshot.run, pluginRuntime: { configDirectory: directory,
     entries: [entry, { id: "unrelated-solver", name: "./does-not-exist.mjs" }],
     reportingProviders: { "metrics:fixture-metrics": entry.id, "reporter:fixture-reporter": entry.id } }, pluginVersions: { [entry.id]: resolved.version } };
@@ -101,7 +101,7 @@ test("offline third-party reports load their plugin from the saved explicit patc
   await copyFile(join(fixture, "plugin.mjs"), pluginPath);
   await writeFile(patchPath, JSON.stringify([{ insert: [{ id: "fixture-seven-roles", name: "./plugin.mjs" }] }]));
   const entry = { id: "fixture-seven-roles", name: "./plugin.mjs" };
-  const resolved = await resolvePlugin(entry, patchPath);
+  const resolved = await loadPluginModule(entry, patchPath);
   const manifest: RunManifest = {
     ...mixedSnapshot.run,
     pluginRuntime: {
@@ -142,7 +142,7 @@ test("downloaded Ray Jobs reports use the submitter patch and retain coordinator
   await copyFile(join(fixture, "plugin.mjs"), join(patchDirectory, "plugin.mjs"));
   await writeFile(patchPath, JSON.stringify([{ insert: [{ id: "fixture-seven-roles", name: "./plugin.mjs" }] }]));
   const entry = { id: "fixture-seven-roles", name: "./plugin.mjs" };
-  const resolved = await resolvePlugin(entry, patchPath);
+  const resolved = await loadPluginModule(entry, patchPath);
   const manifest: RunManifest = {
     ...mixedSnapshot.run,
     pluginRuntime: {
