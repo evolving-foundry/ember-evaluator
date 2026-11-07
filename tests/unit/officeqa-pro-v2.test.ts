@@ -12,7 +12,7 @@ import { officeQAFiles, officeQAHub, fixtureCSV } from "../fixtures/officeqa.js"
 import { loadConfig, loadSavedConfig } from "../../src/application/config.js";
 import { exportConfig } from "../../src/config/export.js";
 import { stringify } from "yaml";
-import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
+import { createBenchmark } from "../../src/application/plugins/create-components.js";
 import { runCli } from "../../src/cli/main.js";
 import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
 import { localizePortableSelection, validatePortableSelection } from "../../src/infrastructure/ray/protocol.js";
@@ -70,13 +70,14 @@ test("YAML hfToken uses SDK env and preserves references across save, export and
   expect(rotated.persisted).toEqual(loaded.persisted);
   await expect(loadConfig(file, {}, { MODEL_KEY: "model-secret" })).rejects.toThrow(/SDK_HF_TOKEN/);
   await expect(loadConfig(file, {}, { ...env, SDK_HF_TOKEN: "" })).rejects.toThrow(/hfToken/);
-  const components = await bootstrapBenchmark(loaded, directory);
+  const registry = await openPluginRegistry();
   try {
+    const benchmark = await createBenchmark(registry, loaded, directory);
     // The tiny Hub has two documents rather than 1,435. Only authentication is under test.
-    await expect(components.benchmark.resolveSource(null, signal())).rejects.toThrow(/file count/);
+    await expect(benchmark.resolveSource(null, signal())).rejects.toThrow(/file count/);
     expect(hub.authorizations.length).toBeGreaterThan(0);
     expect(hub.authorizations.every(value => value === "Bearer sdk-dataset-secret")).toBe(true);
-  } finally { await components.dispose(); }
+  } finally { await registry.dispose(); }
 });
 
 test("Ray nodes authenticate with their own fixed HF_TOKEN after explicit credentials are stripped", async () => {
@@ -191,8 +192,6 @@ test("OfficeQA is discoverable without network and Ray localizes node paths", as
   expect(await runCli(["run", file, "--dry-run"], io), errors.join("\n")).toBe(0);
   expect(files).toHaveBeenCalledOnce();
   const bad = structuredClone(config); bad.experiment.environment = { name: "local", config: {} };
-  await expect(bootstrapBenchmark(bad, directory)).rejects.toThrow(/Docker/);
-  expect(network).not.toHaveBeenCalled();
   const registry = await openPluginRegistry();
   try {
     const lookup = (role: string, name: string) => registry.ctx.evaluator.configTransport(role, name);

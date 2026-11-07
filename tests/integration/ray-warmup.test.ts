@@ -59,7 +59,7 @@ async function fixture(count = 6) {
     planBenchmarkRun(components.benchmark, refs, source, signal, { source: "fixture", version: "1" }, 10);
   config.experiment.run.preparation = { mode: "batch", concurrency: 1 };
   assertJsonValue(config.experiment); config.persisted = structuredClone(config.experiment);
-  cleanups.push(async () => { await scheduler.close(); await components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await scheduler.close(); await value.dispose(); await rm(root, { recursive: true, force: true }); });
   return { ...value, scheduler };
 }
 

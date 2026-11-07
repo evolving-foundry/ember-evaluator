@@ -8,7 +8,7 @@ import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/agent-harness/d
 import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
 import { loadConfig, loadSavedConfig } from "../../src/application/config.js";
 import { exportConfig } from "../../src/config/export.js";
-import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
+import { createBenchmark } from "../../src/application/plugins/create-components.js";
 import { localizePortableSelection, projectPortableSelection, validatePortableSelection } from "../../src/infrastructure/ray/protocol.js";
 import { parseAgentXConfig } from "../../src/plugins/benchmarks/inference-engine/agentx/agentx-benchmark.js";
 import { parseAgentXReplayConfig } from "../../src/plugins/solvers/agentx-replay.js";
@@ -44,8 +44,8 @@ test.each(DEFINED_BENCHMARKS.map(entry => ({ name: entry.definition.name, source
         ? new Response(JSON.stringify({ sha: "a".repeat(40), siblings: paths.map(rfilename => ({ rfilename })) }))
         : new Response("fixture file bytes");
     });
-    const components = await bootstrapBenchmark(config, directory, undefined, registry);
-    await components.benchmark.resolveSource(null, AbortSignal.timeout(5000));
+    const benchmark = await createBenchmark(registry, config, directory);
+    await benchmark.resolveSource(null, AbortSignal.timeout(5000));
     expect(fetch).toHaveBeenCalledTimes(paths.length + 1);
     const lookup = (role: string, component: string) => registry.ctx.evaluator.configTransport(role, component);
     const portable = projectPortableSelection(config.experiment.benchmark, "benchmark", lookup);

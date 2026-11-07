@@ -103,7 +103,7 @@ test("requests acknowledged during preparation are admitted once after the execu
 
 test("offline recovery claims a pending request atomically and rejects a second claim", async () => {
   const root = await directory(), value = harness(root);
-  cleanups.push(() => value.components.dispose());
+  cleanups.push(() => value.dispose());
   value.config.experiment.run.taskIds = ["a"];
   const solve = value.components.solver.solve;
   value.components.solver.solve = async () => { throw new Error("ECONNRESET"); };
@@ -182,7 +182,7 @@ test.each(["EPERM", "EACCES", "EBUSY"])("persistent %s preserves the old file an
 test("a failed manual admission does not cancel active tasks; the same ID can be submitted successfully", async () => {
   const root = await directory();
   const value = harness(root);
-  cleanups.push(() => value.components.dispose());
+  cleanups.push(() => value.dispose());
   value.config.experiment.run.onError = "continue";
   const failed = Promise.withResolvers<void>(), held = Promise.withResolvers<void>();
   const solve = value.components.solver.solve;
@@ -221,7 +221,7 @@ test("a failed manual admission does not cancel active tasks; the same ID can be
 test.each(["startup", "shutdown"])("control persistence failure at %s leaves successful evaluations intact", async phase => {
   const root = await directory();
   const value = harness(root);
-  cleanups.push(() => value.components.dispose());
+  cleanups.push(() => value.dispose());
   const runId = "control-failure";
   fault.target = join(value.config.experiment.output.directory, runId, "retry-control.json");
   fault.code = "EPERM";

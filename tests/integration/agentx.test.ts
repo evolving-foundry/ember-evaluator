@@ -94,7 +94,7 @@ test("tokenizer resume reuses its pinned revision, and content changes alter its
 
 test("performance payload survives public projection; timeout remains incomplete and resume restarts it", async () => {
   const path = await root(), value = harness(path);
-  cleanup.push(() => value.components.dispose());
+  cleanup.push(() => value.dispose());
   value.components.benchmark = { ...value.components.benchmark, evaluationKind: "performance" };
   const prepare = value.components.benchmark.prepare.bind(value.components.benchmark);
   value.components.benchmark.prepare = async (...args) => {
@@ -123,7 +123,7 @@ test("performance payload survives public projection; timeout remains incomplete
 
 test.each(["none", "v1", "v2", "custom-duration"] as const)("offline reporting reproduces saved AgentX %s metrics without loading Python or credentials", async version => {
   const path = await root(), value = harness(path);
-  cleanup.push(() => value.components.dispose());
+  cleanup.push(() => value.dispose());
   value.components.benchmark = { ...value.components.benchmark, evaluationKind: "performance" };
   value.components.benchmark.verify = async () => ({ passed: null, details: {} });
   const solve = value.components.solver.solve.bind(value.components.solver);
@@ -177,7 +177,7 @@ test.each(["none", "v1", "v2", "custom-duration"] as const)("offline reporting r
 
 test("an explicit Agent timeout code still cannot create a zero-scored performance result", async () => {
   const path = await root(), value = harness(path);
-  cleanup.push(() => value.components.dispose());
+  cleanup.push(() => value.dispose());
   value.components.benchmark = { ...value.components.benchmark, evaluationKind: "performance" };
   value.components.benchmark.verify = async () => ({ passed: null, details: {} });
   value.components.solver.solve = async () => { throw new EvaluatorError("SOLVER_AGENT_TIMEOUT", "controlled timeout"); };

@@ -16,8 +16,8 @@ const cases = (["batch", "pipeline"] as const).flatMap(mode =>
 
 test.each(cases)("$mode / $code plans remaining tasks and obeys onError=$onError", async ({ mode, code, onError }) => {
   const root = await mkdtemp(join(tmpdir(), "task-planning-errors-"));
-  const { components, config, inputs } = harness(root, { transfer: true });
-  cleanup.push(async () => { await components.dispose(); await rm(root, { recursive: true, force: true }); });
+  const { components, config, inputs, dispose } = harness(root, { transfer: true });
+  cleanup.push(async () => { await dispose(); await rm(root, { recursive: true, force: true }); });
   config.experiment.run.preparation = { mode, concurrency: 2, ...(mode === "pipeline" ? { lookahead: 2 } : {}) };
   config.experiment.run.onError = onError;
   const planned: string[] = [];

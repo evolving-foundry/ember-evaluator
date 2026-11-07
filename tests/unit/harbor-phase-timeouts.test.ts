@@ -8,7 +8,8 @@ import { loadGenericHarborTask } from "../../src/plugins/benchmarks/agent-harnes
 import { HarborShellVerifier } from "../../src/plugins/verifiers/shell.js";
 import type { PhaseTimeoutOverrides } from "../../src/core/contracts/task.js";
 import { loadConfig } from "../../src/application/config.js";
-import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
+import { createBenchmark } from "../../src/application/plugins/create-components.js";
 import { setTimeout as delay } from "node:timers/promises";
 import { runTask } from "../../src/core/execution/run-task.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
@@ -58,16 +59,17 @@ test("YAML run overrides reach the actual Harbor component through bootstrap", a
     benchmark: { name: "harbor", config: { source: { kind: "local", path: "./dataset" }, cacheDir: "./cache", tasks: { root: "tasks", id: "directory" } } },
     run: { solveTimeoutSeconds: 23, verifyTimeoutSeconds: 29 } }));
   const config = await loadConfig(file, {}, {}, { allowMissingAuth: true });
-  const components = await bootstrapBenchmark(config, root);
+  const registry = await openPluginRegistry();
   try {
-    const signal = AbortSignal.timeout(5000), source = await components.benchmark.resolveSource(null, signal);
+    const benchmark = await createBenchmark(registry, config, root);
+    const signal = AbortSignal.timeout(5000), source = await benchmark.resolveSource(null, signal);
     const refs = [];
-    for await (const ref of components.benchmark.enumerate(source, signal)) refs.push(ref);
+    for await (const ref of benchmark.enumerate(source, signal)) refs.push(ref);
     expect(refs).toHaveLength(1);
-    const task = await components.benchmark.prepare(refs[0]!, source, signal);
+    const task = await benchmark.prepare(refs[0]!, source, signal);
     expect(task.phaseTimeoutSeconds).toMatchObject({ solve: 23, verify: 29 });
     expect(task.verification).toHaveProperty("descriptor.timeoutSeconds", 29);
-  } finally { await components.dispose(); }
+  } finally { await registry.dispose(); }
 });
 
 test("a longer YAML verification ceiling also replaces the Shell verifier's internal task deadline", async () => {
@@ -98,5 +100,5 @@ test("a longer YAML verification ceiling also replaces the Shell verifier's inte
       value.components, source, new AbortController().signal, { timeoutSeconds: 2, verifyTimeoutSeconds: 1 });
     expect(result.executionStatus, JSON.stringify(result.errors)).toBe("completed");
     expect(result.verdict?.score).toBe(1);
-  } finally { await value.components.dispose(); }
+  } finally { await value.dispose(); }
 });

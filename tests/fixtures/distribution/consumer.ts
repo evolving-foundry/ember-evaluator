@@ -1,7 +1,7 @@
 import { Evaluator, bootstrap, loadConfig, runEngine, rebuildReport, DefinedBenchmark, DockerEnvironment, readProfileDirectory,
   runDockerCommand, parseConfigProfile, DirectoryReceiver } from "ember-evaluator";
 import type { EngineInput, PluginFactory, PluginFactoryContext, ConfigProfile, ConfigTransportLookup, BenchmarkDefinition,
-  DatasetRecordSource, EffectiveConfig, Environment, RunComponents, LoadedConfig } from "ember-evaluator";
+  DatasetRecordSource, EffectiveConfig, Environment, RunComponents, BootstrappedComponents, LoadedConfig } from "ember-evaluator";
 
 export async function consume(config: LoadedConfig, components: RunComponents, factory: PluginFactory<"environment">,
   runtime: PluginFactoryContext, definition: BenchmarkDefinition, source: DatasetRecordSource) {
@@ -17,7 +17,9 @@ export async function consume(config: LoadedConfig, components: RunComponents, f
   void runDockerCommand("docker", ["version"]);
   void effective; void lookup; void profile; void environment;
   await runEngine(engine);
-  await bootstrap(config, ".");
+  const bootstrapped: BootstrappedComponents = await bootstrap(config, ".");
+  try { await runEngine({ ...engine, components: bootstrapped }); }
+  finally { await bootstrapped.dispose(); }
   await loadConfig("experiment.yaml", {}, {});
   await new Evaluator().run({ configPath: "experiment.yaml" });
   await rebuildReport("results");

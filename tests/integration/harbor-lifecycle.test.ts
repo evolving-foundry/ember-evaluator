@@ -8,7 +8,7 @@ import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
 
 const fixtures: { root: string; value: ReturnType<typeof harness> }[] = [];
-afterEach(async () => { for (const { root, value } of fixtures.splice(0)) { await value.components.dispose(); await rm(root, { recursive: true, force: true }); } });
+afterEach(async () => { for (const { root, value } of fixtures.splice(0)) { await value.dispose(); await rm(root, { recursive: true, force: true }); } });
 async function setup(shared: boolean, hookCode = 0) {
   const root = await mkdtemp(join(tmpdir(), "harbor-lifecycle-")); const value = harness(root, { transfer: !shared }); fixtures.push({ root, value });
   const prepare = value.components.benchmark.prepare.bind(value.components.benchmark);

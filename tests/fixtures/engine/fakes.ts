@@ -76,7 +76,6 @@ export function harness(root: string, options: { fail?: string | readonly string
         return { finalText: "Answer: 42", usage: { inputTokens: 2, outputTokens: 3, totalTokens: 5 } };
       },
     },
-    async dispose() { await store.close(); await rm(join(root, "workspaces"), { recursive: true, force: true }); },
   };
   const config: LoadedConfig = {
     experiment: {
@@ -88,5 +87,6 @@ export function harness(root: string, options: { fail?: string | readonly string
     },
     persisted: { fixture: true }, auths: { default: { value: "fixture-key", reference: null } },
   };
-  return { components, config, events, inputs, entered };
+  return { components, config, events, inputs, entered,
+    async dispose() { await store.close(); await rm(join(root, "workspaces"), { recursive: true, force: true }); } };
 }

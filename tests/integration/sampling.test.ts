@@ -9,11 +9,11 @@ import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js"
 import { harness } from "../fixtures/engine/fakes.js";
 
 const roots: string[] = [];
-const components: ReturnType<typeof harness>["components"][] = [];
+const fixtures: ReturnType<typeof harness>[] = [];
 const ids = Array.from({ length: 20 }, (_, index) => `task-${index}`);
 
 afterEach(async () => {
-  for (const value of components.splice(0)) await value.dispose();
+  for (const value of fixtures.splice(0)) await value.dispose();
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
 });
 
@@ -28,7 +28,7 @@ async function fixture(run: Record<string, unknown> = {}, existingRoot?: string)
   }));
   const config = await loadConfig(path, {}, { FIXTURE_KEY: "fixture-key" });
   const value = harness(root);
-  components.push(value.components);
+  fixtures.push(value);
   value.components.benchmark.enumerate = async function* () {
     for (const id of ids) yield { id, recordKey: id };
   };
@@ -163,7 +163,7 @@ test.each([{}, { offset: 4 }])("resume keeps the sampled task order and skips co
   expect(partial.run.status).toBe("cancelled");
   expect(partial.records).toHaveLength(1);
   expect(partial.records[0]?.executionStatus).toBe("completed");
-  await first.components.dispose();
+  await first.dispose();
 
   const resumed = await fixture(run, first.root);
   const snapshot = await runEngine({ ...resumed, resumeDirectory: join(first.root, "runs", partial.run.runId), signal: new AbortController().signal });
@@ -172,13 +172,13 @@ test.each([{}, { offset: 4 }])("resume keeps the sampled task order and skips co
   expect(snapshot.records[0]?.key).toEqual(partial.records[0]?.key);
   expect(snapshot.run.status).toBe("completed");
   expect(await resumed.components.store.listAttempts()).toHaveLength(5);
-  await resumed.components.dispose();
+  await resumed.dispose();
 
   const changed = await fixture({ ...run, sampling: random(43) }, first.root);
   await expect(runEngine({ ...changed, resumeDirectory: join(first.root, "runs", partial.run.runId), signal: new AbortController().signal }))
     .rejects.toMatchObject({ code: "SOURCE_CHANGED" });
   expect(changed.inputs).toEqual([]);
-  await changed.components.dispose();
+  await changed.dispose();
 
   const changedOffset = await fixture({ ...run, offset: 5 }, first.root);
   await expect(runEngine({ ...changedOffset, resumeDirectory: join(first.root, "runs", partial.run.runId), signal: new AbortController().signal }))

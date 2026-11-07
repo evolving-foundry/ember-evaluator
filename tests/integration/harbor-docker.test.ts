@@ -52,7 +52,7 @@ test.skipIf(!enabled).each(["shared", "separate"] as const)("Harbor Docker %s gr
     expect(JSON.parse(await readFile(join(attempt, "verifier/reward.json"), "utf8"))).toEqual({ reward: 1 });
     await access(join(attempt, "agent/session.jsonl"));
     await expect(access(join(attempt, "artifacts/artifacts.tar"))).rejects.toMatchObject({ code: "ENOENT" });
-  } finally { await value.components.dispose(); await rm(root, { recursive: true, force: true }); }
+  } finally { await value.dispose(); await rm(root, { recursive: true, force: true }); }
 }, 180_000);
 
 test.skipIf(!enabled)("Harbor Docker shared verification preserves deliverables and admits private tests only after solve", async () => {

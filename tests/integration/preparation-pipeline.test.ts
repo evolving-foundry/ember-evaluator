@@ -24,7 +24,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(
 async function fixture(budget = 20) {
   const root = await mkdtemp(join(tmpdir(), "preparation-pipeline-"));
   const value = harness(root, { transfer: true });
-  cleanups.push(async () => { await value.components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   const { components, config } = value;
   config.experiment.run.preparation = { mode: "pipeline", concurrency: 2, lookahead: 2 };
   components.benchmark.planRun = (refs, source, signal) =>

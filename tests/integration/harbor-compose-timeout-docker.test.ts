@@ -85,7 +85,7 @@ test.skipIf(!enabled).each(["timeout", "cancel"] as const)("multi-container %s c
       expect(remaining.stdout.trim()).toBe("");
     }
   } finally {
-    await value.components.dispose();
+    await value.dispose();
     await rm(root, { recursive: true, force: true });
   }
 }, 240_000);

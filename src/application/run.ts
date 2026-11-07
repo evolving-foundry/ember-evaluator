@@ -1,6 +1,6 @@
 import { networkSecrets } from "../config/network-schema.js";
 import { dirname, join, resolve } from "node:path";
-import { bootstrap, bootstrapBenchmark, createPluginRuntime } from "./plugins/bootstrap.js";
+import { createRunComponents, createBenchmark, createPluginRuntime } from "./plugins/create-components.js";
 import { loadConfig } from "./config.js";
 import { assertJsonValue } from "../core/validation/input.js";
 import { solverBinding } from "../core/policies/service-bindings.js";
@@ -138,7 +138,7 @@ export async function executeExperiment(options: ExecutionOptions): Promise<Exec
     if (config.deployment) {
       const { RayJobsDeployment } = await import("./ray/deployment.js");
       const { parseJobsConfig } = await import("../config/jobs.js");
-      await bootstrapBenchmark(config, dirname(file), patchPath, registry);
+      await createBenchmark(registry, config, dirname(file));
       const { kind: _kind, ...connection } = config.deployment;
       const evaluator = registry.ctx.evaluator;
       const deployment = new RayJobsDeployment(parseJobsConfig({ ...connection, ...experiment.scheduler.config }),
@@ -161,7 +161,7 @@ export async function executeExperiment(options: ExecutionOptions): Promise<Exec
         diagnose(new Error(jobs.collectionError ?? jobs.reportError ?? "Ray Jobs result collection failed"));
       }
     } else {
-      components = await bootstrap(config, dirname(file), patchPath, undefined, registry);
+      components = await createRunComponents(registry, config, dirname(file));
       if (resume !== undefined) progress({ phase: "resume", message: "Locating previous run" });
       const resumeDirectory = resume === undefined ? undefined : await resolveResumeRun(experiment.output.directory, resume);
       const snapshot = await runEngine({ components, config, signal, onProgress: progress,
@@ -198,11 +198,9 @@ export async function executeExperiment(options: ExecutionOptions): Promise<Exec
     }
   } finally {
     try { progress({ phase: "dispose", message: "Releasing runtime resources" }); } catch (error) { diagnose(error); }
-    for (const resource of [components, registry]) {
-      try { await resource?.dispose(); } catch (error) {
-        diagnose(error, "dispose");
-        if (exitCode !== 130) exitCode = 1;
-      }
+    try { await registry?.dispose(); } catch (error) {
+      diagnose(error, "dispose");
+      if (exitCode !== 130) exitCode = 1;
     }
     try { globalOperation?.finish(signal.aborted ? "cancelled" : "completed"); } catch (error) { diagnose(error); }
   }

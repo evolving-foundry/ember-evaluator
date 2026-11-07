@@ -7,7 +7,7 @@ import { LocalFileSource, LocalRecordSource } from "../../src/infrastructure/dat
 import { LocalZipJsonSource } from "../../src/infrastructure/datasets/sources/local/zip-json-source.js";
 import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/agent-harness/definitions/index.js";
 import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
-import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
+import { createBenchmark } from "../../src/application/plugins/create-components.js";
 import { loadConfig } from "../../src/application/config.js";
 import { stringify } from "yaml";
 import { projectPortableSelection } from "../../src/infrastructure/ray/protocol.js";
@@ -34,16 +34,17 @@ test.each(DEFINED_BENCHMARKS)("$definition.name uses a YAML-relative local datas
   await writeFile(file, stringify({ services: { default: { model: "fixture", base_url: "https://model.invalid/v1", api_key: "${TEST_KEY}" }, judge: { model: "fixture", base_url: "https://model.invalid/v1", api_key: "${TEST_KEY}" } },
     benchmark: { name: definition.name, config: { localPath: "./dataset" } } }));
   const config = await loadConfig(file, {}, { TEST_KEY: "fixture" });
-  const components = await bootstrapBenchmark(config, path);
+  const registry = await openPluginRegistry();
   try {
-    const lock = await components.benchmark.resolveSource(null, signal());
+    const benchmark = await createBenchmark(registry, config, path);
+    const lock = await benchmark.resolveSource(null, signal());
     expect(lock.source).toBe(`local:${source.dataset}`);
     expect(lock.files).toHaveLength(source.selections.length);
-    expect(await components.benchmark.resolveSource(lock, signal())).toEqual(lock);
+    expect(await benchmark.resolveSource(lock, signal())).toEqual(lock);
     expect(fetch).not.toHaveBeenCalled();
     await put(path, `dataset/${source.selections[0]!.path ?? `${source.selections[0]!.prefix}000.${source.selections[0]!.format}`}`, "changed");
-    await expect(components.benchmark.resolveSource(lock, signal())).rejects.toThrow(/changed/);
-  } finally { await components.dispose(); }
+    await expect(benchmark.resolveSource(lock, signal())).rejects.toThrow(/changed/);
+  } finally { await registry.dispose(); }
 }, 30000);
 
 test.each([
@@ -60,12 +61,13 @@ test.each([
   const config = await loadConfig(file, {}, { TEST_KEY: "fixture" });
   expect(config.experiment.benchmark.config.source).toEqual({ kind: "local", path: localPath });
   expect(config.experiment.benchmark.config.tasks).toMatchObject({ root: tasksRoot, expectedCount: 2 });
-  const components = await bootstrapBenchmark(config, directory);
+  const registry = await openPluginRegistry();
   try {
-    const lock = await components.benchmark.resolveSource(null, signal());
-    expect(await collect(components.benchmark.enumerate(lock, signal()))).toHaveLength(2);
+    const benchmark = await createBenchmark(registry, config, directory);
+    const lock = await benchmark.resolveSource(null, signal());
+    expect(await collect(benchmark.enumerate(lock, signal()))).toHaveLength(2);
     expect(fetch).not.toHaveBeenCalled();
-  } finally { await components.dispose(); }
+  } finally { await registry.dispose(); }
 });
 
 test.each([

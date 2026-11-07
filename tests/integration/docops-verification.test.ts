@@ -79,7 +79,6 @@ test.skipIf(process.env.EVALUATOR_TEST_DOCKER !== "1")(
     metrics: [],
     reporter: { async render() { return "docops fixture"; } },
     pluginVersions: { "docops-plugin": "fixture" },
-    async dispose() { await store.close(); },
   };
   const record = await runTask({
     runId: manifest.runId,

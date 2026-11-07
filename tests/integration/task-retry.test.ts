@@ -55,7 +55,7 @@ async function jiuwenswarmFixture(errorFor: (count: number, taskId: string) => s
 }
 afterEach(async () => {
   for (const { root, value } of fixtures.splice(0)) {
-    await value.components.dispose();
+    await value.dispose();
     await rm(root, { recursive: true, force: true });
   }
 });

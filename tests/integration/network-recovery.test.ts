@@ -17,14 +17,14 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "network-recovery-"));
   const value = harness(root);
-  cleanups.push(async () => { await value.components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   value.config.experiment.run.onError = "continue";
   return value;
 }
 test.each(["solve", "verify"] as const)("a %s image build failure never starts a second attempt", async phase => {
   const root = await mkdtemp(join(tmpdir(), "build-no-task-retry-"));
   const value = harness(root, { transfer: true });
-  cleanups.push(async () => { await value.components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   value.config.experiment.run.taskIds = ["a"];
   value.config.experiment.run.onError = "continue";
   const prepare = value.components.environment.prepare.bind(value.components.environment);

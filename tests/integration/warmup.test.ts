@@ -19,7 +19,7 @@ afterEach(async () => {
 async function fixture(mode: "batch" | "pipeline" = "pipeline", budget = 10) {
   const root = await mkdtemp(join(tmpdir(), "warmup-"));
   const value = harness(root, { transfer: true });
-  cleanups.push(async () => { await value.components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   const { components, config } = value;
   config.experiment.run.preparation = { mode, concurrency: 2, ...(mode === "pipeline" ? { lookahead: 2 } : {}) };
   components.benchmark.planRun = (refs, source, signal) =>

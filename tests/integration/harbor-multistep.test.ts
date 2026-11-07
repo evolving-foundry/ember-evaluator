@@ -127,5 +127,5 @@ test.each([
     const output = join(value.config.experiment.output.directory, record.key.runId, "tasks", createHash("sha256").update("a").digest("hex"), "attempts", "first");
     expect((await readTrajectoryPrefix(output, record.key)).state).toBe("complete");
     expect(await readFile(join(output, "steps/first/agent/session.jsonl"), "utf8")).toContain("fixture");
-  } finally { await value.components.dispose(); }
+  } finally { await value.dispose(); }
 });

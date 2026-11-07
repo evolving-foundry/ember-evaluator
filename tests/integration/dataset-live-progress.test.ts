@@ -156,7 +156,7 @@ test("archive validation and extraction expose counts without file names or cont
 
 test("planning reports each task before preparation ends, retains failures, and preserves the stage clock", async () => {
   const fixture = harness(await root());
-  cleanup.push(() => fixture.components.dispose());
+  cleanup.push(() => fixture.dispose());
   const gate = Promise.withResolvers<void>(); cleanup.push(async () => gate.resolve());
   const started = Promise.withResolvers<void>();
   const prepare = fixture.components.benchmark.prepare.bind(fixture.components.benchmark);
@@ -184,7 +184,7 @@ test("planning reports each task before preparation ends, retains failures, and 
 });
 
 test("engine forwards source and enumeration observations without persisting temporary events", async () => {
-  const fixture = harness(await root()); cleanup.push(() => fixture.components.dispose());
+  const fixture = harness(await root()); cleanup.push(() => fixture.dispose());
   fixture.components.benchmark.resolveSource = async (_previous, _signal, activity) => {
     activity?.({ lines: ["来源文件 3/7"] }); return source;
   };
@@ -224,7 +224,7 @@ test("real Harbor local source and batch planning forward directory, checksum an
 });
 
 test("fatal planning errors end the operation as failed without claiming all tasks were checked", async () => {
-  const fixture = harness(await root()); cleanup.push(() => fixture.components.dispose());
+  const fixture = harness(await root()); cleanup.push(() => fixture.dispose());
   fixture.components.benchmark.prepare = async () => { throw new Error("source changed"); };
   const events: ProgressEvent[] = [];
   const signal = new AbortController().signal;

@@ -18,7 +18,7 @@ import { storeRun, trajectoryLines } from "../fixtures/results/store-fixture.js"
 const fixtures: { root: string; value: ReturnType<typeof harness> }[] = [];
 afterEach(async () => {
   for (const { root, value } of fixtures.splice(0)) {
-    await value.components.dispose();
+    await value.dispose();
     await rm(root, { recursive: true, force: true });
   }
 });

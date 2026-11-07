@@ -48,7 +48,7 @@ test.skipIf(!enabled).each(["success", "failure", "cancel"] as const)(
     const environment = new DockerEnvironment();
     const components: RunComponents = {
       store, environment, scheduler: new LocalScheduler(4), pluginVersions: { fixture: "1" }, metrics: [],
-      reporter: { async render() { return "fixture"; } }, async dispose() { await store.close(); },
+      reporter: { async render() { return "fixture"; } },
       benchmark: {
         async resolveSource() { return source; }, async *enumerate() { for (const id of ids) yield { id, recordKey: id }; },
         async prepare(ref) { return {

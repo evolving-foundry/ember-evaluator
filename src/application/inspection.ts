@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { loadConfig } from "./config.js";
 import { openPluginRegistry } from "./plugins/open-registry.js";
-import { bootstrapBenchmark } from "./plugins/bootstrap.js";
+import { createBenchmark } from "./plugins/create-components.js";
 import { exportConfig } from "../config/export.js";
 import { redactNetwork } from "../config/network-schema.js";
 import type { LoadedConfig } from "../config/loaded.js";
@@ -42,13 +42,11 @@ export async function diagnoseExperiment(options: InspectionOptions, signal: Abo
     const config = await loadConfig(resolve(options.file), options.overrides, process.env, { registry,
       ...(options.networkConfigPath === undefined ? {} : { networkConfigPath: options.networkConfigPath }) });
     options.onLoaded?.(config);
-    const components = await bootstrapBenchmark(config, dirname(resolve(options.file)), options.patchPath, registry);
-    try {
-      const checks = await diagnose(config, options.file, signal);
-      const network = await diagnoseDownloads({ config, configPath: options.file,
-        ...(options.patchPath === undefined ? {} : { patchPath: options.patchPath }) }, signal, log);
-      return { checks, network };
-    } finally { await components.dispose(); }
+    await createBenchmark(registry, config, dirname(resolve(options.file)));
+    const checks = await diagnose(config, options.file, signal);
+    const network = await diagnoseDownloads({ config, configPath: options.file,
+      ...(options.patchPath === undefined ? {} : { patchPath: options.patchPath }) }, signal, log);
+    return { checks, network };
   } finally { await registry.dispose(); }
 }
 
@@ -59,7 +57,6 @@ export async function previewExperiment(options: InspectionOptions & {
 }, signal: AbortSignal): Promise<{ taskIds: string[] | null; exitCode: number }> {
   const { onProgress: progress } = options;
   let registry: Awaited<ReturnType<typeof openPluginRegistry>> | undefined;
-  let components: Awaited<ReturnType<typeof bootstrapBenchmark>> | undefined;
   let phase = "config";
   let exitCode = 0;
   let taskIds: string[] | null = null;
@@ -79,8 +76,7 @@ export async function previewExperiment(options: InspectionOptions & {
     options.onLoaded?.(config);
     phase = "bootstrap";
     progress({ phase, message: `Initializing benchmark plugin: ${config.experiment.benchmark.name}` });
-    components = await bootstrapBenchmark(config, dirname(resolve(options.file)), options.patchPath, registry);
-    const benchmark = components.benchmark;
+    const benchmark = await createBenchmark(registry, config, dirname(resolve(options.file)));
     phase = "source";
     const source = await progressOperation(progress, { phase, message: `Preparing dataset ${config.experiment.benchmark.name} (checking the cache and downloading as needed)` }, signal,
       activity => benchmark.resolveSource(null, signal, activity));
@@ -93,11 +89,12 @@ export async function previewExperiment(options: InspectionOptions & {
     options.onDiagnostic(phase, error);
     exitCode = signal.aborted ? 130 : 2;
   } finally {
-    progress({ phase: "dispose", message: "Releasing benchmark resources" });
-    try { await components?.dispose(); }
-    catch (error) { options.onDiagnostic("dispose", error); if (exitCode !== 130) exitCode = 1; }
-    try { await registry?.dispose(); }
-    catch (error) { options.onDiagnostic("dispose", error); if (exitCode !== 130) exitCode = 1; }
+    try {
+      progress({ phase: "dispose", message: "Releasing benchmark resources" });
+    } finally {
+      try { await registry?.dispose(); }
+      catch (error) { options.onDiagnostic("dispose", error); if (exitCode !== 130) exitCode = 1; }
+    }
   }
   return { taskIds, exitCode };
 }

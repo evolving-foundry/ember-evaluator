@@ -147,7 +147,7 @@ async function exercise(solver: Solver, fault: Fault) {
   } finally {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
-    await value.components.dispose();
+    await value.dispose();
   }
 }
 

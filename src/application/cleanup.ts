@@ -1,5 +1,5 @@
 import { dirname, resolve } from "node:path";
-import { createPluginRuntime } from "./plugins/bootstrap.js";
+import { createPluginRuntime } from "./plugins/create-components.js";
 import { loadConfig } from "./config.js";
 import type { LoadedConfig } from "../config/loaded.js";
 import type { ImageCleanupSummary, ImageCleanupRequest } from "../core/contracts/image-cleanup.js";

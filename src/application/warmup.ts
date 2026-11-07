@@ -1,7 +1,7 @@
 import { networkSecrets } from "../config/network-schema.js";
 import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
-import { bootstrap, bootstrapBenchmark, createPluginRuntime } from "./plugins/bootstrap.js";
+import { createRunComponents, createBenchmark, createPluginRuntime } from "./plugins/create-components.js";
 import { loadConfig } from "./config.js";
 import type { CliOverrides } from "../core/contracts/config.js";
 import type { LoadedConfig } from "../config/loaded.js";
@@ -116,7 +116,6 @@ export async function executeWarmup(options: { configPath: string; networkConfig
   const controller = new AbortController();
   const signal = AbortSignal.any([options.signal, controller.signal]);
   let registry: PluginRegistry | undefined;
-  let components: RunComponents | undefined;
   const secrets = [options.overrides?.apiKey ?? "", ...Object.entries(process.env)
     .filter(([name]) => /(?:KEY|TOKEN|PASSWORD|SECRET)$/iu.test(name)).flatMap(([, value]) => value ? [value] : [])];
   const progress: ProgressListener = event => {
@@ -141,7 +140,7 @@ export async function executeWarmup(options: { configPath: string; networkConfig
     if (config.deployment) {
       const { RayJobsDeployment } = await import("./ray/deployment.js");
       const { parseJobsConfig } = await import("../config/jobs.js");
-      await bootstrapBenchmark(config, dirname(file), options.patchPath, registry);
+      await createBenchmark(registry, config, dirname(file));
       const { kind: _kind, ...connection } = config.deployment;
       const deployment = new RayJobsDeployment(parseJobsConfig({ ...connection, ...config.experiment.scheduler.config }),
         createPluginRuntime(config, dirname(file), options.patchPath), (role, name) => registry!.ctx.evaluator.configTransport(role, name));
@@ -150,7 +149,7 @@ export async function executeWarmup(options: { configPath: string; networkConfig
         log: message => progress({ phase: "deployment", message }) });
     }
     progress({ phase: "bootstrap", message: "Initializing plugins for image warmup" });
-    components = await bootstrap(config, dirname(file), options.patchPath, undefined, registry);
+    const components = await createRunComponents(registry, config, dirname(file));
     const release = components.scheduler.executionLocation === "remote" ? undefined : await components.environment.acquireImageLease?.(signal);
     let result: WarmupSummary;
     try { result = await warmupSelectedTasks(components, config, signal, progress, secrets); }
@@ -161,8 +160,8 @@ export async function executeWarmup(options: { configPath: string; networkConfig
   finally {
     const cleanupErrors: unknown[] = [];
     try { progress({ phase: "dispose", message: "Releasing warmup resources", transient: failure !== undefined }); } catch (error) { cleanupErrors.push(error); }
-    for (const resource of [components, ...(options.execution ? [] : [registry])]) {
-      try { await resource?.dispose(); } catch (error) { cleanupErrors.push(error); }
+    if (!options.execution) {
+      try { await registry?.dispose(); } catch (error) { cleanupErrors.push(error); }
     }
     if (cleanupErrors.length) throw new AggregateError(failure === undefined ? cleanupErrors : [failure, ...cleanupErrors], "Warmup resource release failed");
   }

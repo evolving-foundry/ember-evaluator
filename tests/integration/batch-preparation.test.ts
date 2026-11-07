@@ -70,7 +70,7 @@ test("20 live attempts refill only after verification and persistence, without w
 async function fixture(budget = 10) {
   const root = await mkdtemp(join(tmpdir(), "batch-preparation-"));
   const value = harness(root, { transfer: true });
-  cleanups.push(async () => { await value.components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   const { components, config, events } = value;
   config.experiment.run.preparation = { mode: "batch", concurrency: 1 };
   components.benchmark.planRun = (refs, source, signal) =>

@@ -36,7 +36,7 @@ export type { ConfigProfile, ProfileDefaults, ProfileLayer, ProfileRole, Resolve
 export { redactSecrets } from "./config/redact.js";
 export { redactDiagnostic } from "./core/errors/diagnostics.js";
 export type { PluginConfigValidator, PluginFactory, PluginFactoryContext, PluginRole, PreparedPlugin, RoleImplementations } from "./core/contracts/plugin.js";
-export { bootstrap } from "./application/plugins/bootstrap.js";
+export { bootstrap, type BootstrappedComponents } from "./application/plugins/bootstrap.js";
 export { Evaluator, EvaluatorRunError, type EvaluationResult, type EvaluatorRunOptions } from "./application/evaluator.js";
 export type { ProgressEvent, ProgressListener, LiveProgress } from "./core/progress/progress.js";
 export type * from "./core/contracts/activity.js";

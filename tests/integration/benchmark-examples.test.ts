@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { afterEach, expect, test, vi } from "vitest";
 import { stringify } from "yaml";
 import { loadConfig } from "../../src/application/config.js";
-import { bootstrapBenchmark } from "../../src/application/plugins/bootstrap.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
+import { createBenchmark } from "../../src/application/plugins/create-components.js";
 import { runCli } from "../../src/cli/main.js";
 import { assertSourceLock } from "../../src/index.js";
 
@@ -31,9 +32,9 @@ async function fixture(name: string) {
 test.each(["example-definition", "example-protocol", "example-harbor"])("%s has locked, serializable tasks with private verification", async name => {
   const f = await fixture(name);
   const config = await loadConfig(f.file, {}, { KEY: "fixture-key" }, { patchPath: f.patchPath });
-  const components = await bootstrapBenchmark(config, f.root, f.patchPath);
+  const registry = await openPluginRegistry(f.patchPath);
   try {
-    const benchmark = components.benchmark;
+    const benchmark = await createBenchmark(registry, config, f.root);
     const signal = AbortSignal.timeout(5000);
     const source = await benchmark.resolveSource(null, signal);
     assertSourceLock(source);
@@ -57,7 +58,7 @@ test.each(["example-definition", "example-protocol", "example-harbor"])("%s has 
     const changed = name === "example-harbor" ? join(f.root, "harbor/tasks/multiply/instruction.md") : join(f.root, "questions.json");
     await writeFile(changed, (await readFile(changed, "utf8")).replace("6", "8"));
     await expect(benchmark.resolveSource(source, signal)).rejects.toThrow(/changed|differs/i);
-  } finally { await components.dispose(); await components.dispose(); }
+  } finally { await registry.dispose(); }
 });
 
 test.each(["example-definition", "example-protocol"])("%s supports discovery, doctor, run, report and resume with an external patch", async name => {

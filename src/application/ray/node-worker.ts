@@ -4,7 +4,7 @@ import { readFile, mkdir, writeFile, rename } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
-import { bootstrap } from "../plugins/bootstrap.js";
+import { createRunComponents } from "../plugins/create-components.js";
 import { openPluginRegistry, type PluginRegistry } from "../plugins/open-registry.js";
 import { DEFAULT_METRICS } from "../../config/defaults.js";
 import { type LoadedConfig } from "../../config/loaded.js";
@@ -28,13 +28,7 @@ import { progressOperation } from "../../core/progress/progress-operation.js";
 import { assertEnvironmentTimeouts } from "../../core/preparation/preparation-validation.js";
 import { createTaskPreparer } from "../../core/preparation/materialize-task.js";
 
-export async function executeRemoteNode(input: unknown, node: NodeConfig, token: string, sharedRegistry?: PluginRegistry): Promise<unknown> {
-  const registry = sharedRegistry ?? await openPluginRegistry(node.pluginPatchPath);
-  try { return await executeRegisteredNode(input, node, token, registry); }
-  finally { if (!sharedRegistry) await registry.dispose(); }
-}
-
-async function executeRegisteredNode(input: unknown, node: NodeConfig, token: string, registry: PluginRegistry): Promise<unknown> {
+export async function executeRemoteNode(input: unknown, node: NodeConfig, token: string, registry: PluginRegistry): Promise<unknown> {
   if (Number(process.versions.node.split(".")[0]) !== 24) throw new Error("Ray node requires Node 24");
   if (
     !input ||
@@ -105,7 +99,6 @@ async function executeRegisteredNode(input: unknown, node: NodeConfig, token: st
     }
   })();
   const root = join(node.outputRoot, "jobs", key.attemptId);
-  let components: Awaited<ReturnType<typeof bootstrap>> | undefined;
   let preparationTiming: TaskPreparationTiming | undefined;
   const warnings = new Set<string>();
   try {
@@ -137,10 +130,10 @@ async function executeRegisteredNode(input: unknown, node: NodeConfig, token: st
       auths: Object.fromEntries(Object.entries(bindings).map(([name, binding]) => [name, binding.auth])),
       persisted: remote.safeConfig as unknown as JsonValue,
     };
-    components = await bootstrap(config, node.configDirectory, node.pluginPatchPath, message => {
+    const components = await createRunComponents(registry, config, node.configDirectory, message => {
       if (warnings.size < 8) warnings.add(redactDiagnostic(message, secrets)
         .replace(/[\u0000-\u001f\u007f]/gu, " ").slice(0, 4096));
-    }, registry, remote.imageConfigFingerprint);
+    }, remote.imageConfigFingerprint);
     const solverProvenance = await resolveSolverProvenance(components.solver, cancellation.signal, [
       ...secrets,
       token,
@@ -154,10 +147,10 @@ async function executeRegisteredNode(input: unknown, node: NodeConfig, token: st
     );
     const validateSource = () => progressOperation(progress.observe,
       { phase: "source", message: "Validating the node data source", taskId: key.taskId, attemptId: key.attemptId }, cancellation.signal, async activity => {
-      const source = await components!.benchmark.resolveSource(remote.source, cancellation.signal, activity);
+      const source = await components.benchmark.resolveSource(remote.source, cancellation.signal, activity);
       if (fingerprintConfig(source) !== fingerprintConfig(remote.source)) throw new Error("Ray node source lock mismatch");
       let matches = 0;
-      for await (const ref of components!.benchmark.enumerate(source, cancellation.signal, activity)) {
+      for await (const ref of components.benchmark.enumerate(source, cancellation.signal, activity)) {
         if (ref.id !== key.taskId) continue;
         if (fingerprintConfig(ref) !== fingerprintConfig(remote.job.ref)) throw new Error("Ray node task reference mismatch");
         matches++;
@@ -174,7 +167,7 @@ async function executeRegisteredNode(input: unknown, node: NodeConfig, token: st
       if (!components.environment.materialize) throw new Error("Node environment lacks batch materialization");
       const task = await progressOperation(progress.observe,
         { phase: "prepare", message: "Reading node task files", taskId: key.taskId, attemptId: key.attemptId }, cancellation.signal,
-        activity => components!.benchmark.prepare(remote.job.ref, source, cancellation.signal, activity));
+        activity => components.benchmark.prepare(remote.job.ref, source, cancellation.signal, activity));
       if (task.input.id !== key.taskId || (task.transfer !== null && task.verifyEnv === null))
         throw new Error("Invalid prepared task identity or transfer");
       const timing: TaskPreparationTiming = preparationTiming = { taskId: key.taskId, status: "preparing", queuedAt: new Date().toISOString(),
@@ -259,8 +252,6 @@ async function executeRegisteredNode(input: unknown, node: NodeConfig, token: st
       attempt => attempt.key.attemptId === key.attemptId,
     )?.record;
     if (!record) throw new Error("Ray task has no durable result");
-    await components.dispose();
-    components = undefined;
     uploading = true;
     await client.control("control", { key, nodeId, state: "uploading" }, AbortSignal.timeout(15_000));
     const evidence = join(root, key.runId, "tasks", safeTaskKey(key.taskId), "attempts", key.attemptId);
@@ -288,7 +279,6 @@ async function executeRegisteredNode(input: unknown, node: NodeConfig, token: st
     heartbeatStop.abort();
     await heartbeat;
     await progress.close();
-    await components?.dispose();
   }
 }
 

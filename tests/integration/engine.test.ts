@@ -48,7 +48,7 @@ async function fixture(options: Parameters<typeof harness>[1] = {}) {
 afterEach(async () => {
   vi.restoreAllMocks();
   artifactReadFailure.suffix = null; artifactReadFailure.failOnCall = 0; artifactReadFailure.calls = 0; artifactReadFailure.removeOnFailure = false;
-  for (const { root, value } of resources.splice(0)) { await value.components.dispose(); await rm(root, { recursive: true, force: true }); }
+  for (const { root, value } of resources.splice(0)) { await value.dispose(); await rm(root, { recursive: true, force: true }); }
 });
 const job = { runId: "run-1", taskId: "a", attemptId: "attempt-1", ref: { id: "a", recordKey: "a" }, configFingerprint: "config-hash" };
 async function taskFixture(options: Parameters<typeof harness>[1] = {}) {

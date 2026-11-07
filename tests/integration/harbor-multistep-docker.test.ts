@@ -54,7 +54,7 @@ test.skipIf(process.env.EVALUATOR_HARBOR_DOCKER_TESTS !== "1")("native shared st
     const results = await value.components.store.listAttempts();
     expect(results).toHaveLength(1);
   } finally {
-    await value.components.dispose();
+    await value.dispose();
     await new Promise<void>(resolve => { upstream.closeAllConnections(); upstream.close(() => resolve()); });
     await rm(root, { recursive: true, force: true });
   }
