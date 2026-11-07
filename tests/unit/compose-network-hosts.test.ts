@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { relocateSharedNetworkHosts } from "../../src/plugins/environments/docker-compose.js";
+import { relocateSharedNetworkHosts } from "../../src/infrastructure/containers/compose.js";
 import type { JsonValue } from "../../src/core/contracts/task.js";
 
 test("shared-network tasks inherit gateway and explicit mappings from their ultimate network owner", () => {

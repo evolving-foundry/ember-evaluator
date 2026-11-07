@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { kernelProfile } from "../../src/adapters/kernel/profile.js";
+import { kernelProfile } from "../../src/plugins/benchmarks/operator/kernel/runtime/profile.js";
 test("profiling records and applies explicit cache, retry and timeout options", async () => {
   const dir = await mkdtemp(join(tmpdir(), "kernel-profile-options-"));
   try {
@@ -52,7 +52,7 @@ test.skipIf(process.platform === 'win32')('cancelling profiling terminates the r
 });
 
 test('published kernel atoms resolve from their packaged directory without a source checkout', async () => {
-  const { resolveAtomDir } = await import('../../src/adapters/kernel/cli.js');
+  const { resolveAtomDir } = await import('../../src/plugins/benchmarks/operator/kernel/runtime/cli.js');
   const dir = await mkdtemp(join(tmpdir(), 'kernel-packaged-atoms-'));
   const previous = process.env.KERNEL_ATOM_DIR;
   delete process.env.KERNEL_ATOM_DIR;
@@ -67,7 +67,7 @@ test('published kernel atoms resolve from their packaged directory without a sou
 
 
 test("metric parsing keeps actual zero and omits missing or non-finite cells", async () => {
-  const { parseMsprofMetricsTable, rowsToMetrics } = await import("../../src/plugins/benchmarks/protocols/kernel/msprof-csv.js");
+  const { parseMsprofMetricsTable, rowsToMetrics } = await import("../../src/plugins/benchmarks/operator/kernel/msprof-csv.js");
   const dir = await mkdtemp(join(tmpdir(), "kernel-profile-metrics-"));
   try {
     await writeFile(join(dir, "PipeUtilization.csv"), "block_id,aiv_vec_ratio,aiv_scalar_ratio,aiv_mte2_ratio\n0,0.4,0,\n1,0.7,NaN,Infinity\n");
@@ -84,7 +84,7 @@ test("metric parsing keeps actual zero and omits missing or non-finite cells", a
 });
 
 test("roofline leaves absent pipes unavailable rather than reporting zero utilization", async () => {
-  const { analyzeRoofline } = await import("../../src/plugins/benchmarks/protocols/kernel/roofline.js");
+  const { analyzeRoofline } = await import("../../src/plugins/benchmarks/operator/kernel/roofline.js");
   const analysis = analyzeRoofline({ block0: { aiv_vec_ratio: 0.9 } });
   expect(analysis.vec_rate).toBe(0.9);
   expect(analysis.scalar_rate).toBeNull(); expect(analysis.mte2_rate).toBeNull();

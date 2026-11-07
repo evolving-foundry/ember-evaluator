@@ -2,31 +2,31 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { RayScheduler } from "../../src/plugins/schedulers/ray.js";
-import { warmupSelectedTasks } from "../../src/warmup.js";
-import { planBenchmarkRun } from "../../src/plugins/benchmarks/plan-run.js";
-import type { RayResult } from "../../src/adapters/ray/client.js";
-import type { RemoteJob } from "../../src/adapters/ray/protocol.js";
-import type { ReceiverServerOptions } from "../../src/adapters/transfer/https.js";
+import { RayScheduler } from "../../src/plugins/schedulers/ray/scheduler.js";
+import { warmupSelectedTasks } from "../../src/application/warmup.js";
+import { planBenchmarkRun } from "../../src/plugins/benchmarks/shared/plan-run.js";
+import type { RayResult } from "../../src/infrastructure/ray/client.js";
+import type { RemoteJob } from "../../src/infrastructure/ray/protocol.js";
+import type { ReceiverServerOptions } from "../../src/infrastructure/transfer/https.js";
 import { harness } from "../fixtures/engine/fakes.js";
-import { assertJsonValue } from "../../src/config/schema.js";
+import { assertJsonValue } from "../../src/core/validation/input.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
-import { fingerprintConfig } from "../../src/core/run-manifest.js";
+import { fingerprintConfig } from "../../src/core/results/run-manifest.js";
 
 const digest = `sha256:${"a".repeat(64)}`;
 const bridge = vi.hoisted(() => ({ submit: vi.fn<(job: RemoteJob) => Promise<RayResult>>(), cancel: vi.fn(),
   close: vi.fn(async () => {}), server: vi.fn<(options: ReceiverServerOptions) => void>(),
   env: {} as Record<string, string | undefined>,
   nodes: ["node-b", "node-a"], nodeSlots: { "node-a": 1, "node-b": 1 } as Record<string, number> }));
-vi.mock("../../src/adapters/ray/client.js", () => ({ RayClient: class {
+vi.mock("../../src/infrastructure/ray/client.js", () => ({ RayClient: class {
   constructor(options: { env: Record<string, string | undefined> }) { bridge.env = options.env; }
   nodes = bridge.nodes; nodeSlots = bridge.nodeSlots;
   slots = Object.values(bridge.nodeSlots).reduce((a, b) => a + b, 0);
   start = async () => {};
   submit = bridge.submit; cancel = bridge.cancel; close = bridge.close;
 } }));
-vi.mock("../../src/core/package-provenance.js", () => ({ PACKAGE_RUNTIME_ID: "ember-evaluator:package", loadPackageDigest: async () => `sha256:${"a".repeat(64)}` }));
-vi.mock("../../src/adapters/transfer/https.js", () => ({ startTransferReceiver: async (options: ReceiverServerOptions) => {
+vi.mock("../../src/infrastructure/provenance/package.js", () => ({ PACKAGE_RUNTIME_ID: "ember-evaluator:package", loadPackageDigest: async () => `sha256:${"a".repeat(64)}` }));
+vi.mock("../../src/infrastructure/transfer/https.js", () => ({ startTransferReceiver: async (options: ReceiverServerOptions) => {
   bridge.server(options); return { url: "https://collector.invalid", close: async () => {} };
 } }));
 
@@ -59,7 +59,7 @@ async function fixture(count = 6) {
     planBenchmarkRun(components.benchmark, refs, source, signal, { source: "fixture", version: "1" }, 10);
   config.experiment.run.preparation = { mode: "batch", concurrency: 1 };
   assertJsonValue(config.experiment); config.persisted = structuredClone(config.experiment);
-  cleanups.push(async () => { await scheduler.close(); await components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await scheduler.close(); await value.dispose(); await rm(root, { recursive: true, force: true }); });
   return { ...value, scheduler };
 }
 

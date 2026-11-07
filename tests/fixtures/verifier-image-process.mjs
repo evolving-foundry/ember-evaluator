@@ -1,8 +1,9 @@
 import { access, appendFile, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { createPythonVerifierImage } from "../../dist/adapters/verifiers/python/image.js";
-import { DockerRuntime, PINNED_NODE_IMAGE } from "../../dist/plugins/environments/docker-runtime.js";
+import { createPythonVerifierImage } from "../../dist/plugins/verifiers/python/runtime/image.js";
+import { DockerRuntime } from "../../dist/infrastructure/containers/runtime.js";
+import { PINNED_NODE_IMAGE } from "../../dist/infrastructure/containers/runtime-contract.js";
 
 const root = process.argv[2];
 const signal = AbortSignal.timeout(10000);

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { mgsmDefinition } from "../../src/plugins/benchmarks/definitions/mgsm.js";
+import { mgsmDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/mgsm.js";
 
 const context = {
   model: { name: "unused", endpoint: null, provider: null, api: null },

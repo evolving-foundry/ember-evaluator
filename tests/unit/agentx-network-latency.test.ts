@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { parseAgentXReplayConfig } from "../../src/plugins/solvers/agentx-replay.js";
-import { parseNetworkLatencyConfig } from "../../src/adapters/harness/agentx/network-latency.js";
-import { normalizeAgentXExport, parseAgentXSummary } from "../../src/adapters/harness/agentx/protocol.js";
+import { parseNetworkLatencyConfig } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/network-latency.js";
+import { normalizeAgentXExport, parseAgentXSummary } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/summary.js";
 import { workload, lexicon, profileExport, networkProfileExport } from "../fixtures/agentx/export.js";
 
 const automatic = { mode: "automatic" as const, pingIntervalSeconds: 1 };

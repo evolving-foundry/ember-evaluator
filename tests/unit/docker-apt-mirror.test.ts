@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { aptSourceInstructions } from "../../src/adapters/containers/apt-sources.js";
+import { aptSourceInstructions } from "../../src/infrastructure/containers/apt-sources.js";
 
 const execute = promisify(execFile);
 

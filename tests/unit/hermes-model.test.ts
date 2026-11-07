@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { parse } from "yaml";
-import { HERMES_AUTH_ENV, hermesModelSettings } from "../../src/adapters/harness/hermes/model.js";
+import { HERMES_AUTH_ENV, hermesModelSettings } from "../../src/runtimes/hermes/model.js";
 
 test("maps the shared model to a custom endpoint alias with its own key env", () => {
   const value = parse(hermesModelSettings({ name: "office-mock-model", endpoint: "http://localhost:18080/v1", api: "openai-completions", provider: null }));

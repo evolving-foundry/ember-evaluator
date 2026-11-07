@@ -1,8 +1,8 @@
 import { classifyError } from "../../core/errors/classify.js";
 import { EvaluatorError } from "../../core/errors/evaluator-error.js";
-import { readProcess } from "../../adapters/verifiers/process.js";
-import { checkedPath } from "../../core/artifacts.js";
-import { expectRecord, rejectUnknown } from "../../config/schema.js";
+import { readProcess } from "../../infrastructure/process/output.js";
+import { checkedPath } from "../../core/artifacts/artifacts.js";
+import { expectRecord, rejectUnknown } from "../../core/validation/input.js";
 import { lstat } from "node:fs/promises";
 import { join } from "node:path";
 import type { EnvironmentSession } from "../../core/contracts/environment.js";

@@ -1,17 +1,16 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
-import { JobsClient } from "../../src/adapters/ray/jobs-client.js";
-import { ProgressPublisher, parseProgressSnapshot } from "../../src/core/progress-wire.js";
-import { LiveOperation } from "../../src/core/live-progress.js";
+import { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
+import { ProgressPublisher, parseProgressSnapshot } from "../../src/core/progress/progress-wire.js";
+import { LiveOperation } from "../../src/core/progress/live-progress.js";
 import { createGatewayCertificate } from "../fixtures/ray/gateway-certificate.js";
 
-const available = spawnSync("openssl", ["version"], { windowsHide: true }).status === 0 && existsSync("dist/adapters/ray/jobs-progress.js");
+const available = spawnSync("openssl", ["version"], { windowsHide: true }).status === 0;
 test.skipIf(!available)("authenticated Jobs gateway keeps previews in RAM and repopulates them after restart", async () => {
   const root = await mkdtemp(join(tmpdir(), "jobs-live-gateway-"));
   const security = join(root, "security"); const jobs = join(root, "jobs"); const id = randomUUID();
@@ -26,7 +25,7 @@ test.skipIf(!available)("authenticated Jobs gateway keeps previews in RAM and re
   let output = "";
   let client: JobsClient;
   const start = async () => {
-    child = spawn(process.execPath, [resolve("src/adapters/ray/runtime/jobs-gateway.mjs")], { windowsHide: true,
+    child = spawn(process.execPath, [resolve("src/application/ray/entries/jobs-gateway.mjs")], { windowsHide: true,
       env: { ...process.env, EVALUATOR_JOBS_ROOT: jobs, EVALUATOR_JOBS_SECURITY: security, EVALUATOR_JOBS_PORT: "0", EVALUATOR_RAY_DASHBOARD: `http://127.0.0.1:${address.port}` }, stdio: ["ignore", "pipe", "pipe"] });
     const port = await new Promise<number>((done, fail) => {
       const timeout = setTimeout(() => fail(new Error("Gateway did not start")), 10_000);

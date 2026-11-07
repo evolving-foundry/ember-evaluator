@@ -2,8 +2,8 @@ import { expect, test, vi } from "vitest";
 import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
-import { kernelProfile } from "../../src/adapters/kernel/profile.js";
-import { KernelBenchmark, parseKernelConfig } from "../../src/plugins/benchmarks/protocols/kernel/index.js";
+import { kernelProfile } from "../../src/plugins/benchmarks/operator/kernel/runtime/profile.js";
+import { KernelBenchmark, parseKernelConfig } from "../../src/plugins/benchmarks/operator/kernel/index.js";
 import type { EnvironmentSession, CommandSpec, ProcessHandle } from "../../src/core/contracts/environment.js";
 
 async function fixture(mode: "complete" | "missing" | "cleanup" | "no-trace" | "missing-l2" | "wrong-seed" | "wrong-capture" = "complete", device = 0, operation: "evaluate" | "profile" = "profile", collection?: "Default" | "PipeTimeline,Default") {

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
-import { createPiRuntimeInstallation } from "../../src/adapters/harness/pi/package-runtime.js";
+import { createPiRuntimeInstallation } from "../../src/runtimes/pi/package-runtime.js";
 
 const exec = promisify(execFile);
 
@@ -17,7 +17,7 @@ test.each([
   try {
     const packageRoot = join(root, "node_modules", "ember-evaluator");
     const piRoot = join(layout === "nested" ? packageRoot : root, "node_modules", "@earendil-works", "pi-coding-agent");
-    const runnerRoot = join(packageRoot, "dist", "adapters", "harness", "pi");
+    const runnerRoot = join(packageRoot, "dist", "runtimes", "pi");
     await mkdir(join(piRoot, "dist"), { recursive: true });
     await mkdir(runnerRoot, { recursive: true });
     await writeFile(join(packageRoot, "package.json"), JSON.stringify({ type: "module",

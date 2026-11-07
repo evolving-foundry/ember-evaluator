@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { assertResumePluginVersions, planResume } from "../../src/core/resume.js";
-import { assertResumeSolverProvenance, assertSolverProvenance } from "../../src/core/solver-provenance.js";
-import { selectAttemptRecords } from "../../src/core/task-result-resolver.js";
+import { assertResumePluginVersions, planResume } from "../../src/core/recovery/resume.js";
+import { assertResumeSolverProvenance, assertSolverProvenance } from "../../src/core/results/solver-provenance.js";
+import { selectAttemptRecords } from "../../src/core/results/task-result-resolver.js";
 import { attempt, attemptSummaries, cancelledRun } from "../fixtures/results/interrupted-run/fixture.js";
 
 test("restarts only cancelled and uncommitted tasks in locked selection order", () => {

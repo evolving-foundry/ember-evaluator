@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { ChoiceLogprobsSolver } from "../../src/plugins/solvers/choice-logprobs.js";
-import { LocalEnvironment } from "../../src/plugins/environments/local.js";
-import { requestChatLogprobs } from "../../src/adapters/models/chat-logprobs.js";
-import { trajectoryType } from "../../src/core/record-validation.js";
+import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
+import { requestChatLogprobs } from "../../src/infrastructure/models/chat-logprobs.js";
+import { trajectoryType } from "../../src/core/results/record-validation.js";
 
 test("choice-logprobs sends one direct request and retains probability evidence without credentials", async () => {
   let captured: Record<string, unknown> | undefined;

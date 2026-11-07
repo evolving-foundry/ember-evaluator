@@ -1,7 +1,8 @@
 import type { HardwareKind } from "../core/contracts/hardware.js";
 import { parseHardware } from "./hardware.js";
 import { parseDeployment, type Deployment } from "./deployment.js";
-import { expectNonEmptyString, expectPositiveInteger, expectRecord, rejectUnknown, type EffectiveConfig } from "./schema.js";
+import { expectNonEmptyString, expectPositiveInteger, expectRecord, rejectUnknown } from "../core/validation/input.js";
+import { type EffectiveConfig } from "../core/contracts/config.js";
 
 export type PluginSelection = { name?: string; config?: Record<string, unknown>; service?: string };
 export type EnvironmentInput = Omit<PluginSelection, "service"> & { platform?: string };

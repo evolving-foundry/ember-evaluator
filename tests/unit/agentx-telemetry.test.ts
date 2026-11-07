@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { normalizeTelemetry, parseTelemetry, parseTelemetryConfig } from "../../src/adapters/harness/agentx/telemetry.js";
+import { normalizeTelemetry, parseTelemetry, parseTelemetryConfig } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/telemetry.js";
 import { parseAgentXReplayConfig } from "../../src/plugins/solvers/agentx-replay.js";
-import { normalizeAgentXExport, parseAgentXSummary } from "../../src/adapters/harness/agentx/protocol.js";
+import { normalizeAgentXExport, parseAgentXSummary } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/summary.js";
 import { renderAgentXTables } from "../../src/plugins/reporters/agentx-tables.js";
 import { serverMetricsEvidence, telemetryConfig } from "../fixtures/agentx/server-metrics.js";
 import { profileExport, workload, lexicon } from "../fixtures/agentx/export.js";

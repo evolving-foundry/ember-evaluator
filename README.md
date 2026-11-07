@@ -5,7 +5,7 @@
 <h3 align="center">Many ways to evaluate. One framework to bring them together.</h3>
 
 <p align="center">
-  Bring benchmarks, agent evaluations, and performance testing into one workflow — across coding, terminal, office, web, and more.
+  A plugin-based framework for evaluating agent harnesses, inference engines, and kernels, with more areas to come.
 </p>
 
 <p align="center">
@@ -27,31 +27,31 @@
 
 ## ℹ️ Introduction
 
-Ember Evaluator configures models, agents, benchmarks, and execution environments in one YAML file. It executes tasks, verifies answers, saves results, and generates reports so you can compare models and agents under the same experimental conditions.
+Ember Evaluator uses YAML to select tasks and components and `--patch` to load custom plugins. Evaluations support custom network settings, automatic network retries, run resumption, and per-task failure diagnostics.
 
-It supports math and knowledge questions, code changes, terminal operations, office, web, and security tasks. AgentX can also replay traces to measure model service throughput and latency.
+Supported scenarios include evaluating agent harnesses on terminal, coding, and office tasks, benchmarking inference engine performance, and testing kernel correctness and performance.
 
 ![Evaluator architecture from YAML configuration through execution, verification, result storage, and reporting](imgs/01-framework-project-overview-v2.png.png)
 
-Models and agents solve tasks, benchmarks verify them, and stores save results and evidence. See `src/` for module responsibilities, execution flows, and implementation entry points.
+[Source architecture and execution flow](docs/development/architecture.en.md)
 
 ## ⚙️ Features
 
-- **Multiple evaluation workloads**: GSM8K, MMLU, HumanEval, Terminal-Bench, SWE-bench, WorkBuddy, [OfficeQA Pro V2](docs/users/benchmarks/officeqa-pro-v2.md) (parsed JSON by default, with original PDF support), and custom Harbor tasks. See [supported benchmarks](docs/users/README.md#supported-benchmarks).
-- **Multiple agents and model services**: Built-in SimpleAgent and AgentBundle with support for the dsh, dify, pi, deepagents, hermes, and jiuwenswarm harnesses. See [solvers and model services](docs/users/solvers.md).
-- **Local, container, and distributed execution**: Run tasks in local or Docker environments, schedule them locally or through Ray, and control concurrency and environment preparation. See [execution modes](docs/users/usage.md#local-docker-and-ray) and [concurrency](docs/users/concurrency.md).
-- **Network configuration**: Configure proxies, data download URLs, Docker registry mirrors, and package sources. See the [network configuration guide](docs/users/network.md).
-- **Evidence and resume**: Save configuration, source versions, trajectories, verification logs, and artifacts. Resume unfinished tasks after interruption. See [resume and result files](docs/users/usage.md#resume-and-rebuild-reports).
-- **Metrics and offline reports**: Compute scores, accuracy, duration, and token usage, and rebuild Markdown reports from saved results. See [reading results](docs/users/usage.md#read-results) and [scoring](docs/users/reference/scoring.md).
-- **Model service performance**: Measure throughput, TTFT, ITL, and request latency with AgentX, optionally collecting vLLM and Ascend NPU metrics. See [AgentX](docs/users/benchmarks/agentx.md).
-- **Plugins**: Replace or add any of eight component types, including Benchmark, Verifier, Solver, and Environment. See [plugin development and loading](docs/development/plugins.en.md).
-- **Node.js SDK**: Execute evaluations with `Evaluator.run()`, including progress, cancellation, resume, and Ray Jobs. See the [SDK guide](docs/users/sdk.md).
+- **Multiple evaluation workloads.** Give agents terminal, coding, and office tasks with Terminal-Bench, SWE-bench Verified, WorkBuddy, or your own Harbor tasks. OfficeQA Pro V2 accepts parsed JSON and original PDFs. [Supported benchmarks](docs/users/README.md#supported-benchmarks) · [OfficeQA Pro V2](docs/users/benchmarks/officeqa-pro-v2.md)
+- **Local, container, and distributed execution.** Run locally or in Docker with configurable concurrency. Each Ray worker warms up only its assigned tasks. [Execution modes](docs/users/usage.md#local-docker-and-ray) · [Concurrency and warmup](docs/users/concurrency.md)
+- **Evidence and resume.** Per-task results record the failed stage, error codes, traces, and verification logs. Use `--resume` to continue a run and `retry` for eligible network failures. [Resume](docs/users/usage.md#resume-and-rebuild-reports) · [Error diagnostics](docs/users/reference/errors.md) · [Network retries](docs/users/network-retry.md)
+- **Model service performance.** AgentX replays requests to measure throughput, time to first token, and latency, with optional vLLM and Ascend NPU metrics. [AgentX guide](docs/users/benchmarks/agentx.md)
+- **Multiple agents and model services.** Use SimpleAgent, or run DSH, Dify, Pi, DeepAgents, Hermes, or JiuwenSwarm through AgentBundle. [Solvers and model services](docs/users/solvers.md)
+- **Metrics and offline reports.** Use saved results to report scores, accuracy, elapsed time, and token usage. [Read results](docs/users/usage.md#read-results) · [Scoring](docs/users/reference/scoring.md)
+- **Network configuration.** Use `--network` to select settings for your execution environment. [Network configuration](docs/users/network.md)
+- **Plugins.** Use `--patch` to add a benchmark, solver, verifier, or other component. [Plugin development](docs/development/README.en.md#add-your-first-component)
+- **Node.js SDK.** `Evaluator.run()` supports progress, cancellation, resume, and Ray Jobs. [SDK guide](docs/users/sdk.md)
 
 ## 📦 Installation and Deployment
 
 ### Agent Instruction
 
-Copy this instruction into your coding agent.
+Give this instruction to your coding agent.
 
 ```text
 Install the Ember Evaluator CLI and its ember-evaluator skill from https://github.com/evolving-foundry/ember-evaluator.
@@ -63,13 +63,7 @@ Run ember-evaluator --help and confirm that this agent can discover and read the
 
 #### 1. Install the CLI
 
-Requirements:
-
-1. **Node.js** >= 24.22.1 (24.x).
-2. **pnpm** >= 11 < 13. If missing, run `npm install --global pnpm` first.
-3. **Git** and read access to the private AgentBundle repository.
-
-Clone the repository, then build and install from its root.
+Use Node.js 24.x (at least 24.22.1), pnpm 11 or 12, and Git with read access to the private AgentBundle repository. If needed, install pnpm with `npm install --global pnpm`.
 
 ```bash
 git clone https://github.com/evolving-foundry/ember-evaluator.git
@@ -80,11 +74,11 @@ pnpm add -g .
 ember-evaluator --help
 ```
 
-The help output confirms installation. See the [installation guide](docs/users/installation.md) for details, or use the [management container](docs/users/deployment/container-toolbox.md) on Linux servers.
+The help output confirms installation. [Installation guide](docs/users/installation.md) · [Linux management container](docs/users/deployment/container-toolbox.md)
 
 #### 2. Install the skill
 
-Run this from the project where you want to use the skill, then select your coding agent.
+Run this in the target project and select your coding agent.
 
 ```bash
 npx skills add evolving-foundry/ember-evaluator --skill ember-evaluator
@@ -92,7 +86,7 @@ npx skills add evolving-foundry/ember-evaluator --skill ember-evaluator
 
 ## 🚀 Quick Start
 
-Run two GSM8K math questions locally with SimpleAgent; Docker is not required. Replace the model name, API URL, and key with your own values, then run from the repository root in Bash:
+Run two GSM8K questions locally with SimpleAgent. Replace the settings below with an OpenAI Chat Completions service that supports tool calling, then run the commands in Bash from the repository root.
 
 ```bash
 export MODEL_NAME="your-model-id"
@@ -103,9 +97,7 @@ ember-evaluator inspect playbook/gsm8k/gsm8k-quick-start.yaml
 ember-evaluator run playbook/gsm8k/gsm8k-quick-start.yaml
 ```
 
-Use `inspect` to validate the configuration file and review the expanded experiment and network settings before executing `run`.
-
-The model service must support OpenAI Chat Completions and tool calling. When the run finishes, open `report.md` in the result directory shown in the logs. See the [two-question quick start](docs/users/quick-start.md) for PowerShell commands and more details.
+Use `inspect` to check the configuration and `run` to start. Open `report.md` in the results directory printed by the CLI. [Full walkthrough and PowerShell commands](docs/users/quick-start.md)
 
 | Goal | Benchmark / scenario | Environment | Additional requirements | Quick start |
 | --- | --- | --- | --- | --- |
@@ -113,11 +105,11 @@ The model service must support OpenAI Chat Completions and tool calling. When th
 | Evaluate terminal operations | Terminal-Bench 4.0 | Docker | amd64 images; QEMU/binfmt on ARM64 | [Terminal-Bench 4.0](docs/users/quick-start/terminalbench.md) |
 | Standard model service performance evaluation | AgentX standard | local, optionally in the management container | Python 3.11–3.13, venv, tokenizer, streaming model service with long context; management image includes Python | [AgentX performance](docs/users/quick-start/agentx.md) |
 
-See [Playbook examples](playbook/README.md) for other benchmarks and combinations, and the [user documentation](docs/users/README.md) for resume, reports, and daily operations.
+Find more configurations in the [Playbooks](playbook/README.md).
 
 ## 🔥 Warm Images Before Evaluation
 
-For Docker workloads, use `warmup` to download or build images and install dependencies before evaluation. The following commands use the same experiment YAML to check the environment, prepare images, and start evaluation:
+Use the same YAML to check the environment, warm the images, and run the evaluation. Address any failed `doctor` checks first.
 
 ```bash
 ember-evaluator doctor playbook/terminalbench/terminalbench-4.0.yaml
@@ -125,57 +117,43 @@ ember-evaluator warmup playbook/terminalbench/terminalbench-4.0.yaml
 ember-evaluator run playbook/terminalbench/terminalbench-4.0.yaml
 ```
 
-Resolve failed `doctor` checks before running `warmup`. Warmup prepares solve, verification, and service images for the selected tasks, plus Evaluator runtimes and Solver dependencies. It makes no model calls, executes no tasks, and creates no evaluation reports.
+`warmup` prepares the selected tasks’ solve, verification, and sidecar images plus runtime dependencies. Model calls and scoring happen during `run`, so warmup can run without a model API key.
 
-Warmup does not require a model API key, but model names, endpoints, and other configuration must be valid. Add model credentials for evaluation and keep task versions, task selection, platform, plugin configuration, and Docker daemon unchanged to reuse cached images.
-
-Local Docker, Ray Client, and Ray Jobs support warmup; Ray prepares images on the execution nodes. See the [image warmup guide](docs/users/usage.md#warm-images-without-evaluation) for options and prerequisites.
+Warmup works with local Docker, Ray Client, and Ray Jobs. Ray prepares images on the execution nodes. Keep the experiment and execution environment the same to reuse cached images. [Warmup guide](docs/users/usage.md#warm-images-without-evaluation)
 
 ### 📥 Download Evaluation Images from ModelScope
 
-**Ember Evaluator can download task image archives from ModelScope and load them into Docker automatically.** Once an archive source is configured, `warmup` and `run` select images by task, platform, and solve/verify phase. Hugging Face image archives are also supported.
+`warmup` and `run` can load ModelScope archives into Docker by task, platform, and phase. Hugging Face archives are also supported. [Official ModelScope image repository](https://www.modelscope.cn/datasets/evolving-foundry/ember-evaluator)
 
-> **Official image repository: [evolving-foundry/ember-evaluator](https://www.modelscope.cn/datasets/evolving-foundry/ember-evaluator)**
->
-> Maintained by the Ember Evaluator team, this repository hosts official task image archives for selected benchmarks. Check its file tree for available tasks and platforms.
-
-Use the bundled network file from the repository root. The experiment YAML selects the benchmark, model, and tasks; the YAML after `--network` selects image download sources:
+Use `--network` to select the image source.
 
 ```bash
 ember-evaluator warmup playbook/terminalbench/terminalbench-4.0.yaml --network playbook/network/archives.yaml
 ember-evaluator run playbook/terminalbench/terminalbench-4.0.yaml --network playbook/network/archives.yaml
 ```
 
-Prepare Docker, model settings, and task selection using the [Terminal-Bench quick start](docs/users/quick-start/terminalbench.md). The example selects all tasks; only published tasks and platforms are available, and other downloads retain their defaults. See [how to use --network](docs/users/network.md#1-choose-a-network-file) to select mirrors, combine settings, or set a default file.
+The example selects all tasks by default. Archive coverage depends on published tasks and platforms. [Terminal-Bench quick start](docs/users/quick-start/terminalbench.md) · [Configure image sources](docs/users/network.md#1-choose-a-network-file)
 
 ## 📖 Guides
 
-Choose a guide for your task:
-
-- **Configure experiments**: [YAML, profiles, and environment variables](docs/users/config.md); [solvers, AgentBundle, and model services](docs/users/solvers.md).
-- **Run workloads**: [Benchmark guides](docs/users/benchmarks/README.md); [experiment configurations](playbook/README.md).
-- **Manage evaluation runs**: [Task selection, resume, and reports](docs/users/usage.md); [image warmup](docs/users/usage.md#warm-images-without-evaluation); [image cleanup](docs/users/usage.md#delete-evaluation-images); [concurrency, preparation pipelines, and timeouts](docs/users/concurrency.md).
-- **Measure service performance**: [AgentX concurrency sweeps, trace replay, and metrics](docs/users/benchmarks/agentx.md).
-- **Extend the project**: [Plugin development and loading](docs/development/plugins.en.md); [benchmark requirements and acceptance](docs/development/benchmark-evaluation-requirements.en.md) for dataset integration; [benchmark development](docs/development/benchmarks.en.md) for plugins.
-- **Troubleshoot**: [Downloads, logs, and truncated model output](docs/users/faq/README.md); [error codes](docs/users/reference/errors.md); [retrying network failures](docs/users/network-retry.md).
-
-See the [user documentation index](docs/users/README.md) for all guides, benchmarks, and execution limitations.
+- **Configure experiments** · [YAML and profiles](docs/users/config.md) · [Solvers and model services](docs/users/solvers.md)
+- **Run workloads** · [Benchmark guides](docs/users/benchmarks/README.md) · [Runnable configurations](playbook/README.md)
+- **Manage evaluation runs** · [Task selection, resume, and reports](docs/users/usage.md) · [Concurrency](docs/users/concurrency.md) · [Image cleanup](docs/users/usage.md#delete-evaluation-images)
+- **Measure service performance** · [AgentX concurrency sweeps and trace replay](docs/users/benchmarks/agentx.md)
+- **Extend the project** · [Add a Solver](docs/development/add-solver.en.md) · [Add a built-in component](docs/development/add-built-in-plugin.en.md) · [Add an external plugin](docs/development/add-external-plugin.en.md) · [Benchmark development](docs/development/benchmarks.en.md) · [Dataset acceptance](docs/development/benchmark-evaluation-requirements.en.md)
+- **Troubleshoot** · [FAQ](docs/users/faq/README.md) · [Error codes](docs/users/reference/errors.md) · [Network retries](docs/users/network-retry.md)
 
 ## 🧪 Supported Benchmarks
 
-Benchmarks fall into three categories by evaluation purpose:
-
 | Category | Supported benchmarks | What is measured and where to start |
 | --- | --- | --- |
-| Model + agent harness capability evaluation | GSM8K, MATH-500, MGSM, MMLU, MMLU-Pro, GPQA, DROP, TriviaQA, SimpleQA, HealthBench, HumanEval, DeepSWE, SWE-bench Verified, Terminal-Bench, WorkBuddy, OfficeQA Pro V2, and custom Harbor task packages | Math, knowledge questions, code generation and changes, terminal, office, web, and security tasks, with accuracy or scores computed under each benchmark's rules. See [benchmarks and requirements](docs/users/README.md#supported-benchmarks) and [Playbook configurations](playbook/README.md). |
-| Inference engine performance evaluation (AgentX) | AgentX (`agentx`) | Replay agent traces to measure throughput, TTFT, ITL, and request latency, optionally collecting vLLM and Ascend NPU metrics. See the [AgentX guide](docs/users/benchmarks/agentx.md). |
-| Operator performance evaluation (kernel) | kernel (`kernel`) | Verify existing candidate kernels on Ascend NPU, measure reference and candidate execution times and speedup, and optionally collect detailed hardware performance metrics. Runs locally and serially without model calls. See the [kernel guide](docs/users/benchmarks/kernel-npu.md) and [example configuration](playbook/kernel/existing.yaml). |
+| Model + agent harness capability evaluation | GSM8K, MATH-500, MGSM, MMLU, MMLU-Pro, GPQA, DROP, TriviaQA, SimpleQA, HealthBench, HumanEval, DeepSWE, SWE-bench Verified, Terminal-Bench, WorkBuddy, OfficeQA Pro V2, and custom Harbor task packages | Score questions, code, terminal, office, web, and security tasks under each benchmark’s rules. [Benchmarks and requirements](docs/users/README.md#supported-benchmarks) |
+| Inference engine performance evaluation (AgentX) | AgentX (`agentx`) | Replay agent requests and measure throughput, time to first token, inter-token latency, and request latency. [AgentX guide](docs/users/benchmarks/agentx.md) |
+| Operator performance evaluation (kernel) | kernel (`kernel`) | Verify candidates serially on a local Ascend NPU, compare runtime and speedup, and optionally collect hardware metrics. [Kernel guide](docs/users/benchmarks/kernel-npu.md) · [Example configuration](playbook/kernel/existing.yaml) |
 
 ## 📊 Evaluation Results
 
-`tbd` indicates a pending evaluation. Compare document inputs, task ranges, and scoring conditions along with the scores.
-
-**Model** · DeepSeek V4.1 Flash 1017
+These runs used **DeepSeek V4.1 Flash 1017**. `tbd` marks a pending evaluation. Scores follow each benchmark’s rules.
 
 | Benchmark | Agent Harness | Result |
 | --- | --- | --- |

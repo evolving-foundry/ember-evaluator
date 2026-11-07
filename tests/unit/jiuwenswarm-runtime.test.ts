@@ -6,7 +6,7 @@ import {
   JIUWENSWARM_VERSION,
   jiuwenswarmRuntimeInstallation,
   resolveJiuwenswarmCommand,
-} from "../../src/adapters/harness/jiuwenswarm/runtime.js";
+} from "../../src/runtimes/jiuwenswarm/runtime.js";
 
 test("pins the semver form of the companion runtime within the declared range", () => {
   expect(JIUWENSWARM_VERSION).toBe("0.2.5");

@@ -1,5 +1,5 @@
-import { parseJobsConfig, type JobsConfig } from "../adapters/ray/jobs-client.js";
-import { expectRecord, rejectUnknown } from "./schema.js";
+import { parseJobsConfig, type JobsConfig } from "./jobs.js";
+import { expectRecord, rejectUnknown } from "../core/validation/input.js";
 
 export type Deployment = { kind: "ray-jobs" } & Omit<JobsConfig, "concurrency" | "nodes" | "transport">;
 

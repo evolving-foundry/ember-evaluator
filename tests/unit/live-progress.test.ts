@@ -1,13 +1,13 @@
 import { EventEmitter } from "node:events";
 import { afterEach, expect, test, vi } from "vitest";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { CliLiveProgress } from "../../src/cli-live-progress.js";
-import { LIVE_LINES, LiveOperation, ProgressSnapshots, safeLiveText, toolOutputLines } from "../../src/core/live-progress.js";
-import { parseProgressSnapshot, ProgressPublisher } from "../../src/core/progress-wire.js";
-import { JobsProgressMailbox } from "../../src/adapters/ray/jobs-progress.js";
-import type { ProgressEvent } from "../../src/core/progress.js";
-import { progressOperation } from "../../src/core/progress-operation.js";
-import { parseRunnerOutput } from "../../src/adapters/harness/pi/protocol.js";
+import { CliLiveProgress } from "../../src/cli/live-progress.js";
+import { LIVE_LINES, LiveOperation, ProgressSnapshots, safeLiveText, toolOutputLines } from "../../src/core/progress/live-progress.js";
+import { parseProgressSnapshot, ProgressPublisher } from "../../src/core/progress/progress-wire.js";
+import { JobsProgressMailbox } from "../../src/infrastructure/ray/jobs-progress.js";
+import type { ProgressEvent } from "../../src/core/progress/progress.js";
+import { progressOperation } from "../../src/core/progress/progress-operation.js";
+import { parseRunnerOutput } from "../../src/runtimes/pi/protocol.js";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 function clock() { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "performance"] }); }

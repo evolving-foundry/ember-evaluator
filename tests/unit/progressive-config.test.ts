@@ -4,16 +4,17 @@ import { join, resolve } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { stringify } from "yaml";
 import { exportConfig } from "../../src/config/export.js";
-import { loadConfig, loadSavedConfig } from "../../src/config/load.js";
+import { loadConfig, loadSavedConfig } from "../../src/application/config.js";
 import { resolveConfig, resolveInput } from "../../src/config/resolve.js";
 import { parseUserConfig } from "../../src/config/user-schema.js";
-import { readProfileDirectory, type ConfigProfile } from "../../src/config/profiles.js";
-import { fingerprintConfig } from "../../src/core/run-manifest.js";
+import { readProfileDirectory } from "../../src/infrastructure/profiles/read.js";
+import { type ConfigProfile } from "../../src/config/profile-schema.js";
+import { fingerprintConfig } from "../../src/core/results/run-manifest.js";
 import { explainConfig } from "../../src/config/explain.js";
-import { assertJsonValue } from "../../src/config/schema.js";
+import { assertJsonValue } from "../../src/core/validation/input.js";
 
 const services = { default: { model: "fixture", base_url: "https://model.invalid/v1", api_key: "${TEST_MODEL_KEY}" } };
-const profiles = await readProfileDirectory(new URL("../../src/plugins/benchmarks/profiles/", import.meta.url));
+const profiles = (await Promise.all(["agent-harness", "inference-engine", "operator"].map(category => readProfileDirectory(new URL(`../../src/plugins/benchmarks/${category}/profiles/`, import.meta.url))))).flat();
 const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
 async function file(value: unknown): Promise<string> {
@@ -206,5 +207,5 @@ test("Ray shorthand equals explicit local deployment, exports with provenance an
 
 test("packaged profiles participate in byte-level provenance", async () => {
   const manifest = JSON.parse(await readFile(resolve("dist/package-provenance.json"), "utf8"));
-  expect(Object.keys(manifest.files)).toContain("plugins/benchmarks/profiles/workbuddy.yaml");
+  expect(Object.keys(manifest.files)).toContain("plugins/benchmarks/agent-harness/profiles/workbuddy.yaml");
 });

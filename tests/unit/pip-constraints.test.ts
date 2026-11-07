@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { applyBuildPipConstraints, parseBuildPipConstraints } from "../../src/adapters/containers/pip-constraints.js";
+import { applyBuildPipConstraints, parseBuildPipConstraints } from "../../src/infrastructure/containers/pip-constraints.js";
 
 const roots: string[] = [];
 const signal = () => AbortSignal.timeout(5000);

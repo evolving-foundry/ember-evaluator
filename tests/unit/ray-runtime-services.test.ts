@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parseRuntimeServices } from "../../src/adapters/ray/runtime-services.js";
+import { parseRuntimeServices } from "../../src/infrastructure/ray/runtime-services.js";
 
 const model = { name: "solver", endpoint: "https://model.invalid/v1", api: "openai-completions", provider: null };
 const auth = { value: "solver-key", reference: null };

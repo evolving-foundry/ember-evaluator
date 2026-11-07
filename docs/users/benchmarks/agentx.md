@@ -224,7 +224,7 @@ Optional SSH/remote Python workers may start host samplers, inject dynamic `asce
 This older deployment is optional and unnecessary for ordinary CLI use. Endpoints must be task-reachable: host networking reaches host loopback; others need explicit addresses. To manage sampling independently, start:
 
 ```bash
-python3 dist/adapters/harness/agentx/assets/ascend_metrics.py \
+python3 dist/runtimes/agentx/assets/ascend_metrics.py \
   --device-id 4 --chip-id 0 --host 127.0.0.1 --port 18095
 ```
 

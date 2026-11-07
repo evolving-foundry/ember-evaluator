@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
-import { DockerRuntime } from "../../src/plugins/environments/docker-runtime.js";
-import { DockerEnvironment, runDockerCommand } from "../../src/plugins/environments/docker.js";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
-import { inspectWorkspaceArchive } from "../../src/plugins/environments/workspace-transfer.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
+import { inspectWorkspaceArchive } from "../../src/infrastructure/filesystem/workspace-transfer.js";
 
 const exec = promisify(execFile);
 test.skipIf(process.env.EVALUATOR_TEST_DOCKER !== "1" || process.platform !== "linux")("non-root task identity, private runtime assets and child-UID logs survive restrictive umask", async () => {

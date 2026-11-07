@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { textualAnswer } from "../../src/plugins/benchmarks/definitions/records.js";
+import { textualAnswer } from "../../src/plugins/benchmarks/agent-harness/definitions/records.js";
 
 test("publishes a textual expected answer and its aliases", () => {
   expect(textualAnswer({ kind: "answer-line", expected: "70,000", pattern: "gsm8k" })).toBe("70,000");

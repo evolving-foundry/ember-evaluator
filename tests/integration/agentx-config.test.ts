@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { expect, test, vi } from "vitest";
 import { stringify } from "yaml";
-import { runCli } from "../../src/cli.js";
-import { loadConfig } from "../../src/config/load.js";
-import { bootstrap } from "../../src/bootstrap.js";
+import { runCli } from "../../src/cli/main.js";
+import { loadConfig } from "../../src/application/config.js";
+import { bootstrap } from "../../src/application/plugins/bootstrap.js";
 
 test.each([60, 120, 3600])("YAML durationSeconds=%s overrides the profile without other configuration changes", async durationSeconds => {
   await mkdir(".scratch", { recursive: true });

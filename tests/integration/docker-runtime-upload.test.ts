@@ -4,9 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { EnvironmentSession, EnvironmentSpec } from "../../src/core/contracts/environment.js";
-import { DockerEnvironment, runDockerCommand } from "../../src/plugins/environments/docker.js";
-import { PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
 
 const enabled = process.env.EVALUATOR_TEST_DOCKER === "1" && process.platform === "linux";
 

@@ -2,8 +2,8 @@ import { expect, test } from "vitest";
 import { classifyError, normalizeFailure } from "../../src/core/errors/classify.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
 import { validFailureMetadata } from "../../src/core/errors/validation.js";
-import { failureDecision } from "../../src/core/error-policy.js";
-import { isManualRetryEligible } from "../../src/core/manual-retry.js";
+import { failureDecision } from "../../src/core/policies/error-policy.js";
+import { isManualRetryEligible } from "../../src/core/recovery/manual-retry.js";
 import { storeRecord } from "../fixtures/results/store-fixture.js";
 
 const context = { phase: "environment", component: "docker", operation: "build" } as const;

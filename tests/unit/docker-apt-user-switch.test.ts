@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { aptSourceInstructions } from "../../src/adapters/containers/apt-sources.js";
-import { insertDockerfileStageSettings } from "../../src/adapters/containers/dockerfile.js";
+import { aptSourceInstructions } from "../../src/infrastructure/containers/apt-sources.js";
+import { insertDockerfileStageSettings } from "../../src/infrastructure/containers/dockerfile.js";
 
 const injectTaskBuildInstructions = (recipe: string, setup: string[]) => insertDockerfileStageSettings(recipe, setup, undefined, true);
 

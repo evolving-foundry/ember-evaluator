@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { localizeRunPluginRuntime } from "../../src/adapters/ray/jobs-results.js";
+import { localizeRunPluginRuntime } from "../../src/application/ray/jobs-results.js";
 
 const directories: string[] = [];
 

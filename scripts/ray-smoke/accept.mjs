@@ -3,9 +3,9 @@ import { writeFileSync } from "node:fs";
 import { spawn, execFileSync } from "node:child_process";
 import { join } from "node:path";
 import assert from "node:assert/strict";
-import { loadConfig } from "../../dist/config/load.js";
-import { bootstrapBenchmark } from "../../dist/bootstrap.js";
-import { safeTaskKey } from "../../dist/core/artifacts.js";
+import { loadConfig } from "../../dist/application/config.js";
+import { bootstrapBenchmark } from "../../dist/application/plugins/bootstrap.js";
+import { safeTaskKey } from "../../dist/core/artifacts/artifacts.js";
 
 const mode = process.argv[2] ?? "controlled";
 if (!["controlled", "office", "office-cancel", "live", "fault", "resume", "cancel", "check", "prepare-fail"].includes(mode)) throw new Error("Use controlled, office, office-cancel, live, fault, resume, cancel, check, or prepare-fail");

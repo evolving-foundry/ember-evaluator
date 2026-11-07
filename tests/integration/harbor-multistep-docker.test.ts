@@ -3,11 +3,12 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
-import { PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
-import { HarborBenchmark, parseHarborConfig } from "../../src/plugins/benchmarks/protocols/harbor/index.js";
-import { runTask } from "../../src/core/run-task.js";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
+import { HarborBenchmark, parseHarborConfig } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/index.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
 import { writeFixture } from "../fixtures/dataset-tasks.js";
 import { harness } from "../fixtures/engine/fakes.js";
 import { storeRun, trajectoryLines } from "../fixtures/results/store-fixture.js";
@@ -47,14 +48,14 @@ test.skipIf(process.env.EVALUATOR_HARBOR_DOCKER_TESTS !== "1")("native shared st
     const refs = []; for await (const ref of value.components.benchmark.enumerate(source, signal())) refs.push(ref);
     const ref = refs[0]!;
     await value.components.store.create(value.config.experiment.output.directory, { ...storeRun, source, taskIds: [ref.id] }, {});
-    const record = await runTask({ runId: storeRun.runId, taskId: ref.id, attemptId: "first", ref, configFingerprint: storeRun.configFingerprint }, value.components, source, signal(), { timeoutSeconds: 240 });
+    const record = await runTask(onDemand({ runId: storeRun.runId, taskId: ref.id, attemptId: "first", ref, configFingerprint: storeRun.configFingerprint }), value.components, source, signal(), { timeoutSeconds: 240 });
     expect(record.errors).toEqual([]);
     expect(record).toMatchObject({ executionStatus: "completed", verdict: { score: 0.9 }, solve: { usage: { totalTokens: 4 } } });
     expect(record.steps?.map(step => step.verdict?.score)).toEqual([0.8, 1]);
     const results = await value.components.store.listAttempts();
     expect(results).toHaveLength(1);
   } finally {
-    await value.components.dispose();
+    await value.dispose();
     await new Promise<void>(resolve => { upstream.closeAllConnections(); upstream.close(() => resolve()); });
     await rm(root, { recursive: true, force: true });
   }

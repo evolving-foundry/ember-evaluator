@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import type { TaskJob, AttemptRecord } from "../../src/index.js";
 import { storeRecord } from "../fixtures/results/store-fixture.js";
 

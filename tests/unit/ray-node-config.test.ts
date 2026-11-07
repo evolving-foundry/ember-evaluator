@@ -3,10 +3,10 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import {
   parseNodeConfig,
   resolvePluginPatchPath,
-} from "../../src/adapters/ray/node-config.js";
-import { localizePortableSelection, projectRemoteJob, validateRemoteJob } from "../../src/adapters/ray/protocol.js";
-import { openPluginRegistry, type PluginRegistry } from "../../src/plugin-runtime.js";
-import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/definitions/index.js";
+} from "../../src/infrastructure/ray/node-config.js";
+import { localizePortableSelection, projectRemoteJob, validateRemoteJob } from "../../src/infrastructure/ray/protocol.js";
+import { openPluginRegistry, type PluginRegistry } from "../../src/application/plugins/open-registry.js";
+import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/agent-harness/definitions/index.js";
 import { resolveConfig } from "../../src/config/resolve.js";
 import { mixedSnapshot } from "../fixtures/results/mixed-run/fixture.js";
 

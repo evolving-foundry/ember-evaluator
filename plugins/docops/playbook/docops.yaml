@@ -5,15 +5,15 @@ services:
     api: openai-completions
     api_key: ${MODEL_API_KEY}
     maxTokens: 32768
-benchmarks:
-  - name: docops
-    config:
-      repository: icip-cas/DocOps
-      revision: main
-      cacheDir: ../../.cache/docops
-    solver:
-      name: simpleagent
-      service: default
+benchmark:
+  name: docops
+  config:
+    repository: icip-cas/DocOps
+    revision: main
+    cacheDir: ../../.cache/docops
+  solver:
+    name: simpleagent
+    service: default
 environment:
   name: docops-docker
   config:

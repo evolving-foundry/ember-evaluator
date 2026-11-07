@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { huggingfaceEndpoint } from "../../src/adapters/datasets/sources/huggingface/endpoint.js";
+import { huggingfaceEndpoint } from "../../src/infrastructure/datasets/sources/huggingface/endpoint.js";
 
 test("HF_ENDPOINT replaces the Hugging Face origin", () => {
   expect(huggingfaceEndpoint({})).toBe("https://huggingface.co");

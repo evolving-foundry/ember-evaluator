@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, expect, test } from "vitest";
 
-import { apply as registryPlugin } from "../../src/core/registry.js";
+import { apply as registryPlugin } from "../../src/application/plugins/registry.js";
 import {
   DocOpsBenchmark,
   DocOpsDockerEnvironment,

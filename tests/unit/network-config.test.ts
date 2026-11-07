@@ -4,9 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
 import { getGlobalDispatcher } from "undici";
-import { defaultNetworkConfigPath, loadNetworkConfig, networkDocument, networkSnapshot, parseNetworkSettings, redactNetwork, restoreNetworkTemplate } from "../../src/config/network.js";
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { mirrorImageReference } from "../../src/adapters/containers/registry-image.js";
+import { defaultNetworkConfigPath, loadNetworkConfig } from "../../src/config/network.js";
+import { networkDocument, networkSnapshot, parseNetworkSettings, redactNetwork, restoreNetworkTemplate } from "../../src/config/network-schema.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { mirrorImageReference } from "../../src/infrastructure/containers/registry-image.js";
 
 afterEach(() => vi.unstubAllEnvs());
 

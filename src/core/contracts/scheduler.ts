@@ -1,7 +1,7 @@
 import type { AttemptKey, AttemptRecord, Failure, RunManifest } from "./result.js";
 import type { JsonValue, TaskRef } from "./task.js";
 import type { RunStore } from "./run-store.js";
-import type { ProgressListener } from "../progress.js";
+import type { ProgressListener } from "../progress/progress.js";
 import type { BenchmarkRunPlan } from "./benchmark.js";
 import type { PreparationContext, ScheduledPreparation } from "./preparation.js";
 
@@ -33,7 +33,7 @@ export type TaskJob = {
 export type TaskExecutor = (job: TaskJob, signal: AbortSignal) => Promise<AttemptRecord>;
 
 export interface TaskScheduler {
-  cleanupImages?(request: import("./image-cleanup.js").ImageCleanupRequest, environment: import("../../config/schema.js").Selection, pluginVersions: Record<string, string>, signal: AbortSignal): Promise<import("./image-cleanup.js").ImageCleanupNode[]>;
+  cleanupImages?(request: import("./image-cleanup.js").ImageCleanupRequest, environment: import("./config.js").Selection, pluginVersions: Record<string, string>, signal: AbortSignal): Promise<import("./image-cleanup.js").ImageCleanupNode[]>;
   readonly executionLocation?: "remote";
   validateCapacity?(taskCount: number): void;
   /** Arrange planned preparation, including its barrier or readiness queue, before execution admission. */

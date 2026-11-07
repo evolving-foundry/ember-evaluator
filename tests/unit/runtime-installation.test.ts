@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { RuntimeInstallation } from "../../src/core/contracts/environment.js";
-import { applicationCacheRoot, prepareLocalRuntime, runtimeCacheRoot, runtimeInventory } from "../../src/plugins/environments/runtime-installation.js";
+import { applicationCacheRoot, prepareLocalRuntime, runtimeCacheRoot, runtimeInventory } from "../../src/infrastructure/runtime-installation/install.js";
 
 const roots: string[] = [];
 const signal = () => AbortSignal.timeout(20_000);

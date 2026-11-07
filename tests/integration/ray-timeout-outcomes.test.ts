@@ -1,25 +1,25 @@
-import { PhaseTimeoutError } from "../../src/core/phase-timeout.js";
+import { PhaseTimeoutError } from "../../src/core/policies/phase-timeout.js";
 import { classifyError } from "../../src/core/errors/classify.js";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { RayResult } from "../../src/adapters/ray/client.js";
-import type { RemoteJob } from "../../src/adapters/ray/protocol.js";
-import { RayScheduler } from "../../src/plugins/schedulers/ray.js";
+import type { RayResult } from "../../src/infrastructure/ray/client.js";
+import type { RemoteJob } from "../../src/infrastructure/ray/protocol.js";
+import { RayScheduler } from "../../src/plugins/schedulers/ray/scheduler.js";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
 import { storeRun, storeRecord } from "../fixtures/results/store-fixture.js";
 import { computeSuccessRate } from "../../src/plugins/metrics/success-rate.js";
 
 const bridge = vi.hoisted(() => ({ submit: vi.fn<(job: RemoteJob) => Promise<RayResult>>(),
   cleanupAttempt: vi.fn(async () => {}), cancel: vi.fn(), close: vi.fn(async () => {}) }));
-vi.mock("../../src/adapters/ray/client.js", () => ({ RayClient: class {
+vi.mock("../../src/infrastructure/ray/client.js", () => ({ RayClient: class {
   nodes = ["node"]; nodeSlots = { node: 2 }; slots = 2;
   start = async () => {};
   submit = bridge.submit; cleanupAttempt = bridge.cleanupAttempt; cancel = bridge.cancel; close = bridge.close;
 } }));
-vi.mock("../../src/core/package-provenance.js", () => ({ PACKAGE_RUNTIME_ID: "ember-evaluator:package", loadPackageDigest: async () => `sha256:${"a".repeat(64)}` }));
-vi.mock("../../src/adapters/transfer/https.js", () => ({ startTransferReceiver: async () => ({ url: "https://collector.invalid", close: async () => {} }) }));
+vi.mock("../../src/infrastructure/provenance/package.js", () => ({ PACKAGE_RUNTIME_ID: "ember-evaluator:package", loadPackageDigest: async () => `sha256:${"a".repeat(64)}` }));
+vi.mock("../../src/infrastructure/transfer/https.js", () => ({ startTransferReceiver: async () => ({ url: "https://collector.invalid", close: async () => {} }) }));
 
 const cleanups: (() => Promise<void>)[] = [];
 beforeEach(() => { vi.clearAllMocks(); vi.stubEnv("TEST_RAY_TIMEOUT_TOKEN", "fixture-transfer-token"); });

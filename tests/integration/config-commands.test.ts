@@ -6,9 +6,9 @@ import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, expect, test, vi } from "vitest";
 import { parse, stringify } from "yaml";
-import { runCli } from "../../src/cli.js";
-import { apply as registryPlugin } from "../../src/core/registry.js";
-import { readProfileDirectory } from "../../src/config/profiles.js";
+import { runCli } from "../../src/cli/main.js";
+import { apply as registryPlugin } from "../../src/application/plugins/registry.js";
+import { readProfileDirectory } from "../../src/infrastructure/profiles/read.js";
 
 const roots: string[] = [];
 afterEach(async () => { vi.unstubAllEnvs(); await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });

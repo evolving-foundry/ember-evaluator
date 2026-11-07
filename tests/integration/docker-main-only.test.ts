@@ -2,9 +2,10 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { expect, test } from "vitest";
-import { DockerEnvironment, runDockerCommand } from "../../src/plugins/environments/docker.js";
-import { PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
 import type { EnvironmentSpec, EnvironmentSession } from "../../src/core/contracts/environment.js";
 
 const enabled = process.env.EVALUATOR_COMPOSE_DOCKER_TESTS === "1";

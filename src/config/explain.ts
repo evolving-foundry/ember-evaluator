@@ -1,4 +1,4 @@
-import type { LoadedConfig } from "./schema.js";
+import type { LoadedConfig } from "./loaded.js";
 import { exportConfig } from "./export.js";
 
 const SERVICE_FIELDS: Record<string, string> = { model: "name", base_url: "endpoint", api_key: "apiKey" };

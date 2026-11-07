@@ -2,7 +2,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { JobsClient, parseJobsConfig } from "../../src/adapters/ray/jobs-client.js";
+import { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
+import { parseJobsConfig } from "../../src/config/jobs.js";
 
 const roots: string[] = [];
 const fileToken = "f".repeat(64);

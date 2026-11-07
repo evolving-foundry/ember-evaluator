@@ -2,16 +2,17 @@ import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
 import { HarborShellVerifier } from "../../src/plugins/verifiers/shell.js";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
 import type { EnvironmentSession, EnvironmentSpec } from "../../src/core/contracts/environment.js";
 import { writeFixture } from "../fixtures/dataset-tasks.js";
-import { HarborBenchmark, parseHarborConfig } from "../../src/plugins/benchmarks/protocols/harbor/index.js";
-import { runTask } from "../../src/core/run-task.js";
+import { HarborBenchmark, parseHarborConfig } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/index.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { harness } from "../fixtures/engine/fakes.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
 
 const enabled = process.env.EVALUATOR_HARBOR_DOCKER_TESTS === "1";
 const base: EnvironmentSpec = { image: "node:24.22.1-bookworm-slim", workdir: "/app", runtime: [], initialFiles: [], network: "none" };
@@ -43,7 +44,7 @@ test.skipIf(!enabled).each(["shared", "separate"] as const)("Harbor Docker %s gr
       return solve(input, session, context);
     };
     await value.components.store.create(value.config.experiment.output.directory, { ...storeRun, source, taskIds: [ref.id] }, {});
-    const record = await runTask({ runId: storeRun.runId, taskId: ref.id, attemptId: "first", ref, configFingerprint: storeRun.configFingerprint },
+    const record = await runTask(onDemand({ runId: storeRun.runId, taskId: ref.id, attemptId: "first", ref, configFingerprint: storeRun.configFingerprint }),
       value.components, source, signal());
     expect(record).toMatchObject({ executionStatus: "completed", scoreStatus: "valid", verdict: { score: 1 },
       cleanupStatus: "cleaned", collection: { artifacts: "not-produced", trajectory: "complete" } });
@@ -52,7 +53,7 @@ test.skipIf(!enabled).each(["shared", "separate"] as const)("Harbor Docker %s gr
     expect(JSON.parse(await readFile(join(attempt, "verifier/reward.json"), "utf8"))).toEqual({ reward: 1 });
     await access(join(attempt, "agent/session.jsonl"));
     await expect(access(join(attempt, "artifacts/artifacts.tar"))).rejects.toMatchObject({ code: "ENOENT" });
-  } finally { await value.components.dispose(); await rm(root, { recursive: true, force: true }); }
+  } finally { await value.dispose(); await rm(root, { recursive: true, force: true }); }
 }, 180_000);
 
 test.skipIf(!enabled)("Harbor Docker shared verification preserves deliverables and admits private tests only after solve", async () => {

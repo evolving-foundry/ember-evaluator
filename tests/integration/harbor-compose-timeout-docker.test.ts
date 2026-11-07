@@ -4,11 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { extract } from "tar";
 import { expect, test } from "vitest";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
 import type { EnvironmentSpec } from "../../src/core/contracts/environment.js";
-import { runTask } from "../../src/core/run-task.js";
-import { DockerEnvironment, runDockerCommand } from "../../src/plugins/environments/docker.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
 import { computeSuccessRate } from "../../src/plugins/metrics/success-rate.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun, trajectoryLines } from "../fixtures/results/store-fixture.js";
@@ -60,7 +62,7 @@ test.skipIf(!enabled).each(["timeout", "cancel"] as const)("multi-container %s c
   value.components.benchmark.verify = async () => { throw new Error("Verification must not run after timeout or cancellation"); };
   try {
     await value.components.store.create(value.config.experiment.output.directory, { ...storeRun, runId, source, taskIds: ["a"] }, {});
-    const record = await runTask({ runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint },
+    const record = await runTask(onDemand({ runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint }),
       value.components, source, controller.signal, { timeoutSeconds: 180, solveTimeoutSeconds: 5 });
     expect(solveStarted, JSON.stringify(record.errors)).toBe(true);
     expect(record.collection.artifacts, JSON.stringify(record.errors)).toBe("complete");
@@ -84,7 +86,7 @@ test.skipIf(!enabled).each(["timeout", "cancel"] as const)("multi-container %s c
       expect(remaining.stdout.trim()).toBe("");
     }
   } finally {
-    await value.components.dispose();
+    await value.dispose();
     await rm(root, { recursive: true, force: true });
   }
 }, 240_000);

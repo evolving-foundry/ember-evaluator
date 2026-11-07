@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { parseInstalledBundle } from "../../src/adapters/agentbundle/cli.js";
-import { agentBundleRuntimeFiles } from "../../src/adapters/agentbundle/runtime-files.js";
-import { AGENT_BUNDLE_CORE_VERSION } from "../../src/adapters/agentbundle/sdk.js";
-import { dshRuntimeInstallation } from "../../src/adapters/harness/dsh/runtime.js";
+import { parseInstalledBundle } from "../../src/runtimes/agentbundle/cli.js";
+import { agentBundleRuntimeFiles } from "../../src/runtimes/agentbundle/runtime-files.js";
+import { AGENT_BUNDLE_CORE_VERSION } from "../../src/runtimes/agentbundle/sdk.js";
+import { dshRuntimeInstallation } from "../../src/runtimes/dsh/runtime.js";
 import { AgentBundleSolver } from "../../src/plugins/solvers/agentbundle.js";
-import { copyRuntimeInventory, runtimeInventory } from "../../src/plugins/environments/runtime-installation.js";
+import { copyRuntimeInventory, runtimeInventory } from "../../src/infrastructure/runtime-installation/install.js";
 
 const execFileAsync = promisify(execFile);
 

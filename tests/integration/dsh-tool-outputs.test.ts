@@ -4,11 +4,11 @@ import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { consumeDsh } from "../../src/adapters/harness/dsh/protocol.js";
-import { dshOutputRuntimeFile } from "../../src/adapters/harness/dsh/runtime.js";
-import { localDshLauncher } from "../../src/adapters/harness/dsh/local-runtime.js";
-import { startLocalProcess } from "../../src/plugins/environments/process.js";
-import { buildFileManifest, verifyFileManifest } from "../../src/core/artifacts.js";
+import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
+import { dshOutputRuntimeFile } from "../../src/runtimes/dsh/runtime.js";
+import { localDshLauncher } from "../../src/runtimes/dsh/local-runtime.js";
+import { startLocalProcess } from "../../src/infrastructure/process/local.js";
+import { buildFileManifest, verifyFileManifest } from "../../src/core/artifacts/artifacts.js";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });

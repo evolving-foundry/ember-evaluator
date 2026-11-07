@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { collectAttemptAccounting } from "../../src/core/attempt-accounting.js";
+import { collectAttemptAccounting } from "../../src/core/results/attempt-accounting.js";
 import { storeRecord } from "../fixtures/results/store-fixture.js";
 test("failed attempt retains provider usage in a valid trajectory prefix and leaves unobserved cost incomplete", async () => {
   const root = await mkdtemp(join(tmpdir(), "attempt-accounting-"));

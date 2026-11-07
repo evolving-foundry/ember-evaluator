@@ -2,20 +2,20 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
-import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/definitions/officeqa-pro-v2/index.js";
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
+import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/index.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
 import { officeQAFiles, fixtureCSV } from "../fixtures/officeqa.js";
 import { harness } from "../fixtures/engine/fakes.js";
-import { runEngine } from "../../src/core/engine.js";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
 import { trajectoryLines } from "../fixtures/results/store-fixture.js";
-import { saveReport, rebuildReport } from "../../src/report.js";
+import { saveReport, rebuildReport } from "../../src/application/report/index.js";
 import { SuccessRateMetrics } from "../../src/plugins/metrics/success-rate.js";
 import { MarkdownReporter } from "../../src/plugins/reporters/markdown.js";
 
 const enabled = process.env.EVALUATOR_OFFICEQA_DOCKER_TESTS === "1";
 test.skipIf(!enabled).each(["parsed-json", "pdf"] as const)("OfficeQA %s Docker corpus, tools, private official grading and image reuse", async corpusFormat => {
-  const root = await mkdtemp(join(tmpdir(), "officeqa-docker-")); const { components, config } = harness(root);
+  const root = await mkdtemp(join(tmpdir(), "officeqa-docker-")); const { components, config, dispose } = harness(root);
   try {
     const fixture = await officeQAFiles(join(root, "source"), corpusFormat, fixtureCSV.replace('"$7,046,001.98"', "21.58"));
     components.benchmark = new OfficeQAProV2Benchmark(parseOfficeQAProV2Config({ cacheDir: join(root, "cache"), corpusFormat }), fixture.source, { questions: 2, documents: 2 });
@@ -67,5 +67,5 @@ test.skipIf(!enabled).each(["parsed-json", "pdf"] as const)("OfficeQA %s Docker 
     expect(images.every(image => typeof image === "string" && image.startsWith("sha256:"))).toBe(true);
     expect(new Set(images.slice(0, 2))).toEqual(new Set(images.slice(2)));
     expect(new Set(corpusImages).size).toBe(1);
-  } finally { vi.restoreAllMocks(); await components.dispose(); await rm(root, { recursive: true, force: true }); }
+  } finally { vi.restoreAllMocks(); await dispose(); await rm(root, { recursive: true, force: true }); }
 }, 900_000);

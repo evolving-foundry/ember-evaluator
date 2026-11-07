@@ -44,7 +44,7 @@ MATH-500、SimpleQA、HealthBench 的模板与裁判解析规则依据固定的 
 
 OfficeQA `reward.py` 的 SHA-256 为 `0d91698c87df6d889339aac36f63ae0966607f169890b0bf8b472b26bfe8138f`。运行时将完整预测直接传给 `score_answer`，最终答案提取与匹配由原始脚本执行；基础设施失败不产生分数，题库答案不随程序包分发。
 
-复制模板的 MIT 许可保存在 [LICENSE-MIT](../../../src/plugins/benchmarks/definitions/scoring/LICENSE-MIT)。OfficeQA 的原始 [LICENSE-APACHE](../../../src/adapters/verifiers/officeqa/LICENSE-APACHE) 和 [NOTICE](../../../src/adapters/verifiers/officeqa/NOTICE) 保留在评分脚本旁，并随构建打包。
+复制模板的 MIT 许可保存在 [LICENSE-MIT](../../../src/plugins/benchmarks/agent-harness/definitions/scoring/LICENSE-MIT)。OfficeQA 的原始 [LICENSE-APACHE](../../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/runtime/LICENSE-APACHE) 和 [NOTICE](../../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/runtime/NOTICE) 保留在评分脚本旁，并随构建打包。
 
 ## MMLU 概率评分与服务要求
 

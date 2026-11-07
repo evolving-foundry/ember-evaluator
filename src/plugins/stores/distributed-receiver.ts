@@ -1,6 +1,6 @@
 import type { RunStore } from "../../core/contracts/run-store.js";
-import { DirectoryReceiver } from "../../adapters/transfer/receiver.js";
-import { TransferError, createReceipt } from "../../adapters/transfer/protocol.js";
+import { DirectoryReceiver } from "../../infrastructure/transfer/receiver.js";
+import { TransferError, createReceipt } from "../../infrastructure/transfer/protocol.js";
 
 export function createDistributedReceiver(directory: string, store: RunStore): DirectoryReceiver {
   if (!store.importAttempt)

@@ -9,7 +9,7 @@
 | `design/YYYY-MM-DD/` | 评测契约、组件、执行流程与运行时设计 | 只新增；保留最近 14 天，边界日期保留 |
 | `tasks/YYYY-MM-DD/` | 评测能力开发、故障修复和验收 | 只新增；保留最近 5 天，边界日期保留 |
 | `users/` | 项目介绍、安装配置、使用说明与排障 | 面向当前行为维护 |
-| `development/` | 插件与 Benchmark 开发、协议说明和受控测试用法 | 面向当前实现维护；不放正式实验成绩 |
+| `development/` | 当前源码架构、插件与 Benchmark 开发、协议说明和受控测试用法 | 面向当前实现维护；不放正式实验成绩 |
 | `experiments/` | 正式实验的结果、用量、失败与限制 | 按实验记录；不收录临时探针和原始运行输出 |
 | `lessions/` | 可复用经验 | 有结论时记录并引用证据 |
 
@@ -33,6 +33,7 @@
 
 - 用户文档分工：根 README 介绍项目、能力、场景入口和成果；`users/README.md` 提供导航；`users/` 根目录保留安装、配置、Solver、日常操作、并发和补测等通用指南；`users/quick-start/` 提供场景入门，`users/benchmarks/` 说明题库与负载，`users/deployment/` 说明部署，`users/reference/` 保存评分与错误码，`users/faq/` 按问题给出处理方法。`development/` 保存插件、Benchmark 开发和测试用法；`playbook/` 保存可执行 YAML。
 - 用户指南描述当前操作、结果和限制，不追加“本轮修复”“首版新增”、测试夹具执行过程或未来实现清单。同一 Benchmark 的场景、裁判和来源要求放在其指南；跨 Benchmark 的下载、平台和资源故障放在 FAQ。安装命令与配置事实各维护一处，其他入口引用。
+- 当前模块职责、依赖规则、调用顺序与资源所有权在 [development/architecture.md](development/architecture.md) 及其英文版维护。根 README 和开发索引提供入口，插件及 Benchmark 指南维护各自实现细节；根 AGENTS.md 保留代码放置与开发约束。架构变化时同步修改相关长期文档，不只更新会按保留期清理的 design/task，也不把历史验收数字复制到架构指南。
 
 - 新设计使用 `YYYY-MM-DD-<主题>.md`；新任务使用 `YYYY-MM-DD-<类型>-<主题>.md`，同日需要区分时添加两位序号；主题使用简短英文 kebab-case。既有文件名保留。
 - 用户文档 `users/` 默认英文，使用 `xxx.md`；对应中文版本使用 `xxx.zh-CN.md`，两种语言提供互相切换的链接，导航链接保持对应语言。其他文档默认中文。文件使用 UTF-8、LF，以换行结束。使用相对链接；跨日期引用必须包含正确日期目录，过期材料使用具体 Git 提交链接。

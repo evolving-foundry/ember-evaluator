@@ -8,7 +8,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-runtime = Path(__file__).resolve().parents[2] / 'src/adapters/kernel'
+runtime = Path(__file__).resolve().parents[2] / 'src/plugins/benchmarks/operator/kernel/runtime'
 sys.path.insert(0, str(runtime))
 spec = importlib.util.spec_from_file_location('kernel_profile_replay', runtime / 'msprof_replay.py')
 module = importlib.util.module_from_spec(spec)

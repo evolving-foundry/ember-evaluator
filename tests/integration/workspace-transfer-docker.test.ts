@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
-import { workspaceHelperSource } from "../../src/plugins/environments/workspace-transfer.js";
+import { workspaceHelperSource } from "../../src/infrastructure/filesystem/workspace-transfer.js";
 
 const run = promisify(execFile);
 const image = process.env.EVALUATOR_DOCKER_TEST_IMAGE;

@@ -2,7 +2,7 @@
 
 > [English](./external-plugins.en.md) | 中文
 
-本文从独立 TypeScript 项目开始，演示如何编译插件、通过文件或包名加载、在实验中选择组件，并检查运行结果。已有 JavaScript 插件可以直接从第 3 步开始。八类组件的接口与生命周期见[插件开发与加载](plugins.md)，Benchmark 的数据准备与评分实现见[Benchmark 开发指南](benchmarks.md)。
+本文从空目录创建独立 TypeScript 项目，实现并编译一个 Metrics 组件，再用实验验证它。要开发其他角色，先在[插件种类](plugins.md#插件种类)选择契约，再把第 2 步的实现和注册替换成自己的组件。Solver 可以按[独立项目中的 Solver](#独立项目中的-solver)照做。单文件 JavaScript 示例见[新增外部插件](add-external-plugin.md)，已有 JavaScript 模块可以直接从第 3 步开始。
 
 外部插件不需要修改 Evaluator 的 `src/plugins/index.ts`。接入分为三个动作：插件在 `apply(ctx)` 中注册组件，命令用 `--patch` 加载插件模块，实验 YAML 按注册名选择组件。只安装包或只写 YAML 都不会自动加载插件。
 
@@ -16,6 +16,7 @@ work/
 └── evaluator-metrics/          # 独立插件项目；以下命令均在此目录执行
     ├── package.json
     ├── tsconfig.json
+    ├── src/context.ts
     ├── src/index.ts
     ├── cordis.patch.yaml
     └── experiment.yaml
@@ -76,15 +77,33 @@ work/
 
 ## 2. 实现并编译插件
 
-新建 `src/index.ts`，注册一个统计有效评分任务数的指标：
+独立项目使用包根导出的组件类型。Cordis 的 `Context` 类型本身没有声明 Evaluator 注入的 `evaluator` 服务。在 `src/context.ts` 声明本例用到的 `register()` 签名，`inject` 会在运行时声明对该服务的依赖。
 
 ```ts
 import type { Context } from "@deepseek-ai/cordis";
+import type { PluginConfigValidator, PluginFactory, PluginRole } from "ember-evaluator";
+
+export type EvaluatorPluginContext = Context & {
+  evaluator: {
+    register<R extends PluginRole, T>(
+      role: R,
+      name: string,
+      validate: PluginConfigValidator<T>,
+      factory: PluginFactory<R, T>,
+    ): () => Promise<void>;
+  };
+};
+```
+
+新建 `src/index.ts`，注册一个统计有效评分任务数的指标。
+
+```ts
 import type { Metrics } from "ember-evaluator";
+import type { EvaluatorPluginContext } from "./context.js";
 
 export const inject = ["evaluator"];
 
-export function apply(ctx: Context): void {
+export function apply(ctx: EvaluatorPluginContext): void {
   ctx.evaluator.register(
     "metrics",
     "valid-count",
@@ -120,6 +139,30 @@ pnpm build
 首次安装后提交插件自己的 `pnpm-lock.yaml`，后续安装使用 `pnpm install --frozen-lockfile`。修改 TypeScript 后重新构建；Evaluator 拒绝直接加载 `.ts` 入口。Evaluator 根目录的构建不会自动编译这个独立项目。
 
 其他组件也使用相同的 `register(role, name, validate, factory)`。从包根导入公共类型，不导入 `ember-evaluator/src/...`。`validate` 只校验配置，资源在工厂或运行阶段创建；工厂使用 `runtime.resolvePath()` 解析实验相对路径。持有长连接、临时目录等资源时，在插件作用域注册 `ctx.effect(() => () => resource.close())`；attempt 资源按对应 session 契约释放。详见[组件接口与生命周期](plugins.md)。
+
+### 独立项目中的 Solver
+
+沿用第 1 步的项目结构。把[固定回复 Solver 的实现](add-solver.md#最小示例)保存为独立项目中的 `src/fixed-answer.ts`，将 `Solver` 类型的导入改为 `import type { Solver } from "ember-evaluator"`。将 `src/index.ts` 写成以下入口，并在独立项目中运行 `pnpm build`。
+
+```ts
+import type { EvaluatorPluginContext } from "./context.js";
+import { createFixedAnswerSolver, parseFixedAnswerConfig } from "./fixed-answer.js";
+
+export const inject = ["evaluator"];
+
+export function apply(ctx: EvaluatorPluginContext): void {
+  ctx.evaluator.register("solver", "external-fixed-answer", parseFixedAnswerConfig, createFixedAnswerSolver);
+}
+```
+
+按第 3 步创建文件方式的 patch，`name` 指向 `./dist/index.js`，`id` 可用 `custom-solver`。将 Solver 示例里的 `experiment.yaml` 和 `gpqa.csv` 保存到独立项目，把 YAML 中的 `benchmark.solver.name` 改为 `external-fixed-answer`，并设置示例中的 `EXAMPLE_SOLVER_KEY`。在独立项目目录执行以下命令。
+
+```bash
+ember-evaluator inspect experiment.yaml --patch cordis.patch.yaml
+ember-evaluator run experiment.yaml --patch cordis.patch.yaml
+```
+
+`inspect` 应显示选中了 `external-fixed-answer`。检查评分和产物时，沿用[固定回复示例](add-solver.md#最小示例)的验收步骤。
 
 ## 3. 选择一种模块加载方式
 
@@ -198,12 +241,12 @@ Solver 的模型服务通过 `benchmark.solver.service` 选择；需要模型的
 先按[安装指南](../users/installation.zh-CN.md#安装全局命令)注册 `ember-evaluator`，再在插件项目目录执行：
 
 ```bash
-ember-evaluator config explain experiment.yaml --patch cordis.patch.yaml
+ember-evaluator inspect experiment.yaml --patch cordis.patch.yaml
 ember-evaluator run experiment.yaml --patch cordis.patch.yaml --dry-run
 ember-evaluator run experiment.yaml --patch cordis.patch.yaml
 ```
 
-- `config explain` 检查配置解析、组件注册名和配置校验，显示最终配置及字段来源；不执行指标计算。
+- `inspect` 校验实验配置、组件注册名和插件参数，输出展开后的实验配置和脱敏后的网络配置。
 - `--dry-run` 还会解析数据来源、枚举并选择题目，可能联网下载数据。它不会调用 Solver，也不会验证指标计算、报告渲染及全部运行时能力。
 - 正式运行会调用模型。成功后检查输出 run 目录下 `metrics.json` 的 `metrics.valid-count`，本例选中数应为 1；`valid` 由实际评分状态决定。内置 Markdown 不保证展示任意自定义指标，先以 `metrics.json` 验证结果。
 

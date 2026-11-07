@@ -2,7 +2,7 @@
 
 > English | [中文](./external-plugins.md)
 
-This guide starts with an independent TypeScript project and covers compilation, file and package loading, experiment selection, and result checks. For an existing JavaScript plugin, start at step 3. See [Plugin development and loading](plugins.en.md) for component contracts and lifecycles, and [Benchmark development](benchmarks.en.md) for task preparation and scoring.
+This guide starts from an empty directory and walks through implementing and building a Metrics component in an independent TypeScript project, then verifying it in an experiment. To write another role, choose a contract from [Component Types](plugins.en.md#component-types) and replace the implementation and registration in step 2. For a Solver, follow [Solver in a standalone project](#solver-in-a-standalone-project). [Add an external plugin](add-external-plugin.en.md) has a single-file JavaScript example. For an existing JavaScript module, start at step 3.
 
 External plugins do not require changes to Evaluator's `src/plugins/index.ts`. The plugin registers components in `apply(ctx)`, the command loads its module through `--patch`, and the experiment selects components by registered name. Installing a package or editing the experiment alone does not load it.
 
@@ -16,6 +16,7 @@ work/
 └── evaluator-metrics/          # Run all commands below from this plugin project
     ├── package.json
     ├── tsconfig.json
+    ├── src/context.ts
     ├── src/index.ts
     ├── cordis.patch.yaml
     └── experiment.yaml
@@ -76,15 +77,33 @@ Create `tsconfig.json`:
 
 ## 2. Implement and compile the plugin
 
-Create `src/index.ts` with a metric that counts tasks with valid scores:
+Use component types exported from the package root. Cordis's `Context` type does not declare the `evaluator` service that Evaluator injects. Declare the `register()` signature used by these examples in `src/context.ts`. The `inject` declaration tells Cordis which service the plugin needs at runtime.
 
 ```ts
 import type { Context } from "@deepseek-ai/cordis";
+import type { PluginConfigValidator, PluginFactory, PluginRole } from "ember-evaluator";
+
+export type EvaluatorPluginContext = Context & {
+  evaluator: {
+    register<R extends PluginRole, T>(
+      role: R,
+      name: string,
+      validate: PluginConfigValidator<T>,
+      factory: PluginFactory<R, T>,
+    ): () => Promise<void>;
+  };
+};
+```
+
+Create `src/index.ts` with a metric that counts tasks with valid scores.
+
+```ts
 import type { Metrics } from "ember-evaluator";
+import type { EvaluatorPluginContext } from "./context.js";
 
 export const inject = ["evaluator"];
 
-export function apply(ctx: Context): void {
+export function apply(ctx: EvaluatorPluginContext): void {
   ctx.evaluator.register(
     "metrics",
     "valid-count",
@@ -120,6 +139,30 @@ pnpm build
 Commit the plugin's own `pnpm-lock.yaml` after the first installation; use `pnpm install --frozen-lockfile` thereafter. Rebuild after editing TypeScript. Evaluator rejects `.ts` entry points, and its root build does not compile this independent project.
 
 Other components use the same `register(role, name, validate, factory)` API. Import public types from the package root, not `ember-evaluator/src/...`. Keep `validate` free of resource allocation. Factories can resolve experiment-relative paths with `runtime.resolvePath()`. Register long-lived resources with the plugin scope, for example `ctx.effect(() => () => resource.close())`; release attempt resources through their session contracts. See [component contracts and lifecycles](plugins.en.md).
+
+### Solver in a standalone project
+
+Use the project structure from step 1. Save the [fixed-answer Solver implementation](add-solver.en.md#minimal-example) as `src/fixed-answer.ts` in the standalone project. Change the Solver type import to `import type { Solver } from "ember-evaluator"`. Use this `src/index.ts` and run `pnpm build` in the standalone project.
+
+```ts
+import type { EvaluatorPluginContext } from "./context.js";
+import { createFixedAnswerSolver, parseFixedAnswerConfig } from "./fixed-answer.js";
+
+export const inject = ["evaluator"];
+
+export function apply(ctx: EvaluatorPluginContext): void {
+  ctx.evaluator.register("solver", "external-fixed-answer", parseFixedAnswerConfig, createFixedAnswerSolver);
+}
+```
+
+Follow step 3 to write a file-based patch with `name` set to `./dist/index.js` and an `id` such as `custom-solver`. Save `experiment.yaml` and `gpqa.csv` from the Solver example in the standalone project. Set `benchmark.solver.name` to `external-fixed-answer` in the YAML and set `EXAMPLE_SOLVER_KEY` as shown in the example. Run these commands in the standalone project.
+
+```bash
+ember-evaluator inspect experiment.yaml --patch cordis.patch.yaml
+ember-evaluator run experiment.yaml --patch cordis.patch.yaml
+```
+
+`inspect` should show that the experiment selects `external-fixed-answer`. Follow the [fixed-answer example](add-solver.en.md#minimal-example) to check the score and artifacts.
 
 ## 3. Choose one module loading method
 
@@ -198,12 +241,12 @@ Select the Solver model service through `benchmark.solver.service`; a model-back
 Register `ember-evaluator` using the [installation guide](../users/installation.md#register-the-global-cli), then run from the plugin project:
 
 ```bash
-ember-evaluator config explain experiment.yaml --patch cordis.patch.yaml
+ember-evaluator inspect experiment.yaml --patch cordis.patch.yaml
 ember-evaluator run experiment.yaml --patch cordis.patch.yaml --dry-run
 ember-evaluator run experiment.yaml --patch cordis.patch.yaml
 ```
 
-- `config explain` checks configuration parsing, registered names, and validators, then displays resolved configuration and field origins. It does not compute metrics.
+- `inspect` validates the experiment configuration, registered component names, and plugin options. It prints the resolved experiment configuration and redacted network settings.
 - `--dry-run` also resolves the dataset, enumerates tasks, and selects them; it may download data. It does not call the Solver or validate metric computation, report rendering, and every runtime capability.
 - A real run calls the model. Inspect `metrics.valid-count` in the output run's `metrics.json`. This example selects one task; `valid` depends on its scoring status. The built-in Markdown reporter does not guarantee display of arbitrary custom metrics, so verify the JSON first.
 

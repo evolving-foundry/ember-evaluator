@@ -1,4 +1,4 @@
-import { attemptTimeoutKind } from "../../src/core/evaluation-outcome.js";
+import { attemptTimeoutKind } from "../../src/core/results/evaluation-outcome.js";
 import { afterEach, expect, test, vi } from "vitest";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,22 +23,23 @@ vi.mock("node:fs", async importOriginal => {
   };
 });
 import { harness, source } from "../fixtures/engine/fakes.js";
-import { runTask } from "../../src/core/run-task.js";
-import { runEngine } from "../../src/core/engine.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
+import { runEngine } from "../../src/application/run-engine.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
 import { VerificationError } from "../../src/index.js";
-import { consumeDsh } from "../../src/adapters/harness/dsh/protocol.js";
-import { planResume } from "../../src/core/resume.js";
+import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
+import { planResume } from "../../src/core/recovery/resume.js";
 import { QualityScoreMetrics } from "../../src/plugins/metrics/quality-score.js";
 import { HarborScoreMetrics } from "../../src/plugins/metrics/harbor-score.js";
 import { SuccessRateMetrics } from "../../src/plugins/metrics/success-rate.js";
 import { MarkdownReporter } from "../../src/plugins/reporters/markdown.js";
-import { scoreHarborEvidence } from "../../src/plugins/benchmarks/protocols/harbor/verify.js";
-import { saveReport } from "../../src/report.js";
+import { scoreHarborEvidence } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/verify.js";
+import { saveReport } from "../../src/application/report/index.js";
 
 const resources: { root: string; value: ReturnType<typeof harness> }[] = [];
 async function fixture(options: Parameters<typeof harness>[1] = {}) {
@@ -48,7 +49,7 @@ async function fixture(options: Parameters<typeof harness>[1] = {}) {
 afterEach(async () => {
   vi.restoreAllMocks();
   artifactReadFailure.suffix = null; artifactReadFailure.failOnCall = 0; artifactReadFailure.calls = 0; artifactReadFailure.removeOnFailure = false;
-  for (const { root, value } of resources.splice(0)) { await value.components.dispose(); await rm(root, { recursive: true, force: true }); }
+  for (const { root, value } of resources.splice(0)) { await value.dispose(); await rm(root, { recursive: true, force: true }); }
 });
 const job = { runId: "run-1", taskId: "a", attemptId: "attempt-1", ref: { id: "a", recordKey: "a" }, configFingerprint: "config-hash" };
 async function taskFixture(options: Parameters<typeof harness>[1] = {}) {
@@ -60,7 +61,7 @@ async function taskFixture(options: Parameters<typeof harness>[1] = {}) {
 test("includeTaskAnswer stores the prompt and only a textual answer", async () => {
   const { components } = await taskFixture();
   components.benchmark.discloseAnswer = () => "private-solution";
-  const disclosed = await runTask(job, components, source, new AbortController().signal, { includeTaskAnswer: true });
+  const disclosed = await runTask(onDemand(job), components, source, new AbortController().signal, { includeTaskAnswer: true });
   expect(disclosed.task).toEqual({ prompt: "Public question", answer: "private-solution" });
   expect(JSON.stringify(disclosed.task)).not.toContain("hidden");
 });
@@ -80,7 +81,7 @@ test("an unregistered plugin warning becomes a protocol failure without exposing
     if (context.warning) Reflect.apply(context.warning, undefined, [{ code: "PRIVATE_LEGACY_CODE", message: "warning" }]);
     return solve(input, session, context);
   };
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result.errors).toContainEqual(expect.objectContaining({ code: "SOLVER_PROTOCOL_INVALID" }));
   expect(JSON.stringify(result)).not.toContain("PRIVATE_LEGACY_CODE");
 });
@@ -96,7 +97,7 @@ test("Solver warnings preserve valid zero scores and do not interrupt verificati
   const verify = vi.fn(async () => ({ score: 0, passed: false, details: { evaluated: true } }));
   components.benchmark.verify = verify;
   const progress: unknown[] = [];
-  const result = await runTask(job, components, source, new AbortController().signal,
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal,
     { sensitiveValues: ["fixture-key"], onProgress: event => progress.push(event) });
   expect(verify).toHaveBeenCalledOnce();
   expect(result).toMatchObject({ executionStatus: "completed", scoreStatus: "valid", solve: { finalText: "" }, verdict: { score: 0 }, errors: [] });
@@ -128,7 +129,7 @@ test("DSH max-tokens exit 1 reaches benchmark verification with its partial outp
     return { score: 0.25, passed: false, details: { evaluated: true } };
   });
   components.benchmark.verify = verify;
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result.errors).toEqual([]);
   expect(verify).toHaveBeenCalledOnce();
   expect(result).toMatchObject({ executionStatus: "completed", scoreStatus: "valid", verdict: { score: 0.25 }, errors: [],
@@ -151,7 +152,7 @@ test.each([0, 127, 126])("collect logs retain diagnostics and only successful ho
   };
   const verify = vi.fn(async () => ({ score: 0, passed: false, details: {} }));
   components.benchmark.verify = verify;
-  const result = await runTask(job, components, source, new AbortController().signal, { sensitiveValues: ["fixture-key"] });
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal, { sensitiveValues: ["fixture-key"] });
   const directory = join(root, "runs", "run-1", "tasks", safeTaskKey("a"), "attempts", "attempt-1", "collect", "001");
   expect(await readFile(join(directory, "stdout.log"), "utf8")).toBe(code === 126 ? "bash: not found; [redacted]\n" : "capturing\n");
   expect(await readFile(join(directory, "stderr.log"), "utf8")).toBe(code === 127 ? "bash: not found; [redacted]\n" : "");
@@ -168,7 +169,7 @@ test.each([0, 127, 126])("collect logs retain diagnostics and only successful ho
 
 test("includeTaskAnswer omits the answer when the benchmark does not disclose one", async () => {
   const { components } = await taskFixture();
-  const result = await runTask(job, components, source, new AbortController().signal, { includeTaskAnswer: true });
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal, { includeTaskAnswer: true });
   expect(result.task).toEqual({ prompt: "Public question" });
   expect(result.task).not.toHaveProperty("answer");
   expect(JSON.stringify(result)).not.toContain("private-solution");
@@ -201,7 +202,7 @@ test("scheduler setup failure marks the run error before any task is started", a
 
 test("single task projects only public input, keeps verdict and commits after cleanup", async () => {
   const { components, events, inputs } = await taskFixture();
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(inputs).toEqual([{ id: "a", prompt: "Public question" }]);
   expect(result.task).toBeUndefined();
   expect(result).toMatchObject({ executionStatus: "completed", trajectory: "agent/trajectory.jsonl", verdict: { score: 1 }, collection: { trajectory: "complete", artifacts: "not-produced" } });
@@ -212,7 +213,7 @@ test("single task projects only public input, keeps verdict and commits after cl
 
 test("state transfer restores a separate verifier and disposes both before commit", async () => {
   const { components, events } = await taskFixture({ transfer: true });
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result.executionStatus).toBe("completed"); expect(result.collection.artifacts).toBe("complete");
   expect(events).toEqual(["prepare", "solve.environment", "solve", "export", "verify.environment", "restore", "verify", "verify.cleanup", "solve.cleanup", "commit"]);
 });
@@ -230,7 +231,7 @@ test.each(["failure", "timeout", "judge-timeout", "cancel"])("incomplete verific
       failedRubric: { rawOutput: `invalid ${secret}` } },
     { cause: mode === "judge-timeout" ? new DOMException("Judge request exceeded its deadline", "TimeoutError") : new SyntaxError("bad JSON") });
   };
-  const record = await runTask(job, components, source, controller.signal, { timeoutSeconds: mode === "timeout" ? 0.1 : 2, sensitiveValues: [secret] });
+  const record = await runTask(onDemand(job), components, source, controller.signal, { timeoutSeconds: mode === "timeout" ? 0.1 : 2, sensitiveValues: [secret] });
   expect(record).toMatchObject({ executionStatus: mode === "cancel" ? "cancelled" : "failed", scoreStatus: "invalid",
     verdict: { passed: null, details: { grades: [{ explanation: "completed [redacted]" }], failedRubric: { rawOutput: "invalid [redacted]" } } } });
   expect(record.verdict).not.toHaveProperty("score");
@@ -257,7 +258,7 @@ test.each([false, true])("persists redacted transfer warnings during normal or f
     session.exportState = async (...parameters) => ({ ...await original(...parameters), warnings: [{ code: "TRANSFER_UNSAFE", message: `/app/link -> /outside/${secret} (invalid-target)` }] });
     return session;
   };
-  const result = await runTask(job, components, source, new AbortController().signal, { sensitiveValues: [secret] });
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal, { sensitiveValues: [secret] });
   expect(result.executionStatus).toBe(failed ? "failed" : "completed");
   expect(result.warnings).toEqual([{ phase: failed ? "collect" : "transfer", code: "TRANSFER_UNSAFE", message: expect.stringContaining("/app/link") }]);
   expect(JSON.stringify(result.warnings)).not.toContain("PRIVATE_VALUE");
@@ -267,7 +268,7 @@ test.each([false, true])("persists redacted transfer warnings during normal or f
 
 test.each(["prepare", "solve.environment", "solve", "verify", "restore", "verify.environment"])("%s failures retain an error record and release prepared environments", async fail => {
   const { components, events, inputs } = await taskFixture({ fail, transfer: true });
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result.executionStatus).toBe("failed");
   expect(result.scoreStatus).toBe("invalid");
   expect(result.errors[0]?.message).toContain(`injected ${fail}`);
@@ -279,7 +280,7 @@ test.each(["prepare", "solve.environment", "solve", "verify", "restore", "verify
 
 test("cleanup failure retains a valid verdict and is classified separately", async () => {
   const { components } = await taskFixture({ fail: "solve.cleanup" });
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result).toMatchObject({ executionStatus: "completed", scoreStatus: "valid", cleanupStatus: "unconfirmed" });
   expect(result.verdict?.score).toBe(1);
   expect(result.errors).toEqual([expect.objectContaining({ phase: "cleanup" })]);
@@ -287,14 +288,14 @@ test("cleanup failure retains a valid verdict and is classified separately", asy
 
 test("both environment cleanup failures accumulate without replacing the verdict", async () => {
   const { components } = await taskFixture({ transfer: true, fail: ["solve.cleanup", "verify.cleanup"] });
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result.verdict?.score).toBe(1);
   expect(result.errors.filter(error => error.phase === "cleanup")).toHaveLength(2);
 });
 
 test("missing native session is collection failure without discarding the score", async () => {
   const { components } = await taskFixture({ missingSession: true });
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result).toMatchObject({ executionStatus: "completed", scoreStatus: "valid", cleanupStatus: "cleaned" });
   expect(result.verdict?.score).toBe(1);
   expect(result.errors).toContainEqual(expect.objectContaining({ phase: "collect" }));
@@ -302,12 +303,12 @@ test("missing native session is collection failure without discarding the score"
 
 test("deadline and user cancellation remain distinct and cleanup gets a fresh signal", async () => {
   const first = await taskFixture({ wait: true });
-  const timeout = await runTask(job, first.components, source, new AbortController().signal, { timeoutSeconds: 0.05, cleanupTimeoutMs: 1000 });
+  const timeout = await runTask(onDemand(job), first.components, source, new AbortController().signal, { timeoutSeconds: 0.05, cleanupTimeoutMs: 1000 });
   expect(timeout.executionStatus).toBe("agent_timeout"); expect(first.events).toContain("solve.cleanup");
   expect(timeout.collection.trajectory).toBe("partial");
   expect(timeout.verdict).toBeNull(); expect(timeout.trajectory).toBe("agent/trajectory.jsonl");
   const second = await taskFixture({ wait: true }); const controller = new AbortController();
-  const pending = runTask(job, second.components, source, controller.signal);
+  const pending = runTask(onDemand(job), second.components, source, controller.signal);
   await second.entered.promise; controller.abort();
   expect((await pending).executionStatus).toBe("cancelled"); expect(second.events).toContain("solve.cleanup");
 });
@@ -324,7 +325,7 @@ test("task-specific solve timeout records SOLVER_AGENT_TIMEOUT and only collects
       events.push("solve.settled");
     }
   };
-  const result = await runTask(job, components, source, new AbortController().signal, { timeoutSeconds: 2, cleanupTimeoutMs: 1000 });
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal, { timeoutSeconds: 2, cleanupTimeoutMs: 1000 });
   expect(result.executionStatus).toBe("agent_timeout");
   expect(result.errors[0]).toMatchObject({ phase: "solve", code: "SOLVER_AGENT_TIMEOUT", details: { originalName: "PhaseTimeoutError" } });
   expect(result.verdict).toBeNull();
@@ -343,7 +344,7 @@ test("task-specific verifier deadline records an invalid infrastructure timeout 
     if (signal.aborted) reject(signal.reason);
     else signal.addEventListener("abort", () => reject(signal.reason), { once: true });
   });
-  const result = await runTask(job, components, source, new AbortController().signal, { timeoutSeconds: 2, cleanupTimeoutMs: 1000 });
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal, { timeoutSeconds: 2, cleanupTimeoutMs: 1000 });
   expect(result.executionStatus).toBe("failed");
   expect(attemptTimeoutKind(result)).toBe("infrastructure");
   expect(result.errors).toContainEqual(expect.objectContaining({ phase: "verify", code: "VERIFY_TIMEOUT" }));
@@ -366,7 +367,7 @@ test("solver runtime installation consumes the solve environment preparation bud
   const received: unknown[] = [];
   const prepareEnvironment = components.environment.prepare.bind(components.environment);
   components.environment.prepare = async (spec, ...rest) => { received.push(spec.installation); return await prepareEnvironment(spec, ...rest); };
-  const result = await runTask(job, components, source, new AbortController().signal, { timeoutSeconds: 2, cleanupTimeoutMs: 1000 });
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal, { timeoutSeconds: 2, cleanupTimeoutMs: 1000 });
   expect(result.executionStatus).toBe("failed");
   expect(result.errors).toContainEqual(expect.objectContaining({ code: "ENV_PREPARATION_TIMEOUT" }));
   expect(events).toContain("install");
@@ -379,13 +380,13 @@ test("runtime installation failures are recorded in the install phase", async ()
   failing.components.solver.runtimeInstallation = async () => runtimeInstallation;
   failing.components.environment.supportsRuntimeInstallation = true;
   failing.components.environment.installRuntime = async () => { throw Object.assign(new Error("npm ci failed"), { code: "ENV_RUNTIME_INSTALL_FAILED" }); };
-  const failed = await runTask(job, failing.components, source, new AbortController().signal);
+  const failed = await runTask(onDemand(job), failing.components, source, new AbortController().signal);
   expect(failed.executionStatus).toBe("failed");
   expect(failed.errors).toContainEqual(expect.objectContaining({ phase: "install", code: "ENV_RUNTIME_INSTALL_FAILED" }));
   expect(failing.events).not.toContain("solve.environment");
   const unsupported = await taskFixture();
   unsupported.components.solver.runtimeInstallation = async () => runtimeInstallation;
-  const rejected = await runTask(job, unsupported.components, source, new AbortController().signal);
+  const rejected = await runTask(onDemand(job), unsupported.components, source, new AbortController().signal);
   expect(rejected.executionStatus).toBe("failed");
   expect(rejected.errors).toContainEqual(expect.objectContaining({ phase: "install", code: "ENV_RUNTIME_INSTALL_FAILED" }));
 });
@@ -409,7 +410,7 @@ test("unknown IDs and empty selection fail before solving", async () => {
 
 test("store commit failure propagates as a global failure after cleanup", async () => {
   const { components, events } = await taskFixture({ fail: "commit" });
-  await expect(runTask(job, components, source, new AbortController().signal)).rejects.toMatchObject({
+  await expect(runTask(onDemand(job), components, source, new AbortController().signal)).rejects.toMatchObject({
     code: "STORE_WRITE_FAILED", cause: new Error("store unavailable"),
   });
   expect(events.at(-2)).toBe("solve.cleanup");
@@ -418,10 +419,42 @@ test("store commit failure propagates as a global failure after cleanup", async 
 test("a solver that ignores abort cannot prevent disposal or exceed the cleanup wait budget", async () => {
   const { components, events } = await taskFixture();
   components.solver.solve = async () => new Promise(() => {});
-  const result = await runTask(job, components, source, new AbortController().signal, { timeoutSeconds: 0.03, cleanupTimeoutMs: 40 });
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal, { timeoutSeconds: 0.03, cleanupTimeoutMs: 40 });
   expect(result.executionStatus).toBe("agent_timeout");
   expect(events).toContain("solve.cleanup");
   expect(result.errors).toContainEqual(expect.objectContaining({ code: "CLEANUP_TIMEOUT" }));
+});
+
+test("cancellation during the solve-to-verify handoff waits for the same disposal", async () => {
+  const { components, events } = await taskFixture({ transfer: true });
+  const controller = new AbortController();
+  const prepare = components.environment.prepare;
+  const releasing = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const dispose = vi.fn(async () => { releasing.resolve(); await release.promise; });
+  components.environment.prepare = async (...args) => {
+    const session = await prepare(...args);
+    if (args[2] === "solve") {
+      session.quiesce = async () => {};
+      session.dispose = dispose;
+    }
+    return session;
+  };
+  let cleanupPhases = 0;
+  const running = runTask(onDemand(job), components, source, controller.signal, {
+    cleanupTimeoutMs: 500,
+    onProgress: event => {
+      if (event.phase === "cleanup" && !event.transient && ++cleanupPhases === 2) release.resolve();
+    },
+  });
+  await releasing.promise;
+  controller.abort();
+  const record = await running;
+  expect(record.executionStatus).toBe("cancelled");
+  expect(record.collection.artifacts).toBe("complete");
+  expect(dispose).toHaveBeenCalledTimes(1);
+  expect(events).not.toContain("verify.environment");
+  expect(events.at(-1)).toBe("commit");
 });
 
 async function latePreparationFixture() {
@@ -452,7 +485,7 @@ test("late preparation during the final drain snapshot is disposed without admit
     if (this === admitted && result.length === 0 && !finalSnapshot) { finalSnapshot = true; value.release.resolve(); }
     return result;
   });
-  const running = runTask(job, value.components, source, controller.signal, { cleanupTimeoutMs: 20 });
+  const running = runTask(onDemand(job), value.components, source, controller.signal, { cleanupTimeoutMs: 20 });
   await value.entered.promise; controller.abort(); const result = await running;
   expect(finalSnapshot).toBe(true); expect(value.disposeSignals).toHaveLength(1);
   expect(value.disposeWasAborted).toEqual([false]);
@@ -472,7 +505,7 @@ test("a late session admitted at cleanup budget expiry still receives disposal w
     cleanup.signal.addEventListener("abort", () => value.release.resolve(), { once: true });
     return cleanup.signal;
   });
-  const running = runTask(job, value.components, source, controller.signal, { cleanupTimeoutMs: 50 });
+  const running = runTask(onDemand(job), value.components, source, controller.signal, { cleanupTimeoutMs: 50 });
   await value.entered.promise; controller.abort();
   await new Promise<void>(done => setImmediate(done)); cleanup.abort(new DOMException("Cleanup deadline", "TimeoutError"));
   const result = await running;
@@ -483,7 +516,7 @@ test("a late session admitted at cleanup budget expiry still receives disposal w
 
 test("preparation after publication gets bounded disposal and cannot mutate the committed record", async () => {
   const value = await latePreparationFixture(); const controller = new AbortController();
-  const running = runTask(job, value.components, source, controller.signal, { cleanupTimeoutMs: 20 });
+  const running = runTask(onDemand(job), value.components, source, controller.signal, { cleanupTimeoutMs: 20 });
   await value.entered.promise; controller.abort(); const result = await running;
   expect(result.errors).toContainEqual(expect.objectContaining({ code: "CLEANUP_TIMEOUT" }));
   const published = structuredClone(result); const disposalEntered = Promise.withResolvers<AbortSignal>();
@@ -502,7 +535,7 @@ test("an unresponsive known session records its ID and unconfirmed cleanup witho
     session.dispose = async active => { expect(active.aborted).toBe(false); called = true; await releaseDisposal.promise; };
     return session;
   };
-  const result = await runTask(job, components, source, new AbortController().signal, { cleanupTimeoutMs: 20 });
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal, { cleanupTimeoutMs: 20 });
   expect(called).toBe(true);
   expect(result).toMatchObject({ executionStatus: "completed", scoreStatus: "valid", cleanupStatus: "unconfirmed" });
   expect(result.verdict?.score).toBe(1);
@@ -517,7 +550,7 @@ test("a valid JSON end event without its final newline is partial evidence", asy
     const result = await solve(...args); const path = join(args[2].paths.agent, "trajectory.jsonl");
     await writeFile(path, (await readFile(path, "utf8")).trimEnd()); return result;
   };
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result.executionStatus).toBe("completed"); expect(result.scoreStatus).toBe("valid"); expect(result.collection.trajectory).toBe("partial");
   expect(result.verdict?.score).toBe(1);
 });
@@ -525,7 +558,7 @@ test("a valid JSON end event without its final newline is partial evidence", asy
 test("an evidence checksum read failure becomes a missing entry and still commits the verdict", async () => {
   artifactReadFailure.suffix = "/agent/session.jsonl";
   const { components, events, root } = await taskFixture();
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result.verdict?.score).toBe(1);
   expect(result.executionStatus).toBe("completed"); expect(result.scoreStatus).toBe("valid");
   expect(result.collection.trajectory).toBe("partial");
@@ -539,7 +572,7 @@ test("an evidence checksum read failure becomes a missing entry and still commit
 test("an evidence read failure followed by disappearance still commits the verdict", async () => {
   artifactReadFailure.suffix = "/agent/session.jsonl"; artifactReadFailure.removeOnFailure = true;
   const { components, events, root } = await taskFixture();
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result.verdict?.score).toBe(1);
   expect(result.executionStatus).toBe("completed"); expect(result.scoreStatus).toBe("valid");
   expect(result.errors).toContainEqual(expect.objectContaining({ phase: "collect" }));
@@ -552,7 +585,7 @@ test("an evidence read failure followed by disappearance still commits the verdi
 test("a trajectory inspection open failure is partial and still commits the hashed file", async () => {
   artifactReadFailure.suffix = "/agent/trajectory.jsonl"; artifactReadFailure.failOnCall = 2;
   const { components, events, root } = await taskFixture();
-  const result = await runTask(job, components, source, new AbortController().signal);
+  const result = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(result.verdict?.score).toBe(1);
   expect(result.executionStatus).toBe("completed"); expect(result.scoreStatus).toBe("valid");
   expect(result.collection.trajectory).toBe("partial");
@@ -717,7 +750,7 @@ test.each(["solve", "verify"] as const)("malformed %s output becomes a task diag
     const solve = components.solver.solve;
     components.solver.solve = async (...args) => ({ ...await solve(...args), usage: { inputTokens: -1, outputTokens: 0, totalTokens: 0 } });
   } else components.benchmark.verify = async () => ({ score: NaN, passed: true, details: {} });
-  const record = await runTask(job, components, source, new AbortController().signal);
+  const record = await runTask(onDemand(job), components, source, new AbortController().signal);
   expect(record).toMatchObject({ executionStatus: "failed", scoreStatus: "invalid", verdict: null });
   expect(record.errors[0]).toMatchObject({ phase, code: phase === "solve" ? "SOLVER_PROTOCOL_INVALID" : "VERIFY_RESULT_INVALID", retryable: false });
   expect(events.at(-1)).toBe("commit");

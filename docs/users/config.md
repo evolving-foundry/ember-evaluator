@@ -121,7 +121,7 @@ Configure download sources, proxies and image acquisition with a separate [netwo
 
 Pi/SimpleAgent and built-in judges with explicit OpenAI Chat Completions `base_url` send `services.<service>.maxTokens` only when configured. Omission sends neither `max_tokens` nor `max_completion_tokens`; the API decides. SDK model budgets still manage local context without hidden output caps. Registered providers retain SDK protocol defaults; external agents retain their own mechanisms.
 
-Pi local budgets prefer explicit `maxTokens`, packaged [model defaults](../../src/adapters/harness/pi/model-defaults.json), registered model settings, then `128000`. Defaults match model ID or `provider/model-ID`, preferring the latter, and participate in runtime digests. Server output/context limits may still truncate. Evaluator preserves actual termination reasons rather than accepting truncated output as valid scoring.
+Pi local budgets prefer explicit `maxTokens`, packaged [model defaults](../../src/runtimes/pi/model-defaults.json), registered model settings, then `128000`. Defaults match model ID or `provider/model-ID`, preferring the latter, and participate in runtime digests. Server output/context limits may still truncate. Evaluator preserves actual termination reasons rather than accepting truncated output as valid scoring.
 
 ### Environment Preparation Timeouts
 

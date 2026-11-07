@@ -1,32 +1,32 @@
 import { rm } from "node:fs/promises";
-import { sameCandidate } from "../../adapters/agentbundle/preparation-state.js";
-import { preparePi } from "../../adapters/harness/pi/prepare.js";
-import { prepareJiuwenswarm, prepareJiuwenswarmDocker } from "../../adapters/harness/jiuwenswarm/prepare.js";
-import { prepareHermes } from "../../adapters/harness/hermes/prepare.js";
-import { prepareDsh } from "../../adapters/harness/dsh/prepare.js";
-import { prepareDify } from "../../adapters/harness/dify/prepare.js";
-import { parseDifyOptions, type DifyOptions } from "../../adapters/harness/dify/config.js";
-import { DIFY_RUNNER_VERSION, difyRuntimeInstallation } from "../../adapters/harness/dify/runtime.js";
-import { prepareDeepagentsDocker, prepareDeepagentsLocal } from "../../adapters/harness/deepagents/prepare.js";
+import { sameCandidate } from "../../runtimes/agentbundle/preparation-state.js";
+import { preparePi } from "../../runtimes/pi/prepare.js";
+import { prepareJiuwenswarm, prepareJiuwenswarmDocker } from "../../runtimes/jiuwenswarm/prepare.js";
+import { prepareHermes } from "../../runtimes/hermes/prepare.js";
+import { prepareDsh } from "../../runtimes/dsh/prepare.js";
+import { prepareDify } from "../../runtimes/dify/prepare.js";
+import { parseDifyOptions, type DifyOptions } from "../../runtimes/dify/config.js";
+import { DIFY_RUNNER_VERSION, difyRuntimeInstallation } from "../../runtimes/dify/runtime.js";
+import { prepareDeepagentsDocker, prepareDeepagentsLocal } from "../../runtimes/deepagents/prepare.js";
 import { createHash } from "node:crypto";
 
-import type { ModelConfig, RuntimeAuth } from "../../config/schema.js";
-import { assertJsonValue, expectNonEmptyString, expectPositiveInteger, expectRecord, rejectUnknown } from "../../config/schema.js";
+import type { ModelConfig, RuntimeAuth } from "../../core/contracts/config.js";
+import { assertJsonValue, expectNonEmptyString, expectPositiveInteger, expectRecord, rejectUnknown } from "../../core/validation/input.js";
 import type { EnvironmentSession, RuntimeInstallation, RuntimeRequirement } from "../../core/contracts/environment.js";
 import type { AttemptContext, PreparedSolver, Solver, SolverProvenance } from "../../core/contracts/solver.js";
 import type { SolveResult } from "../../core/contracts/result.js";
 import type { JsonValue, PublicTask } from "../../core/contracts/task.js";
-import { canonicalJson } from "../../core/run-manifest.js";
-import { AgentBundleError, type VerifiedBundle } from "../../adapters/agentbundle/cli.js";
-import { DSH_VERSION, describeDshBundleRuntime, type DshBundleRuntime } from "../../adapters/harness/dsh/runtime.js";
-import { AGENT_BUNDLE_CORE_VERSION, assertHarnessVersionCompatible, verifyBundleCandidate } from "../../adapters/agentbundle/sdk.js";
+import { canonicalJson } from "../../core/results/run-manifest.js";
+import { AgentBundleError, type VerifiedBundle } from "../../runtimes/agentbundle/cli.js";
+import { DSH_VERSION, describeDshBundleRuntime, type DshBundleRuntime } from "../../runtimes/dsh/runtime.js";
+import { AGENT_BUNDLE_CORE_VERSION, assertHarnessVersionCompatible, verifyBundleCandidate } from "../../runtimes/agentbundle/sdk.js";
 
-import { DEEPAGENTS_VERSION, deepagentsBundleRuntimeInstallation, deepagentsPythonProvenance } from "../../adapters/harness/deepagents/runtime.js";
-import { HERMES_VERSION, hermesRuntimeInstallation } from "../../adapters/harness/hermes/runtime.js";
+import { DEEPAGENTS_VERSION, deepagentsBundleRuntimeInstallation, deepagentsPythonProvenance } from "../../runtimes/deepagents/runtime.js";
+import { HERMES_VERSION, hermesRuntimeInstallation } from "../../runtimes/hermes/runtime.js";
 
-import { JIUWENSWARM_VERSION, jiuwenswarmBundleRuntimeInstallation } from "../../adapters/harness/jiuwenswarm/runtime.js";
-import { PI_VERSION, describePiBundleRuntime, disposePiBundleRuntime, type PiBundleRuntime } from "../../adapters/harness/pi/agentbundle-runtime.js";
-import { verifyPiBundleIntegrity } from "../../adapters/harness/pi/integrity.js";
+import { JIUWENSWARM_VERSION, jiuwenswarmBundleRuntimeInstallation } from "../../runtimes/jiuwenswarm/runtime.js";
+import { PI_VERSION, describePiBundleRuntime, disposePiBundleRuntime, type PiBundleRuntime } from "../../runtimes/pi/agentbundle-runtime.js";
+import { verifyPiBundleIntegrity } from "../../runtimes/pi/integrity.js";
 
 type DshOptions = { dshhome?: string; dshprofile?: string; environmentName?: string };
 type HermesOptions = { hermeshome?: string };

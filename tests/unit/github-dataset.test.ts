@@ -4,8 +4,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { parseGitTree } from "../../src/adapters/datasets/sources/github/tree.js";
-import { GitBlobCache } from "../../src/adapters/datasets/sources/github/blob-cache.js";
+import { parseGitTree } from "../../src/infrastructure/datasets/sources/github/tree.js";
+import { GitBlobCache } from "../../src/infrastructure/datasets/sources/github/blob-cache.js";
 
 const roots: string[] = [];
 afterEach(async () => {

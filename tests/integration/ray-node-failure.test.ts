@@ -35,7 +35,7 @@ test.skipIf(!available).each([
     await writeFile(worker, `process.stdin.resume(); process.stdin.on("end", () => { process.stdout.write(${JSON.stringify(JSON.stringify({ errorCode: code }))}); process.exitCode = 1; });\n`);
     const config = join(root, "node.json");
     await writeFile(config, JSON.stringify({ nodeExecutable: process.execPath, workerEntry: worker }));
-    const { stdout } = await execute(python, ["-c", script, resolve("src/adapters/ray/python/driver.py"), config], { timeout: 10_000 });
+    const { stdout } = await execute(python, ["-c", script, resolve("src/infrastructure/ray/python/driver.py"), config], { timeout: 10_000 });
     expect(JSON.parse(stdout)).toEqual({ code: expected, retired: true });
     expect(stdout).not.toContain("secret");
     expect(stdout).not.toContain("sensitive");
@@ -52,7 +52,7 @@ test.skipIf(!available)("successful Node responses preserve bounded runtime warn
     const config = join(root, "node.json");
     await writeFile(config, JSON.stringify({ nodeExecutable: process.execPath, workerEntry: worker }));
     const successful = script.slice(0, script.indexOf("try:\n")) + 'print(json.dumps(runner({"safeConfig": {"timeoutSeconds": 5}})))\n';
-    const { stdout } = await execute(python, ["-c", successful, resolve("src/adapters/ray/python/driver.py"), config], { timeout: 10_000 });
+    const { stdout } = await execute(python, ["-c", successful, resolve("src/infrastructure/ray/python/driver.py"), config], { timeout: 10_000 });
     expect(JSON.parse(stdout)).toEqual(response);
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 15_000);
@@ -69,10 +69,10 @@ test.skipIf(!available)("preparation without a round deadline preserves environm
     const setup = script.slice(0, script.indexOf("try:\n"));
     const payload = '{"preparation": {"mode": "prepare", "deadlineAt": None}, "safeConfig": {"timeoutSeconds": 5}}';
     const successful = setup + `print(json.dumps(runner(${payload})))\n`;
-    expect(JSON.parse((await execute(python, ["-c", successful, resolve("src/adapters/ray/python/driver.py"), config], { timeout: 10_000 })).stdout)).toEqual(response);
+    expect(JSON.parse((await execute(python, ["-c", successful, resolve("src/infrastructure/ray/python/driver.py"), config], { timeout: 10_000 })).stdout)).toEqual(response);
     await writeFile(worker, `process.stdin.resume(); process.stdin.on("end", () => { process.stdout.write(${JSON.stringify(JSON.stringify({ errorCode: "ENV_PREPARATION_TIMEOUT", environmentTimeouts: timing }))}); process.exitCode = 1; });\n`);
     const failed = setup + `try:\n    runner(${payload})\nexcept module["RetiredNodeFailure"] as error:\n    print(json.dumps({"code": error.code, "timing": error.environment_timeouts}))\n`;
-    expect(JSON.parse((await execute(python, ["-c", failed, resolve("src/adapters/ray/python/driver.py"), config], { timeout: 10_000 })).stdout))
+    expect(JSON.parse((await execute(python, ["-c", failed, resolve("src/infrastructure/ray/python/driver.py"), config], { timeout: 10_000 })).stdout))
       .toEqual({ code: "ENV_PREPARATION_TIMEOUT", timing });
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 15_000);

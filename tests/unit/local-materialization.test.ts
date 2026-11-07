@@ -2,7 +2,7 @@ import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { LocalEnvironment } from "../../src/plugins/environments/local.js";
+import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
 import type { EnvironmentSpec, RuntimeInstallation } from "../../src/core/contracts/environment.js";
 
 test("shared local preparation reuses probes, isolates receipts and revalidates changed configurations", async () => {

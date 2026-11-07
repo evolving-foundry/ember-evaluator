@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { runCli } from "../../src/cli.js";
+import { runCli } from "../../src/cli/main.js";
 
 test("benchmark list displays versions, defaults and scenarios as a table", async () => {
   const out: string[] = [], errors: string[] = [];
@@ -26,8 +26,8 @@ test("benchmark list JSON retains version aliases and matches info", async () =>
 });
 
 test("inherited version differences are not collapsed into aliases", async () => {
-  const { openPluginRegistry } = await import("../../src/plugin-runtime.js");
-  const { benchmarkList } = await import("../../src/commands/benchmark.js");
+  const { openPluginRegistry } = await import("../../src/application/plugins/open-registry.js");
+  const { benchmarkList } = await import("../../src/application/benchmarks.js");
   const registry = await openPluginRegistry();
   try {
     registry.ctx.evaluator.registerProfile({ id: "alias-parent", role: "benchmark", extends: "harbor", defaultVersion: "1.0", versions: {

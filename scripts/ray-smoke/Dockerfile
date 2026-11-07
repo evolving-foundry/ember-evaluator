@@ -19,8 +19,8 @@ COPY dist/adapters/harness/pi/runtime-lock.json ./package-lock.json
 RUN npm ci --omit=dev --ignore-scripts --registry="${NPM_CONFIG_REGISTRY}"
 COPY node_modules/agent-bundle-core/package.json ./node_modules/agent-bundle-core/package.json
 COPY node_modules/agent-bundle-core/dist ./node_modules/agent-bundle-core/dist
-COPY dist/adapters/ray/python/requirements.txt ./src/adapters/ray/python/requirements.txt
-RUN pip install --no-cache-dir -r src/adapters/ray/python/requirements.txt "ray[default]==2.58.0"
+COPY dist/infrastructure/ray/python/requirements.txt ./ray-requirements.txt
+RUN pip install --no-cache-dir -r ray-requirements.txt "ray[default]==2.58.0"
 COPY dist ./dist
 COPY scripts ./scripts
 COPY tests/fixtures/ray/plugin.mjs ./scripts/ray-smoke/controlled.mjs

@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
 import type { CommandSpec, EnvironmentSession, ProcessHandle } from "../../src/core/contracts/environment.js";
 import type { AttemptContext } from "../../src/core/contracts/solver.js";
-import { verifyBundleCandidate } from "../../src/adapters/agentbundle/sdk.js";
-import { JIUWENSWARM_PROCESS_CLI_MARKER, JIUWENSWARM_VERSION } from "../../src/adapters/harness/jiuwenswarm/runtime.js";
+import { verifyBundleCandidate } from "../../src/runtimes/agentbundle/sdk.js";
+import { JIUWENSWARM_PROCESS_CLI_MARKER, JIUWENSWARM_VERSION } from "../../src/runtimes/jiuwenswarm/runtime.js";
 import { AgentBundleSolver } from "../../src/plugins/solvers/agentbundle.js";
 
 const fixtureBundle = join(import.meta.dirname, "..", "fixtures", "agentbundle", "jiuwenswarm");

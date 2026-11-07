@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { preparationConcurrency, withPreparationTimeout } from "../../src/core/preparation-timeout.js";
+import { preparationConcurrency, withPreparationTimeout } from "../../src/core/preparation/preparation-timeout.js";
 import type { PreparationStageTiming } from "../../src/core/contracts/result.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
 

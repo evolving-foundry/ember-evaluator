@@ -9,25 +9,25 @@ afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, {
 
 async function fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "evaluator-checkout-build-")); roots.push(root);
-  for (const dir of ["src", "scripts", "dist", "bin", "src/adapters/ray/python", "src/adapters/ray/runtime", "src/adapters/verifiers/python", "src/adapters/harness/pi", "src/adapters/harness/dsh/assets", "src/adapters/harness/deepagents/assets", "src/adapters/harness/dify/assets", "src/adapters/harness/jiuwenswarm/assets", "src/adapters/agentbundle/assets", "src/plugins/benchmarks/profiles"]) await mkdir(join(root, dir), { recursive: true });
+  for (const dir of ["src", "scripts", "dist", "bin", "src/infrastructure/ray/python", "src/application/ray/entries", "src/plugins/verifiers/python/runtime", "src/runtimes/pi", "src/runtimes/dsh/assets", "src/runtimes/deepagents/assets", "src/runtimes/dify/assets", "src/runtimes/jiuwenswarm/assets", "src/runtimes/agentbundle/assets", "src/plugins/benchmarks/agent-harness/profiles", "src/plugins/benchmarks/inference-engine/profiles", "src/plugins/benchmarks/operator/profiles"]) await mkdir(join(root, dir), { recursive: true });
   await writeFile(join(root, "package.json"), JSON.stringify({ type: "module" }));
   await writeFile(join(root, "package-lock.json"), JSON.stringify({ packages: { "": {} } }));
-  await cp(new URL("../../src/plugins/benchmarks/definitions/scoring/", import.meta.url), join(root, "src/plugins/benchmarks/definitions/scoring"), { recursive: true });
-  await cp(new URL("../../src/adapters/verifiers/officeqa/", import.meta.url), join(root, "src/adapters/verifiers/officeqa"), { recursive: true });
-  await mkdir(join(root, "src/adapters/kernel"), { recursive: true });
+  await cp(new URL("../../src/plugins/benchmarks/agent-harness/definitions/scoring/", import.meta.url), join(root, "src/plugins/benchmarks/agent-harness/definitions/scoring"), { recursive: true });
+  await cp(new URL("../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/runtime/", import.meta.url), join(root, "src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/runtime"), { recursive: true });
+  await mkdir(join(root, "src/plugins/benchmarks/operator/kernel/runtime"), { recursive: true });
   for (const name of ["precision.py", "timing.py", "msprof_replay.py", "strict.py", "timing_evidence.py"])
-    await writeFile(join(root, "src/adapters/kernel", name), "# packaged worker fixture\n");
+    await writeFile(join(root, "src/plugins/benchmarks/operator/kernel/runtime", name), "# packaged worker fixture\n");
   await writeFile(join(root, "src/cli.ts"), "fixture");
-  await writeFile(join(root, "src/plugins/benchmarks/profiles/fixture.yaml"), "id: fixture\n");
-  await writeFile(join(root, "src/adapters/harness/dify/assets/runner.mjs"), "export {};\n");
-  await writeFile(join(root, "src/adapters/harness/pi/model-defaults.json"), "{}\n");
-  await mkdir(join(root, "src/adapters/harness/agentx/assets"), { recursive: true });
-  await writeFile(join(root, "src/adapters/harness/agentx/assets/runner.py"), "# AgentX bridge fixture\n");
-  await mkdir(join(root, "src/adapters/harness/hermes/assets"), { recursive: true });
-  await writeFile(join(root, "src/adapters/harness/hermes/assets/runner.py"), "# Hermes output capture fixture\n");
-  for (const name of ["worker.py", "workbuddy.py", "Dockerfile", "build-runtime.py"]) await writeFile(join(root, "src/adapters/verifiers/python", name), "fixture\n");
-  await writeFile(join(root, "src/adapters/agentbundle/assets/run.mjs"), "export {};\n");
-  for (const name of ["jobs-entry", "jobs-gateway", "jobs-retry-entry"]) await writeFile(join(root, `src/adapters/ray/runtime/${name}.mjs`), "export {};\n");
+  await writeFile(join(root, "src/plugins/benchmarks/agent-harness/profiles/fixture.yaml"), "id: fixture\n");
+  await writeFile(join(root, "src/runtimes/dify/assets/runner.mjs"), "export {};\n");
+  await writeFile(join(root, "src/runtimes/pi/model-defaults.json"), "{}\n");
+  await mkdir(join(root, "src/runtimes/agentx/assets"), { recursive: true });
+  await writeFile(join(root, "src/runtimes/agentx/assets/runner.py"), "# AgentX bridge fixture\n");
+  await mkdir(join(root, "src/runtimes/hermes/assets"), { recursive: true });
+  await writeFile(join(root, "src/runtimes/hermes/assets/runner.py"), "# Hermes output capture fixture\n");
+  for (const name of ["worker.py", "workbuddy.py", "Dockerfile", "build-runtime.py"]) await writeFile(join(root, "src/plugins/verifiers/python/runtime", name), "fixture\n");
+  await writeFile(join(root, "src/runtimes/agentbundle/assets/run.mjs"), "export {};\n");
+  for (const name of ["jobs-entry", "jobs-gateway", "jobs-retry-entry"]) await writeFile(join(root, `src/application/ray/entries/${name}.mjs`), "export {};\n");
   for (const name of ["cli-bootstrap.mjs", "package-runtime.mjs"]) await cp(new URL(`../../scripts/${name}`, import.meta.url), join(root, `scripts/${name}`));
   await cp(new URL("../../scripts/checkout-build.mjs", import.meta.url), join(root, "scripts/checkout-build.mjs")).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
   await cp(join(root, "scripts/cli-bootstrap.mjs"), join(root, "dist/cli.js"));
@@ -39,14 +39,16 @@ import { setTimeout } from "node:timers/promises";
 if (process.argv[2] === "build") {
   await appendFile("builds.log", "build\\n");
   if (process.env.FIXTURE_BUILD_FAIL) process.exit(7);
-  await mkdir("dist/adapters/harness/pi", { recursive: true });
+  await mkdir("dist/runtimes/pi", { recursive: true });
   await mkdir("dist/core/errors", { recursive: true });
-  await mkdir("dist/adapters/net", { recursive: true });
-  await writeFile("dist/adapters/net/env-proxy.js", "export {};\\n");
+  await mkdir("dist/infrastructure/network", { recursive: true });
+  await mkdir("dist/core/progress", { recursive: true });
+  await mkdir("dist/plugins/benchmarks/agent-harness/definitions/scoring", { recursive: true });
+  await writeFile("dist/infrastructure/network/env-proxy.js", "export {};\\n");
   for (const name of ["classify", "network-failure", "evaluator-error", "registry"])
     await writeFile("dist/core/errors/" + name + ".js", "export {};\\n");
-  await writeFile("dist/core/diagnostics.js", "export {};\\n");
-  await writeFile("dist/core/live-progress.js", "export {};\\n");
+  await writeFile("dist/core/errors/diagnostics.js", "export {};\\n");
+  await writeFile("dist/core/progress/live-progress.js", "export {};\\n");
   await writeFile("dist/cli.js", 'export async function runCli() { console.log("fixture-run-ok"); return 0; }\\n');
   // Leave both real launchers time to enter the rebuild before packaging.
   let first = true;
@@ -74,10 +76,10 @@ test.skipIf(process.platform === "win32")("concurrent stale-checkout CLI starts 
   expect(results, JSON.stringify(results)).toEqual(results.map(() => ({ code: 0, output: expect.stringContaining("fixture-run-ok") })));
   expect((await readFile(join(root, "builds.log"), "utf8")).trim().split("\n")).toHaveLength(1);
   expect(await readFile(join(root, "dist/cli-runtime.js"), "utf8")).not.toContain('await import("./cli-runtime.js")');
-  expect(await readFile(join(root, "dist/plugins/benchmarks/profiles/fixture.yaml"), "utf8")).toBe("id: fixture\n");
-  expect(await readFile(join(root, "dist/adapters/harness/dify/assets/runner.mjs"), "utf8")).toBe("export {};\n");
-  expect(await readFile(join(root, "dist/adapters/harness/agentx/assets/runner.py"), "utf8")).toBe("# AgentX bridge fixture\n");
-  expect(await readFile(join(root, "dist/adapters/harness/hermes/assets/runner.py"), "utf8")).toBe("# Hermes output capture fixture\n");
+  expect(await readFile(join(root, "dist/plugins/benchmarks/agent-harness/profiles/fixture.yaml"), "utf8")).toBe("id: fixture\n");
+  expect(await readFile(join(root, "dist/runtimes/dify/assets/runner.mjs"), "utf8")).toBe("export {};\n");
+  expect(await readFile(join(root, "dist/runtimes/agentx/assets/runner.py"), "utf8")).toBe("# AgentX bridge fixture\n");
+  expect(await readFile(join(root, "dist/runtimes/hermes/assets/runner.py"), "utf8")).toBe("# Hermes output capture fixture\n");
   expect((await launch(root)).code).toBe(0);
   expect((await readFile(join(root, "builds.log"), "utf8")).trim().split("\n")).toHaveLength(1);
 });

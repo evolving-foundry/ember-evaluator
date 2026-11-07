@@ -14,5 +14,5 @@ Changes to `plugins/deepswe-guidance/cordis.patch.yml` change the bundle digest.
 From the Evaluator repository root:
 
 ```powershell
-node dist/adapters/agentbundle/assets/cli.mjs --json verify tests/fixtures/agentbundle/dsh-deepswe --harness-version 0.2.2-rc.1
+node dist/runtimes/agentbundle/assets/cli.mjs --json verify tests/fixtures/agentbundle/dsh-deepswe --harness-version 0.2.2-rc.1
 ```

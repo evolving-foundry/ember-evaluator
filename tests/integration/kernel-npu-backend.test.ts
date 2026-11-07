@@ -3,14 +3,14 @@ import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test, vi } from "vitest";
-import { NpuKernelBackend } from "../../src/adapters/kernel/npu.js";
-import { createKernelBackend } from "../../src/adapters/kernel/backend.js";
+import { NpuKernelBackend } from "../../src/plugins/benchmarks/operator/kernel/runtime/npu.js";
+import { createKernelBackend } from "../../src/plugins/benchmarks/operator/kernel/runtime/backend.js";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
 
 const python = process.env.PYTHON_BIN ?? (process.platform === "win32" ? "python" : "python3");
 const available = spawnSync(python, ["--version"], { windowsHide: true }).status === 0;
 test.skipIf(!available)("NPU timing honors the selected device and never probes CUDA or falls back to CPU", () => {
-  const result = spawnSync(python, [resolve("tests/fixtures/kernel/check-npu-timing.py"), resolve("src/adapters/kernel/timing.py")],
+  const result = spawnSync(python, [resolve("tests/fixtures/kernel/check-npu-timing.py"), resolve("src/plugins/benchmarks/operator/kernel/runtime/timing.py")],
     { encoding: "utf8", windowsHide: true, timeout: 10000, env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
   expect(result.status, result.stderr).toBe(0);
 });

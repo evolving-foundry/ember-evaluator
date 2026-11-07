@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { parseKernelContract, parseKernelAssessment } from "../../src/plugins/benchmarks/protocols/kernel/strict.js";
-import { parseKernelManifest } from "../../src/plugins/benchmarks/protocols/kernel/index.js";
+import { parseKernelContract, parseKernelAssessment } from "../../src/plugins/benchmarks/operator/kernel/strict.js";
+import { parseKernelManifest } from "../../src/plugins/benchmarks/operator/kernel/index.js";
 
 const contract = { schemaVersion: 1, caseId: "fixed", inputs: [{ shape: [2, 4], dtype: "float16", contiguous: true }],
   output: { shape: [2, 2, 2], dtype: "float16", contiguous: true, independent: true }, inputUnmodified: true };
@@ -14,8 +14,8 @@ test("strict assessment rejects missing checks and unknown check states", () => 
   expect(() => parseKernelAssessment({ schemaVersion: 1, checks: [] }, parseKernelContract(contract), [42])).toThrow();
 });
 
-import { kernelContractDigest, KERNEL_CHECK_IDS } from "../../src/plugins/benchmarks/protocols/kernel/strict.js";
-import { kernelVerdict } from "../../src/plugins/benchmarks/protocols/kernel/result.js";
+import { kernelContractDigest, KERNEL_CHECK_IDS } from "../../src/plugins/benchmarks/operator/kernel/strict.js";
+import { kernelVerdict } from "../../src/plugins/benchmarks/operator/kernel/result.js";
 const parsed = parseKernelContract(contract);
 const assessment = () => ({ schemaVersion: 1, contractSha256: kernelContractDigest(parsed),
   checks: [0, 1].flatMap(call => KERNEL_CHECK_IDS.map(id => ({ id, seed: 42, call, status: "passed", message: "" }))),

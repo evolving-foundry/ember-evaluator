@@ -7,9 +7,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { afterEach, expect, test, vi } from "vitest";
-import { callControlChannel, openControlChannel } from "../../src/adapters/retry/control-channel.js";
-import { runEngine } from "../../src/core/engine.js";
-import { controlTransaction, RetryControl, submitRetry } from "../../src/core/retry-control.js";
+import { callControlChannel, openControlChannel } from "../../src/infrastructure/ipc/control-channel.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { controlTransaction, RetryControl, submitRetry } from "../../src/application/retry-control/mailbox.js";
 import { harness } from "../fixtures/engine/fakes.js";
 
 const fault = vi.hoisted(() => ({ target: "", remaining: 0, code: "EPERM" }));
@@ -61,7 +61,7 @@ test("a separate Node process submits unicode requests through the coordinator I
     return { commit, release() {} };
   });
   const state = JSON.parse(await readFile(join(root, "retry-control.json"), "utf8")) as { endpoint: string };
-  const moduleUrl = pathToFileURL(resolve("src/adapters/retry/control-channel.ts")).href;
+  const moduleUrl = pathToFileURL(resolve("src/infrastructure/ipc/control-channel.ts")).href;
   const script = `import { callControlChannel } from ${JSON.stringify(moduleUrl)};
     console.log(JSON.stringify(await callControlChannel(process.argv[1], { requestId: "child", taskIds: ["__proto__", "题目"], reason: "网络恢复" })));`;
   const result = await promisify(execFile)(process.execPath, ["--input-type=module", "--eval", script, state.endpoint], { windowsHide: true });
@@ -82,6 +82,43 @@ test("invalid IPC requests and conflicting request IDs do not change the mailbox
   const replay = await submitRetry(root, { requestId: "same", taskIds: ["a"] });
   expect(replay.request.taskIds).toEqual(["a"]);
   expect(JSON.parse(await readFile(join(root, "retry-control.json"), "utf8")).requests).toHaveLength(1);
+});
+
+test("requests acknowledged during preparation are admitted once after the executor is ready", async () => {
+  const { root, server } = await control();
+  expect((await submitRetry(root, { requestId: "preparing", taskIds: ["a"] })).request.status).toBe("pending");
+  const commit = vi.fn(), release = vi.fn();
+  await server.setAdmission(async requests => {
+    expect(requests.map(request => request.requestId)).toEqual(["preparing"]);
+    requests[0]!.status = "accepted";
+    requests[0]!.bindings.a = "original-failure";
+    return { commit, release };
+  });
+  expect((await submitRetry(root, { requestId: "preparing", taskIds: ["a"] })).request).toMatchObject({
+    status: "accepted", bindings: { a: "original-failure" },
+  });
+  expect(commit).toHaveBeenCalledTimes(1);
+  expect(release).toHaveBeenCalledTimes(1);
+});
+
+test("offline recovery claims a pending request atomically and rejects a second claim", async () => {
+  const root = await directory(), value = harness(root);
+  cleanups.push(() => value.dispose());
+  value.config.experiment.run.taskIds = ["a"];
+  const solve = value.components.solver.solve;
+  value.components.solver.solve = async () => { throw new Error("ECONNRESET"); };
+  const failed = await runEngine({ ...value, signal: new AbortController().signal });
+  const runRoot = join(value.config.experiment.output.directory, failed.run.runId);
+  await value.components.store.close();
+  expect((await submitRetry(runRoot, { requestId: "offline", taskIds: ["a"] })).request.status).toBe("pending");
+  value.components.solver.solve = solve;
+  const recovered = await runEngine({ ...value, resumeDirectory: runRoot, retryTaskIds: ["a"], retryRequestId: "offline", signal: new AbortController().signal });
+  expect(recovered.run.status).toBe("completed");
+  expect(recovered.attemptHistory).toHaveLength(2);
+  await value.components.store.close();
+  await expect(runEngine({ ...value, resumeDirectory: runRoot, retryTaskIds: ["a"], retryRequestId: "offline", signal: new AbortController().signal }))
+    .rejects.toThrow("already claimed");
+  expect((await value.components.store.listAttempts())).toHaveLength(2);
 });
 
 test("a stale Ray stopped-owner snapshot cannot disable a new recovery coordinator", async () => {
@@ -145,7 +182,7 @@ test.each(["EPERM", "EACCES", "EBUSY"])("persistent %s preserves the old file an
 test("a failed manual admission does not cancel active tasks; the same ID can be submitted successfully", async () => {
   const root = await directory();
   const value = harness(root);
-  cleanups.push(() => value.components.dispose());
+  cleanups.push(() => value.dispose());
   value.config.experiment.run.onError = "continue";
   const failed = Promise.withResolvers<void>(), held = Promise.withResolvers<void>();
   const solve = value.components.solver.solve;
@@ -184,7 +221,7 @@ test("a failed manual admission does not cancel active tasks; the same ID can be
 test.each(["startup", "shutdown"])("control persistence failure at %s leaves successful evaluations intact", async phase => {
   const root = await directory();
   const value = harness(root);
-  cleanups.push(() => value.components.dispose());
+  cleanups.push(() => value.dispose());
   const runId = "control-failure";
   fault.target = join(value.config.experiment.output.directory, runId, "retry-control.json");
   fault.code = "EPERM";

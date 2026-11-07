@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
-import { PlatformCapabilityDetector, parseDockerPlatform, parseDockerNativePlatform, resolveDockerPlatform } from "../../src/plugins/environments/docker-platform.js";
+import { PlatformCapabilityDetector, parseDockerPlatform, parseDockerNativePlatform, resolveDockerPlatform } from "../../src/infrastructure/containers/platform.js";
 import type { ContainerPlatform } from "../../src/core/contracts/environment.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 import { classifyError } from "../../src/core/errors/classify.js";
 
 const signal = () => new AbortController().signal;

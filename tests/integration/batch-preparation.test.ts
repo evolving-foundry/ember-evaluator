@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { harness } from "../fixtures/engine/fakes.js";
-import { runEngine } from "../../src/core/engine.js";
+import { runEngine } from "../../src/application/run-engine.js";
 import { parseEffectiveConfig } from "../../src/config/effective.js";
-import { planBenchmarkRun } from "../../src/plugins/benchmarks/plan-run.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
-import { consumeDsh } from "../../src/adapters/harness/dsh/protocol.js";
+import { planBenchmarkRun } from "../../src/plugins/benchmarks/shared/plan-run.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
+import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
 import { dshStream, interruptedResponse } from "../fixtures/engine/dsh-stream.js";
 import type { EnvironmentPreparationContext } from "../../src/core/contracts/environment.js";
 import type { ScheduledPreparation } from "../../src/core/contracts/preparation.js";
@@ -70,7 +70,7 @@ test("20 live attempts refill only after verification and persistence, without w
 async function fixture(budget = 10) {
   const root = await mkdtemp(join(tmpdir(), "batch-preparation-"));
   const value = harness(root, { transfer: true });
-  cleanups.push(async () => { await value.components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   const { components, config, events } = value;
   config.experiment.run.preparation = { mode: "batch", concurrency: 1 };
   components.benchmark.planRun = (refs, source, signal) =>
@@ -110,6 +110,20 @@ test("all solve and verify environments become ready before any attempt starts",
   ]));
   expect(events.indexOf("solve.quiesce")).toBeLessThan(events.indexOf("export"));
   expect(events.indexOf("solve.cleanup")).toBeLessThan(events.indexOf("verify.environment"));
+});
+
+test("a batch scheduler that omits a task cannot dispatch it with unprepared dependencies", async () => {
+  const { components, config, inputs } = await fixture();
+  const prepare = components.scheduler.prepareTasks!.bind(components.scheduler);
+  components.scheduler.prepareTasks = async (...args) => {
+    const scheduled = await prepare(...args);
+    if (scheduled.pipeline) throw new Error("Expected a batch");
+    return { tasks: scheduled.tasks.slice(1) };
+  };
+  await expect(runEngine({ components, config, signal: new AbortController().signal }))
+    .rejects.toThrow("Batch preparation differs from locked task plan");
+  expect(inputs).toHaveLength(0);
+  expect(await components.store.listAttempts()).toHaveLength(0);
 });
 
 test("model truncation prepares another round only for the failed task", async () => {

@@ -1,15 +1,16 @@
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { networkDocument, parseNetworkSettings } from "../../src/config/network.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { networkDocument, parseNetworkSettings } from "../../src/config/network-schema.js";
 import { afterEach, expect, test, vi } from "vitest";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { list } from "tar";
-import { pullDockerImage, createDockerImagePuller } from "../../src/plugins/environments/docker-image-pull.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import { pullDockerImage, createDockerImagePuller } from "../../src/infrastructure/containers/image-pull.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 import { registryProxyFixture } from "../fixtures/registry-proxy.js";
-import { resolvePinnedTaskImage } from "../../src/plugins/environments/docker-base-image.js";
-import { DockerRuntime, PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
+import { resolvePinnedTaskImage } from "../../src/infrastructure/containers/base-image.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
 
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => { vi.unstubAllEnvs(); for (const fn of cleanup.splice(0).reverse()) await fn(); });

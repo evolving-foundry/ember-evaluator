@@ -10,8 +10,8 @@ import {
   DEEPAGENTS_DOCKER_UV_TARGET,
   DEEPAGENTS_VERSION,
   deepagentsDockerRuntimeInstallation,
-} from "../../src/adapters/harness/deepagents/runtime.js";
-import { runtimeInventory } from "../../src/plugins/environments/runtime-installation.js";
+} from "../../src/runtimes/deepagents/runtime.js";
+import { runtimeInventory } from "../../src/infrastructure/runtime-installation/install.js";
 
 const execFileAsync = promisify(execFile);
 const fixtureBundle = join(import.meta.dirname, "..", "fixtures", "agentbundle", "deepagents");

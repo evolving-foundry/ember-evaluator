@@ -1,7 +1,7 @@
-import { selectAttemptRecords } from "../../core/task-result-resolver.js";
-import { fingerprintConfig } from "../../core/run-manifest.js";
+import { selectAttemptRecords } from "../../core/results/task-result-resolver.js";
+import { fingerprintConfig } from "../../core/results/run-manifest.js";
 import type { AttemptRecord, ResultSnapshot } from "../../core/contracts/result.js";
-import { isInvalidEvaluation } from "../../core/evaluation-outcome.js";
+import { isInvalidEvaluation } from "../../core/results/evaluation-outcome.js";
 
 /** A corrupt snapshot is an error, not an opportunity to silently change its denominator. */
 export function selectedRecords(snapshot: ResultSnapshot): AttemptRecord[] {

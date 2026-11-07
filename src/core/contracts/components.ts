@@ -17,7 +17,4 @@ export type RunComponents = {
   scheduler: TaskScheduler;
   pluginVersions: Record<string, string>;
   pluginRuntime?: NonNullable<RunManifest["pluginRuntime"]>;
-  dispose(): Promise<void>;
 };
-
-export type BenchmarkComponents = { benchmark: Benchmark; dispose(): Promise<void> };

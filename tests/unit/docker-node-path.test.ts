@@ -4,8 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
-import { DockerRuntime, EVALUATOR_NODE_EXECUTABLE, PINNED_NODE_IMAGE, type DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { DockerSolverRuntime } from "../../src/plugins/environments/docker-solver-runtime.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { EVALUATOR_NODE_EXECUTABLE, PINNED_NODE_IMAGE, type DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { DockerSolverRuntime } from "../../src/infrastructure/containers/solver-runtime.js";
 
 const exec = promisify(execFile);
 

@@ -1,17 +1,23 @@
-import { loadNetworkConfig, storedNetworkTemplate, restoreNetworkTemplate } from "./network.js";
+import { loadNetworkConfig } from "./network.js";
+import { storedNetworkTemplate, restoreNetworkTemplate } from "./network-schema.js";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { parse } from "yaml";
 import type { JsonValue } from "../core/contracts/task.js";
-import { type PluginRegistry, openPluginRegistry } from "../plugin-runtime.js";
+import type { ConfigProfile } from "./profile-schema.js";
+import type { PluginRole } from "../core/contracts/plugin.js";
+import type { Selection } from "../core/contracts/config.js";
 import { parseDeployment } from "./deployment.js";
-import { parseJobsConfig } from "../adapters/ray/jobs-client.js";
+import { parseJobsConfig } from "./jobs.js";
 import { redactConfig } from "./redact.js";
 import { parseEffectiveConfig, parseModel } from "./effective.js";
 import { parseUserConfig } from "./user-schema.js";
 import { resolveInput, type ConfigOrigins } from "./resolve.js";
-import { assertJsonValue, assertServiceBindings, expectRecord, expectNonEmptyString, type CliOverrides, type LoadedConfig, type EffectiveConfig, type ModelConfig, type RuntimeAuth } from "./schema.js";
+import { assertJsonValue, expectRecord, expectNonEmptyString } from "../core/validation/input.js";
+import { assertServiceBindings } from "../core/policies/service-bindings.js";
+import { type CliOverrides, type EffectiveConfig, type ModelConfig, type RuntimeAuth } from "../core/contracts/config.js";
+import { type LoadedConfig } from "./loaded.js";
 
 function expandString(value: string, env: Record<string, string | undefined>, path: string): string {
   return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, name: string) => {
@@ -147,34 +153,36 @@ function resolveServiceAuth(
   return { model: parseModel(expanded), auth: parsedAuth.auth, reference: parsedAuth.persistedReference };
 }
 
-export async function loadConfig(
+export async function readConfig(
   path: string,
   overrides: CliOverrides,
   env: Record<string, string | undefined>,
-  options: LoadOptions = {},
+  options: ConfigReadOptions,
 ): Promise<LoadedConfig> {
   const absolutePath = resolve(path);
   const network = options.network ?? await loadNetworkConfig(options.networkConfigPath, env);
   const source = expectRecord(parse(await readFile(absolutePath, "utf8"), { maxAliasCount: 100 }), "configuration");
-  const registry = options.registry ?? await openPluginRegistry(options.patchPath);
-  try {
+  const registry = options.registry;
+  {
     const user = parseUserConfig(source);
     const benchmarkName = typeof user.benchmark === "string" ? user.benchmark : user.benchmark.name;
-    const { source: normalized, origins } = resolveInput(absolutePath, user, registry.ctx.evaluator.profiles(), overrides);
+    const { source: normalized, origins } = resolveInput(absolutePath, user, registry.profiles(), overrides);
     const loaded = loadResolvedConfig(normalized, absolutePath, overrides, env, options, origins, registry);
     return attachNetwork(loaded, network, benchmarkName);
-  } finally {
-    if (!options.registry) await registry.dispose();
   }
 }
 
-type LoadOptions = { networkConfigPath?: string; network?: import("../core/contracts/network.js").NetworkDocument; allowMissingAuth?: boolean; patchPath?: string; validatePlugins?: boolean; registry?: PluginRegistry; configDirectory?: string };
+export interface ConfigRegistry {
+  profiles(): ConfigProfile[];
+  validate(role: PluginRole, selection: Selection): void;
+}
+export type ConfigReadOptions = { networkConfigPath?: string; network?: import("../core/contracts/network.js").NetworkDocument; allowMissingAuth?: boolean; validatePlugins?: boolean; registry: ConfigRegistry; configDirectory?: string };
 
 /** Internal, persisted execution configuration; never accepts public YAML shortcuts. */
-export async function loadSavedConfig(
+export async function readSavedConfig(
   path: string,
   env: Record<string, string | undefined>,
-  options: LoadOptions = {},
+  options: ConfigReadOptions,
 ): Promise<LoadedConfig> {
   const absolutePath = resolve(path);
   const source = expectRecord(parse(await readFile(absolutePath, "utf8"), { maxAliasCount: 100 }), "saved configuration");
@@ -183,11 +191,9 @@ export async function loadSavedConfig(
   const network = options.network ?? (options.networkConfigPath || env.EVALUATOR_NETWORK_CONFIG || !savedNetwork
     ? await loadNetworkConfig(options.networkConfigPath, env) : restoreNetworkTemplate(savedNetwork.template, env));
   const benchmarkName = savedNetwork?.benchmarkName === undefined ? undefined : expectNonEmptyString(savedNetwork.benchmarkName, "saved benchmark name");
-  const registry = options.registry ?? await openPluginRegistry(options.patchPath);
-  try {
+  const registry = options.registry;
+  {
     return attachNetwork(loadResolvedConfig(source, absolutePath, {}, env, options, {}, registry), network, benchmarkName);
-  } finally {
-    if (!options.registry) await registry.dispose();
   }
 }
 
@@ -203,9 +209,9 @@ function loadResolvedConfig(
   absolutePath: string,
   overrides: CliOverrides,
   env: Record<string, string | undefined>,
-  options: LoadOptions,
+  options: ConfigReadOptions,
   origins: ConfigOrigins,
-  registry: PluginRegistry,
+  registry: ConfigRegistry,
 ): LoadedConfig {
   const deployment = normalized.deployment === undefined ? undefined : parseDeployment(normalized.deployment);
   const rawServices = expectRecord(normalized.services, "services");
@@ -239,10 +245,10 @@ function loadResolvedConfig(
     const selections = ["benchmark", "environment", "solver", "scheduler", "store", "reporter"] as const;
     for (const role of selections) {
       if (role === "scheduler" && deployment) continue;
-      registry.ctx.evaluator.prepare(role, experiment[role]);
+      registry.validate(role, experiment[role]);
     }
-    if (experiment.verifier) registry.ctx.evaluator.prepare("verifier", experiment.verifier);
-    for (const metric of experiment.metrics) registry.ctx.evaluator.prepare("metrics", metric);
+    if (experiment.verifier) registry.validate("verifier", experiment.verifier);
+    for (const metric of experiment.metrics) registry.validate("metrics", metric);
   }
   const loaded = { ...(deployment === undefined ? {} : { deployment }), experiment, auths, persisted: persistedConfig(experiment, references, normalized), resolution: { origins } };
   assertServiceBindings(loaded);

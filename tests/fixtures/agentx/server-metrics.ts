@@ -1,4 +1,4 @@
-import type { AgentXTelemetryConfig } from "../../../src/adapters/harness/agentx/telemetry.js";
+import type { AgentXTelemetryConfig } from "../../../src/plugins/benchmarks/inference-engine/agentx/evidence/telemetry.js";
 
 export const telemetryConfig = {
   vllm: { endpoint: "http://127.0.0.1:18094/metrics" },

@@ -3,8 +3,8 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
-import { startTransferReceiver } from "../../src/adapters/transfer/https.js";
-import { JobsClient } from "../../src/adapters/ray/jobs-client.js";
+import { startTransferReceiver } from "../../src/infrastructure/transfer/https.js";
+import { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
 import { createGatewayCertificate } from "../fixtures/ray/gateway-certificate.js";
 
 test.skipIf(spawnSync("openssl", ["version"], { windowsHide: true }).status !== 0)(

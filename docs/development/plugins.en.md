@@ -2,9 +2,21 @@
 
 > English | [中文](./plugins.md)
 
-Covers eight component interfaces, runnable metric plugins, explicit patches, and Ray deployment. Source commands/experiments paths are relative to the Evaluator root.
+This reference covers component contracts, built-in registration, repository plugin builds, and configuration on Ray. Start with a small example to [add a Solver](add-solver.en.md), [add a built-in component](add-built-in-plugin.en.md), or [add an external plugin](add-external-plugin.en.md).
 
 [Project home](../../README.md) · [User guide](../users/README.md)
+
+## Source and Registration Locations
+
+Built-in components register in each role's index.ts; Metrics and Reporter use metrics/index.ts and reporters/index.ts respectively. Benchmarks have three registration entries: agent-harness, inference-engine and operator. application/plugins/open-registry.ts creates the Cordis registry and registers plugins, load-module.ts locates and imports modules and reads versions, create-components.ts creates components using an existing registry, and bootstrap.ts provides the public entry that opens and disposes its own registry. config/plugin-patch.ts only reads patches, validates entries, and computes patch digests; it does not execute plugin modules. External plugins import public contracts from ember-evaluator, not internal directories. See [Source architecture and execution flow](architecture.en.md) for calls and resource ownership, and [Benchmark development](benchmarks.en.md#where-to-add-new-behavior) for implementation locations and lifecycle limits.
+
+Run `pnpm check:dependencies` to check imports, boundary violations, and executable module cycles. See [dependency rules](architecture.en.md#allowed-source-dependencies) for allowed relationships and coverage limits. Repository plugin manifests control builds. External components load through explicit patches at runtime.
+
+### Published Process Entries
+
+`pnpm build` generates the public package/CLI entries and the existing `dist/adapters/ray/{node-worker,jobs-entry,jobs-retry-entry,jobs-gateway}.js`, Ray `python/requirements.txt`, `dist/adapters/harness/pi/` standalone bundle and `dist/adapters/harness/agentx/assets/ascend_metrics.py`. These deployment paths remain available; internal code uses the new directories. Generated entries and assets are included in the package digest.
+
+After installing an actual packed package with runtime dependencies outside the checkout, run `node scripts/verify-distribution.mjs <installed-package-directory>` from the repository. The target must contain no src or scripts directory. This checks CLI, package-name SDK execution/reporting, Pi protocol, worker task/maintenance/version rejection, Jobs entry processing/gateway and AgentX Python startup. OpenSSL and Python may be selected using OPENSSL_BIN and PYTHON_BIN; unavailable tools are reported as skips. This controlled check does not replace real Docker/Ray/NPU/model acceptance.
 
 ## Component Types
 
@@ -26,7 +38,7 @@ Substeps may supply unique operationId/status started/updated/completed/failed/c
 
 Cordis loads modules; ctx.evaluator.register registers components. Modules may register several; experiment names select them.
 
-Record definitions live in `src/plugins/benchmarks/definitions/`: task files convert/select scoring; `records.ts` validates/builds; `prompts.ts` stores prompts. `scoring/` groups matching/generative-choice/probability/model-judge/code execution; complex DROP algorithms may be separate. Reuse scoring rather than requiring a new `*-score.ts` per dataset. Scoring remains benchmark business logic, not automatically a Verifier because of filenames.
+Record definitions live in `src/plugins/benchmarks/agent-harness/definitions/`: task files convert/select scoring; `records.ts` validates/builds; `prompts.ts` stores prompts. `scoring/` groups matching/generative-choice/probability/model-judge/code execution; complex DROP algorithms may be separate. Reuse scoring rather than requiring a new `*-score.ts` per dataset. Scoring remains benchmark business logic, not automatically a Verifier because of filenames.
 
 
 | Type | Responsibility/interface | Built-ins |
@@ -59,43 +71,16 @@ Remote `warmup` requires setupPreparation(context,signal). `SchedulerPreparation
 
 Store/Scheduler AttemptRecords require evaluationKind/executionStatus/scoreStatus/cleanupStatus, rejecting old status/timeoutKind. Metrics read current fields; display helpers attemptStatus()/attemptTimeoutKind() are root exports and must not be persisted. Only local Store reads convert history; new/remote records use current structures. See [results/errors](../users/reference/errors.md).
 
+## Add a Built-in Component
+
+1. Choose a role and its contract from [Component Types](#component-types). Add the implementation under the corresponding `src/plugins/` role directory. For a Benchmark, choose its category and entry point using the [Benchmark development guide](benchmarks.en.md#where-to-add-new-behavior).
+2. Import the implementation in the role's `index.ts` and call `ctx.evaluator.register(role, name, validate, factory)` in `apply(ctx)`. Choose a name unique within that role. The validator checks `config` and returns the factory's input. The factory creates the instance. Use `runtime.resolvePath()` for relative paths and arrange cleanup for any processes or connections the component owns.
+3. Select the registered name in the experiment YAML. See [Select the component in an experiment](external-plugins.en.md#4-select-the-component-in-an-experiment) for field locations. To use it by default for a Benchmark, set the selection in that Benchmark's [Profile](benchmarks.en.md#publish-default-profiles). `src/plugins/index.ts` already calls each role's `apply(ctx)`. Register implementations for existing roles in their role entry point.
+4. Run `pnpm check:dependencies`, `pnpm typecheck`, and `pnpm build`. Use `node dist/cli.js inspect <experiment.yaml>` to check the selected name and configuration. Run a controlled experiment to verify behavior. For components that own a process or connection, cover failure, cancellation, and cleanup.
+
 ## Write a Plugin
 
-When Solver `runtimeInstallation()` returns `RuntimeInstallation`, it may set `cacheName`, e.g. agentx-1.0.7-py3.12. Local paths are `<root>/<cacheName>/<12-char-hash>`; the default name is runtime. Names accept 1–48 lowercase ASCII letters/digits/dots/hyphens, with alphanumeric ends, excluding Windows reserved devices. Names affect local paths only; the digest still covers id/platform/files/commands, leaving Docker identity unchanged. Install directly in final directories so commands may persist absolute {root}. See [runtime caches](../users/installation.md#local-runtime-cache-and-windows-path-length).
-
 See [benchmark development](benchmarks.en.md) for interfaces/responsibilities/lifecycles/examples and [requirements/acceptance](benchmark-evaluation-requirements.en.md) for official images/platforms/resources/timeouts/real runs.
-
-Example completed-task metric: create `experiments/plugins/completed-count.mjs`:
-
-```js
-export const inject = ["evaluator"];
-
-export function apply(ctx) {
-  ctx.evaluator.register(
-    "metrics",
-    "completed-count",
-    (config) => {
-      if (
-        config === null || typeof config !== "object" ||
-        Array.isArray(config) || Object.keys(config).length > 0
-      ) {
-        throw new TypeError("completed-count accepts no configuration options");
-      }
-      return {};
-    },
-    () => ({
-      name: "completed-count",
-      async compute(snapshot) {
-        return {
-          completed: snapshot.records.filter(
-            (record) => record.executionStatus === "completed",
-          ).length,
-        };
-      },
-    }),
-  );
-}
-```
 
 `register(role, name, validate, factory)` takes component role/name/validator/factory. Factories may receive config/runtime with model settings/auth/resolvePath; use authentication only for model calls, never logs/results.
 
@@ -163,46 +148,7 @@ dist/plugins/
 
 ## Reference External Plugins with `--patch`
 
-Create `cordis.patch.yaml` in a separate directory:
-
-```yaml
-- insert:
-    - id: custom-metrics                    # Unique module ID for provenance and version records
-      name: ./completed-count.mjs            # Module path relative to this patch directory
-      # name may also be an installed npm package, resolved from the patch directory.
-      # Patches currently support insert only; entries accept id and name.
-```
-
-Layout:
-
-```text
-experiments/
-├── gsm8k.yaml
-└── plugins/
-    ├── cordis.patch.yaml
-    └── completed-count.mjs
-```
-
-Change `gsm8k.yaml` `metrics` to:
-
-```yaml
-metrics:                       # Explicit lists replace defaults; include built-in metrics you want to retain
-  - name: success-rate
-  - name: duration
-  - name: usage
-  - name: completed-count      # Component name from register(), not the patch ID or module path
-    # config: {}               # Component options go here; this example rejects nonempty options
-```
-
-Pass patches explicitly; omission loads built-ins only:
-
-```bash
-ember-evaluator run experiments/gsm8k.yaml --patch <path>/plugins/cordis.patch.yaml
-```
-
-dry-run accepts identical --patch. Patch paths use current directory; local modules/npm resolve from patch directory. cacheDir/output/business paths remain YAML-relative.
-
-See [DocOps README](../../plugins/docops/README.md) for additional installation/build details.
+Use `--patch` to select an external module. [Add an external plugin](add-external-plugin.en.md) gives a minimal file-based example. [Integrating external plugins](external-plugins.en.md) covers standalone builds, package names, result checks, and resume.
 
 Ray nodes receive no coordinator patch paths/source. Install patches/modules on every node, then set pluginPatchPath in EVALUATOR_NODE_CONFIG JSON, relative to node config. All patch contents must match; workers validate patch/plugin digests before execution.
 

@@ -2,13 +2,14 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { runTask, type RunTaskOptions } from "../../src/core/run-task.js";
+import { runTask, type RunTaskOptions } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import type { ProcessHandle } from "../../src/core/contracts/environment.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
 
 const fixtures: { root: string; value: ReturnType<typeof harness> }[] = [];
-afterEach(async () => { for (const { root, value } of fixtures.splice(0)) { await value.components.dispose(); await rm(root, { recursive: true, force: true }); } });
+afterEach(async () => { for (const { root, value } of fixtures.splice(0)) { await value.dispose(); await rm(root, { recursive: true, force: true }); } });
 async function setup(shared: boolean, hookCode = 0) {
   const root = await mkdtemp(join(tmpdir(), "harbor-lifecycle-")); const value = harness(root, { transfer: !shared }); fixtures.push({ root, value });
   const prepare = value.components.benchmark.prepare.bind(value.components.benchmark);
@@ -24,7 +25,7 @@ async function setup(shared: boolean, hookCode = 0) {
   };
   value.components.benchmark.verify = async (_task, _solve, session) => { value.events.push("verify"); expect(session?.id).toBe(shared ? "solve-id" : "verify-id"); return { score: 1, passed: true, details: {} }; };
   await value.components.store.create(value.config.experiment.output.directory, { ...storeRun, source, taskIds: ["a"] }, {});
-  const run = (options: RunTaskOptions = {}) => runTask({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint }, value.components, source, new AbortController().signal, options);
+  const run = (options: RunTaskOptions = {}) => runTask(onDemand({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint }), value.components, source, new AbortController().signal, options);
   return { ...value, run };
 }
 
@@ -99,8 +100,10 @@ test("a solver failure still executes collect once and exports partial evidence"
   const value = await setup(false);
   const solve = value.components.solver.solve.bind(value.components.solver);
   value.components.solver.solve = async (...args) => { await solve(...args); throw new Error("solver failed"); };
-  const record = await value.run(); expect(record.verdict).toBeNull();
-  expect(value.events.filter(event => event === "hook")).toHaveLength(1); expect(value.events).toContain("export");
+  const record = await value.run();
+  expect(record).toMatchObject({ executionStatus: "failed", verdict: null, collection: { artifacts: "complete" } });
+  expect(value.events.filter(event => ["hook", "export", "solve.cleanup", "commit"].includes(event)))
+    .toEqual(["hook", "export", "solve.cleanup", "commit"]);
 });
 
 test.each(["hook", "transition", "quiesce"] as const)("a timeout preserves its score and exports only after quiescence when %s fails", async failure => {

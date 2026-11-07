@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { DSH_VERSION, selectDshVersion } from "../../src/adapters/harness/dsh/runtime.js";
+import { DSH_VERSION, selectDshVersion } from "../../src/runtimes/dsh/runtime.js";
 
 test("prefers the compatible default without querying npm", async () => {
   const published = vi.fn(async () => ["0.3.0"]);

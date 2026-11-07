@@ -7,7 +7,7 @@ const native = vi.hoisted(() => ({ container: false, access: vi.fn(), execute: v
 vi.mock("node:fs/promises", () => ({ access: native.access }));
 vi.mock("node:child_process", () => ({ execFile: native.execute, spawn: native.spawn }));
 
-import { checkHostTelemetry, startHostTelemetry } from "../../src/adapters/harness/agentx/host-telemetry.js";
+import { checkHostTelemetry, startHostTelemetry } from "../../src/runtimes/agentx/host-telemetry.js";
 
 beforeEach(() => {
   vi.stubEnv("EVALUATOR_HOST_TELEMETRY_ADDRESS", undefined);

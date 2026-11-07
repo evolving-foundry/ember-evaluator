@@ -2,18 +2,18 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
-import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/definitions/officeqa-pro-v2/index.js";
+import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/index.js";
 import { officeQAFiles } from "../fixtures/officeqa.js";
 import { harness } from "../fixtures/engine/fakes.js";
-import { runEngine } from "../../src/core/engine.js";
-import { saveReport, rebuildReport } from "../../src/report.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { saveReport, rebuildReport } from "../../src/application/report/index.js";
 import { SuccessRateMetrics } from "../../src/plugins/metrics/success-rate.js";
 import { MarkdownReporter } from "../../src/plugins/reporters/markdown.js";
 import { trajectoryLines } from "../fixtures/results/store-fixture.js";
 import { writeFile } from "node:fs/promises";
 
 test("OfficeQA controlled solver completes, persists answers only on request, reports offline and resumes", async () => {
-  const root = await mkdtemp(join(tmpdir(), "officeqa-engine-")); const { components, config } = harness(root);
+  const root = await mkdtemp(join(tmpdir(), "officeqa-engine-")); const { components, config, dispose } = harness(root);
   try {
     const fixture = await officeQAFiles(join(root, "data"), "parsed-json");
     const benchmark = new OfficeQAProV2Benchmark(parseOfficeQAProV2Config({ cacheDir: join(root, "cache") }), fixture.source, { questions: 2, documents: 2 });
@@ -49,5 +49,5 @@ test("OfficeQA controlled solver completes, persists answers only on request, re
     const resumed = await runEngine({ components, config, signal: AbortSignal.timeout(10_000), resumeDirectory: runDir });
     expect(resumed.run.status).toBe("completed"); expect(solves).toHaveBeenCalledOnce();
     expect(resumed.run.source?.files).toHaveLength(3);
-  } finally { vi.restoreAllMocks(); await components.dispose(); await rm(root, { recursive: true, force: true }); }
+  } finally { vi.restoreAllMocks(); await dispose(); await rm(root, { recursive: true, force: true }); }
 });

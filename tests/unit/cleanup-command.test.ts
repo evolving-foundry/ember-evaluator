@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { runCli } from "../../src/cli.js";
+import { runCli } from "../../src/cli/main.js";
 const command = vi.hoisted(() => ({ cleanupImages: vi.fn() }));
-vi.mock("../../src/cleanup.js", () => command);
+vi.mock("../../src/application/cleanup.js", () => command);
 beforeEach(() => { vi.clearAllMocks(); command.cleanupImages.mockResolvedValue({ preview: true, nodes: [] }); });
 async function cli(args: string[]) {
   const out = vi.fn(), error = vi.fn();

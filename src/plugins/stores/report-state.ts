@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { checkedPath } from "../../core/artifacts.js";
+import { checkedPath } from "../../core/artifacts/artifacts.js";
 
 export type ReportRecovery = {
   schemaVersion: 1;

@@ -44,7 +44,7 @@ if (direct) {
   try {
     process.exitCode = await runCli(process.argv.slice(2), undefined, controller.signal);
   } catch (error) {
-    const { formatError } = await import("./core/diagnostics.js");
+    const { formatError } = await import("./core/errors/diagnostics.js");
     process.stderr.write(formatError(error) + "\n");
     process.exitCode = 1;
   } finally {

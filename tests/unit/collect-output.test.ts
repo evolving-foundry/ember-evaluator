@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { readCollectOutput } from "../../src/core/collect-output.js";
+import { readCollectOutput } from "../../src/core/artifacts/collect-output.js";
 import type { ProcessHandle } from "../../src/core/contracts/environment.js";
 
 const roots: string[] = [];

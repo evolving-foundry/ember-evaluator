@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { assertPreparationDiagnostics, validPreparationBudget, assertEnvironmentTimeouts } from "../../src/core/preparation-validation.js";
-import { assertAttemptRecord } from "../../src/core/record-validation.js";
-import { DockerBuildCache } from "../../src/plugins/environments/docker-build-cache.js";
+import { assertPreparationDiagnostics, validPreparationBudget, assertEnvironmentTimeouts } from "../../src/core/preparation/preparation-validation.js";
+import { assertAttemptRecord } from "../../src/core/results/record-validation.js";
+import { DockerBuildCache } from "../../src/infrastructure/containers/build-cache.js";
 import { storeRecord, storeRun } from "../fixtures/results/store-fixture.js";
 import { computeDuration } from "../../src/plugins/metrics/duration.js";
 

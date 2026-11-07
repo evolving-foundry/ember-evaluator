@@ -3,17 +3,17 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, test, vi } from "vitest";
-import { LocalFileSource, LocalRecordSource } from "../../src/adapters/datasets/sources/local/files-source.js";
-import { LocalZipJsonSource } from "../../src/adapters/datasets/sources/local/zip-json-source.js";
-import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/definitions/index.js";
-import { openPluginRegistry } from "../../src/plugin-runtime.js";
-import { bootstrapBenchmark } from "../../src/bootstrap.js";
-import { loadConfig } from "../../src/config/load.js";
+import { LocalFileSource, LocalRecordSource } from "../../src/infrastructure/datasets/sources/local/files-source.js";
+import { LocalZipJsonSource } from "../../src/infrastructure/datasets/sources/local/zip-json-source.js";
+import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/agent-harness/definitions/index.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
+import { createBenchmark } from "../../src/application/plugins/create-components.js";
+import { loadConfig } from "../../src/application/config.js";
 import { stringify } from "yaml";
-import { projectPortableSelection } from "../../src/adapters/ray/protocol.js";
-import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/definitions/officeqa-pro-v2/index.js";
-import { AgentXBenchmark, parseAgentXConfig } from "../../src/plugins/benchmarks/protocols/agentx/agentx-benchmark.js";
-import { parseWorkload } from "../../src/adapters/harness/agentx/protocol.js";
+import { projectPortableSelection } from "../../src/infrastructure/ray/protocol.js";
+import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/index.js";
+import { AgentXBenchmark, parseAgentXConfig } from "../../src/plugins/benchmarks/inference-engine/agentx/agentx-benchmark.js";
+import { parseWorkload } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/summary.js";
 import { officeQAFiles } from "../fixtures/officeqa.js";
 
 async function collect<T>(values: AsyncIterable<T>): Promise<T[]> { const rows: T[] = []; for await (const row of values) rows.push(row); return rows; }
@@ -34,16 +34,17 @@ test.each(DEFINED_BENCHMARKS)("$definition.name uses a YAML-relative local datas
   await writeFile(file, stringify({ services: { default: { model: "fixture", base_url: "https://model.invalid/v1", api_key: "${TEST_KEY}" }, judge: { model: "fixture", base_url: "https://model.invalid/v1", api_key: "${TEST_KEY}" } },
     benchmark: { name: definition.name, config: { localPath: "./dataset" } } }));
   const config = await loadConfig(file, {}, { TEST_KEY: "fixture" });
-  const components = await bootstrapBenchmark(config, path);
+  const registry = await openPluginRegistry();
   try {
-    const lock = await components.benchmark.resolveSource(null, signal());
+    const benchmark = await createBenchmark(registry, config, path);
+    const lock = await benchmark.resolveSource(null, signal());
     expect(lock.source).toBe(`local:${source.dataset}`);
     expect(lock.files).toHaveLength(source.selections.length);
-    expect(await components.benchmark.resolveSource(lock, signal())).toEqual(lock);
+    expect(await benchmark.resolveSource(lock, signal())).toEqual(lock);
     expect(fetch).not.toHaveBeenCalled();
     await put(path, `dataset/${source.selections[0]!.path ?? `${source.selections[0]!.prefix}000.${source.selections[0]!.format}`}`, "changed");
-    await expect(components.benchmark.resolveSource(lock, signal())).rejects.toThrow(/changed/);
-  } finally { await components.dispose(); }
+    await expect(benchmark.resolveSource(lock, signal())).rejects.toThrow(/changed/);
+  } finally { await registry.dispose(); }
 }, 30000);
 
 test.each([
@@ -60,12 +61,13 @@ test.each([
   const config = await loadConfig(file, {}, { TEST_KEY: "fixture" });
   expect(config.experiment.benchmark.config.source).toEqual({ kind: "local", path: localPath });
   expect(config.experiment.benchmark.config.tasks).toMatchObject({ root: tasksRoot, expectedCount: 2 });
-  const components = await bootstrapBenchmark(config, directory);
+  const registry = await openPluginRegistry();
   try {
-    const lock = await components.benchmark.resolveSource(null, signal());
-    expect(await collect(components.benchmark.enumerate(lock, signal()))).toHaveLength(2);
+    const benchmark = await createBenchmark(registry, config, directory);
+    const lock = await benchmark.resolveSource(null, signal());
+    expect(await collect(benchmark.enumerate(lock, signal()))).toHaveLength(2);
     expect(fetch).not.toHaveBeenCalled();
-  } finally { await components.dispose(); }
+  } finally { await registry.dispose(); }
 });
 
 test.each([

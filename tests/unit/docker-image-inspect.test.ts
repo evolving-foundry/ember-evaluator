@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
-import { platformImageCommand } from "../../src/plugins/environments/docker-image-inspect.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import { platformImageCommand } from "../../src/infrastructure/containers/image-inspect.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 test.each([["1.42 1.45", false], ["1.49 1.45", false], ["1.49 1.49", true], ["1.52 1.52", true]])(
   "image inspection negotiates %s before executing, platform selection=%s", async (versions, supported) => {
     const command = vi.fn<DockerCommand>(async args => ({ stdout: args[0] === "version" ? versions : "sha256:fixture", stderr: "" }));

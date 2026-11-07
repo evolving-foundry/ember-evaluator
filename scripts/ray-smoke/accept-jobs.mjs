@@ -2,7 +2,7 @@ import { readFile, writeFile, readdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import assert from "node:assert/strict";
-import { safeTaskKey } from "../../dist/core/artifacts.js";
+import { safeTaskKey } from "../../dist/core/artifacts/artifacts.js";
 
 process.env.EVALUATOR_JOBS_TOKEN = (await readFile("/security/jobs-token", "utf8")).trim();
 process.env.EVALUATOR_SMOKE_MODEL_KEY = "smoke-only-not-a-model-key";

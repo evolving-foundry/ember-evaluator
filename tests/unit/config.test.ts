@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { stringify } from "yaml";
-import { loadConfig, loadSavedConfig } from "../../src/config/load.js";
+import { loadConfig, loadSavedConfig } from "../../src/application/config.js";
 import { exportConfig } from "../../src/config/export.js";
 
 const roots: string[] = [];

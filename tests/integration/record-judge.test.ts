@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { expect, test } from "vitest";
-import { simpleqaDefinition } from "../../src/plugins/benchmarks/definitions/simpleqa.js";
-import { math500Definition } from "../../src/plugins/benchmarks/definitions/math500.js";
+import { simpleqaDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/simpleqa.js";
+import { math500Definition } from "../../src/plugins/benchmarks/agent-harness/definitions/math500.js";
 
 test.each([simpleqaDefinition, math500Definition].flatMap(definition =>
   [undefined, 1234].map(maxTokens => ({ definition, maxTokens }))))("$definition.name judge uses the selected credential and output ceiling $maxTokens", async ({ definition, maxTokens }) => {

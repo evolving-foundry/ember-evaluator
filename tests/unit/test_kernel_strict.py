@@ -22,7 +22,7 @@ def triton_errors(mlir=True):
                                     "triton.compiler.errors": errors}):
         yield errors
 
-path = Path(__file__).resolve().parents[2] / 'src/adapters/kernel/strict.py'
+path = Path(__file__).resolve().parents[2] / 'src/plugins/benchmarks/operator/kernel/runtime/strict.py'
 spec = importlib.util.spec_from_file_location('kernel_strict', path)
 strict = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(strict)

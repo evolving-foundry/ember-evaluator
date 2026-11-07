@@ -3,15 +3,15 @@ import { tmpdir } from "node:os";
 import { join, posix } from "node:path";
 import { test, expect } from "vitest";
 
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
-import { buildFileManifest } from "../../src/core/artifacts.js";
-import { fingerprintConfig } from "../../src/core/run-manifest.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { buildFileManifest } from "../../src/core/artifacts/artifacts.js";
+import { fingerprintConfig } from "../../src/core/results/run-manifest.js";
 import {
   JIUWENSWARM_PROCESS_CLI_NAME,
   JIUWENSWARM_VERSION,
   jiuwenswarmDockerRuntimeInstallation,
-} from "../../src/adapters/harness/jiuwenswarm/runtime.js";
-import { resolveLinuxUvBinary } from "../../src/adapters/harness/uv-binary.js";
+} from "../../src/runtimes/jiuwenswarm/runtime.js";
+import { resolveLinuxUvBinary } from "../../src/infrastructure/runtime-installation/uv-binary.js";
 import { AgentBundleSolver } from "../../src/plugins/solvers/agentbundle.js";
 import type { CommandSpec, EnvironmentSession } from "../../src/core/contracts/environment.js";
 import type { JsonValue } from "../../src/core/contracts/task.js";

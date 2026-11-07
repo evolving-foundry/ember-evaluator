@@ -1,14 +1,14 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { completeJudge } from "../../src/adapters/models/judge.js";
-import { math500Definition } from "../../src/plugins/benchmarks/definitions/math500.js";
-import { MATH_QUERY_TEMPLATE } from "../../src/plugins/benchmarks/definitions/prompts.js";
-import { MATH_EQUALITY_TEMPLATE } from "../../src/plugins/benchmarks/definitions/scoring/judge-prompts.js";
-import { openPluginRegistry } from "../../src/plugin-runtime.js";
-import { loadConfig } from "../../src/config/load.js";
+import { completeJudge } from "../../src/infrastructure/models/judge.js";
+import { math500Definition } from "../../src/plugins/benchmarks/agent-harness/definitions/math500.js";
+import { MATH_QUERY_TEMPLATE } from "../../src/plugins/benchmarks/agent-harness/definitions/prompts.js";
+import { MATH_EQUALITY_TEMPLATE } from "../../src/plugins/benchmarks/agent-harness/definitions/scoring/judge-prompts.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
+import { loadConfig } from "../../src/application/config.js";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 
-vi.mock("../../src/adapters/models/judge.js", () => ({ completeJudge: vi.fn() }));
+vi.mock("../../src/infrastructure/models/judge.js", () => ({ completeJudge: vi.fn() }));
 beforeEach(() => vi.mocked(completeJudge).mockReset());
 const context = { dockerExecutable: "docker", judgeService: "judge", judge: {
   model: { name: "math-judge", endpoint: "https://judge.invalid", provider: null, api: "openai-completions" },

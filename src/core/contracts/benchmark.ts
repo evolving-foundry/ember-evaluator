@@ -1,7 +1,7 @@
 import type { EnvironmentSession } from "./environment.js";
 import type { AttemptStepResult, Failure, SolveResult, VerifyResult } from "./result.js";
 import type { JsonValue, PreparedTask, SourceLock, TaskRef } from "./task.js";
-import type { EffectiveConfig } from "../../config/schema.js";
+import type { EffectiveConfig } from "./config.js";
 import type { EvaluationKind } from "./result.js";
 import type { ActivityListener } from "./activity.js";
 import type { VerificationRuntime } from "./verification-runtime.js";

@@ -1,6 +1,9 @@
-export { DefinedBenchmark } from "./definitions/defined-benchmark.js";
-export { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "./definitions/officeqa-pro-v2/index.js";
-export type { BenchmarkDefinition, BenchmarkRecord, DefinedTask, BenchmarkDefinitionContext } from "./definitions/benchmark-definition.js";
-export { DEFINED_BENCHMARKS } from "./definitions/index.js";
-export { HarborBenchmark, parseHarborConfig } from "./protocols/harbor/index.js";
-export { AgentXBenchmark, parseAgentXConfig } from "./protocols/agentx/agentx-benchmark.js";
+import type { Context } from "@deepseek-ai/cordis";
+import { apply as agentHarness } from "./agent-harness/index.js";
+import { apply as inferenceEngine } from "./inference-engine/index.js";
+import { apply as operator } from "./operator/index.js";
+export async function apply(ctx: Context): Promise<void> {
+  await agentHarness(ctx);
+  await inferenceEngine(ctx);
+  await operator(ctx);
+}

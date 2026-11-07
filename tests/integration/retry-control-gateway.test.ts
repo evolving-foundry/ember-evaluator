@@ -6,11 +6,11 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test, vi } from "vitest";
-import { JobsClient } from "../../src/adapters/ray/jobs-client.js";
-import { controlTransaction, RetryControl } from "../../src/core/retry-control.js";
+import { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
+import { controlTransaction, RetryControl } from "../../src/application/retry-control/mailbox.js";
 import { createGatewayCertificate } from "../fixtures/ray/gateway-certificate.js";
 
-const available = spawnSync("openssl", ["version"], { windowsHide: true }).status === 0 && existsSync("dist/core/retry-control.js");
+const available = spawnSync("openssl", ["version"], { windowsHide: true }).status === 0 && existsSync("dist/application/retry-control/mailbox.js");
 test.skipIf(!available)("Jobs gateway delivers IPC requests to the active original or recovery coordinator without creating another Job", async () => {
   const root = await mkdtemp(join(tmpdir(), "retry-gateway-"));
   const jobs = join(root, "jobs"), security = join(root, "security");
@@ -39,7 +39,7 @@ test.skipIf(!available)("Jobs gateway delivers IPC requests to the active origin
     });
     await new Promise<void>(resolve => backend.listen(0, "127.0.0.1", resolve));
     const address = backend.address(); if (!address || typeof address === "string") throw new Error("No backend port");
-    child = spawn(process.execPath, [resolve("src/adapters/ray/runtime/jobs-gateway.mjs")], { windowsHide: true,
+    child = spawn(process.execPath, [resolve("src/application/ray/entries/jobs-gateway.mjs")], { windowsHide: true,
       env: { ...process.env, EVALUATOR_JOBS_ROOT: jobs, EVALUATOR_JOBS_SECURITY: security, EVALUATOR_JOBS_PORT: "0", EVALUATOR_RAY_DASHBOARD: `http://127.0.0.1:${address.port}` },
       stdio: ["ignore", "pipe", "pipe"],
     });

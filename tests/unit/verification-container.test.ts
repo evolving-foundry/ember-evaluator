@@ -1,11 +1,11 @@
 import type { SpawnOptions } from "node:child_process";
 import { afterEach, expect, test, vi } from "vitest";
-import { humanevalDefinition } from "../../src/plugins/benchmarks/definitions/humaneval.js";
-import { createVerifierContainer, materializeVerifierImage } from "../../src/adapters/verifiers/container.js";
+import { humanevalDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/humaneval.js";
+import { createVerifierContainer, materializeVerifierImage } from "../../src/plugins/verifiers/shared/container.js";
 
 const state = vi.hoisted(() => ({ calls: [] as string[][], missing: false, started: true, removalError: false,
   exitCode: 0, script: "", image: "sha256:" + "a".repeat(64) }));
-vi.mock("../../src/plugins/environments/docker.js", () => ({
+vi.mock("../../src/infrastructure/containers/command.js", () => ({
   runDockerCommand: async (_docker: string, args: string[]) => {
     state.calls.push(args);
     if (args[0] === "version") return { stdout: "linux/amd64", stderr: "" };

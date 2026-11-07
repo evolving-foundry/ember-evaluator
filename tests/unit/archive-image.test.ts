@@ -3,11 +3,11 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { taskArchiveUrl, downloadArchiveImage } from "../../src/adapters/containers/archive-image.js";
-import { networkDocument } from "../../src/config/network.js";
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { DockerTaskArchive } from "../../src/plugins/environments/docker-task-archive.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import { taskArchiveUrl, downloadArchiveImage } from "../../src/infrastructure/containers/archive-image.js";
+import { networkDocument } from "../../src/config/network-schema.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { DockerTaskArchive } from "../../src/infrastructure/containers/task-archive.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 import type { ArchiveImageAcquisition } from "../../src/core/contracts/network.js";
 
 const cleanup: (() => Promise<unknown>)[] = [];

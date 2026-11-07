@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { removeDockerContainer, stopDockerContainer } from "../../src/plugins/environments/docker-cleanup.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import { removeDockerContainer, stopDockerContainer } from "../../src/infrastructure/containers/cleanup.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 
 const id = "a".repeat(64);
 const output = { stdout: "", stderr: "" };

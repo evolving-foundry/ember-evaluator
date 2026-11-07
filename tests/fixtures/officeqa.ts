@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { SourceLock } from "../../src/core/contracts/task.js";
-import type { DatasetFileSource } from "../../src/adapters/datasets/sources/huggingface/snapshot-source.js";
-import { OFFICEQA_DATASET_REVISION } from "../../src/plugins/benchmarks/definitions/officeqa-pro-v2/config.js";
+import type { DatasetFileSource } from "../../src/infrastructure/datasets/sources/huggingface/snapshot-source.js";
+import { OFFICEQA_DATASET_REVISION } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/config.js";
 
 export const fixtureCSV = 'uid,question,answer,source_docs,source_files\nqid_7,What is the receipt?,21.58,private-page-999,private-reference.txt\nqid_9,What is the balance?,"$7,046,001.98",private-page-998,private-other.txt\n';
 // A real, minimal one-page PDF, generated locally without benchmark data.

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { formatError, redactDiagnostic, summarizeDiagnostic } from "../../src/core/diagnostics.js";
+import { formatError, redactDiagnostic, summarizeDiagnostic } from "../../src/core/errors/diagnostics.js";
 
 test("network diagnostics preserve nested and aggregate failure codes without dumping request objects", () => {
   const reset = Object.assign(new Error("connection reset"), { code: "ECONNRESET", syscall: "read", headers: { authorization: "HIDDEN_HEADER" } });

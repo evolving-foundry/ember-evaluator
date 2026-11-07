@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 
-import { runDockerCommand } from "../../src/plugins/environments/docker.js";
+import { runDockerCommand } from "../../src/infrastructure/containers/command.js";
 
 test("stdout and stderr stay independent of output observer mutations", async () => {
   const observed = new Set<string>();

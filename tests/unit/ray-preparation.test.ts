@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
-import { RayControl } from "../../src/adapters/ray/control.js";
-import { validateRemoteJob } from "../../src/adapters/ray/protocol.js";
+import { RayControl } from "../../src/infrastructure/ray/control.js";
+import { validateRemoteJob } from "../../src/infrastructure/ray/protocol.js";
 
 const key = { runId: "run", taskId: "task", attemptId: "preparation" };
 const versions = { fixture: "1" };

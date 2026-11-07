@@ -2,12 +2,12 @@ import type { Solver, AttemptContext } from "../../core/contracts/solver.js";
 import type { PublicTask, JsonValue } from "../../core/contracts/task.js";
 import type { EnvironmentSession, RuntimeRequirement } from "../../core/contracts/environment.js";
 import type { SolveResult } from "../../core/contracts/result.js";
-import type { ModelConfig, RuntimeAuth } from "../../config/schema.js";
-import { expectRecord, rejectUnknown } from "../../config/schema.js";
-import { redactEvidence, formatError } from "../../core/diagnostics.js";
+import type { ModelConfig, RuntimeAuth } from "../../core/contracts/config.js";
+import { expectRecord, rejectUnknown } from "../../core/validation/input.js";
+import { redactEvidence, formatError } from "../../core/errors/diagnostics.js";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { chatLogprobsEndpoint, requestChatLogprobs, type ChatLogprobsParameters } from "../../adapters/models/chat-logprobs.js";
+import { chatLogprobsEndpoint, requestChatLogprobs, type ChatLogprobsParameters } from "../../infrastructure/models/chat-logprobs.js";
 
 export function parseChoiceLogprobsConfig(value: unknown): ChatLogprobsParameters {
   const config = expectRecord(value, "choice-logprobs");

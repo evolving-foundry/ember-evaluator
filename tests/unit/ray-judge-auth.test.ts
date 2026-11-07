@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { RayControl } from "../../src/adapters/ray/control.js";
+import { RayControl } from "../../src/infrastructure/ray/control.js";
 
 test("Ray runtime handshake sends the independent Judge credential to a worker", async () => {
   const control = new RayControl({

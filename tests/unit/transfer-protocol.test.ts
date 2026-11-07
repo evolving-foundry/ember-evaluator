@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { validateUploadManifest } from "../../src/adapters/transfer/protocol.js";
-import { finalizeAttemptOutcome } from "../../src/core/evaluation-outcome.js";
+import { validateUploadManifest } from "../../src/infrastructure/transfer/protocol.js";
+import { finalizeAttemptOutcome } from "../../src/core/results/evaluation-outcome.js";
 import { storeRecord } from "../fixtures/results/store-fixture.js";
 
 function upload() {

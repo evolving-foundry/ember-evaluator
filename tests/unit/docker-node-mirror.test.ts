@@ -1,10 +1,11 @@
-import { NetworkRuntime } from "../../src/adapters/network/runtime.js";
-import { networkDocument } from "../../src/config/network.js";
-import { createDockerImagePuller } from "../../src/plugins/environments/docker-image-pull.js";
+import { NetworkRuntime } from "../../src/infrastructure/network/runtime.js";
+import { networkDocument } from "../../src/config/network-schema.js";
+import { createDockerImagePuller } from "../../src/infrastructure/containers/image-pull.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { DockerRuntime, PINNED_NODE_IMAGE, type DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { PINNED_NODE_IMAGE, type DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 
 afterEach(() => vi.unstubAllEnvs());
 const runtimeWithMirror = (command: DockerCommand, platform: "linux/amd64" | "linux/arm64" = "linux/amd64") => new DockerRuntime(command, PINNED_NODE_IMAGE, platform,

@@ -37,7 +37,7 @@ host_env=()
 if [[ ! -f /.dockerenv && ! -f /run/.containerenv ]] && command -v python3 >/dev/null && command -v npu-smi >/dev/null; then
   mkdir -p "$repo_dir/.scratch"
   host_dir="$(mktemp -d "$repo_dir/.scratch/toolbox-telemetry.XXXXXX")"
-  python3 -B -u "$repo_dir/src/adapters/harness/agentx/assets/host_telemetry.py" \
+  python3 -B -u "$repo_dir/src/runtimes/agentx/assets/host_telemetry.py" \
     --serve "$host_dir/ready.json" > "$host_dir/control.log" 2>&1 &
   host_pid=$!
   for (( attempt=0; attempt<100; attempt++ )); do

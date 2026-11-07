@@ -4,12 +4,13 @@ import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
-import { runEngine } from "../../src/core/engine.js";
-import { runTask } from "../../src/core/run-task.js";
-import { planBenchmarkRun } from "../../src/plugins/benchmarks/plan-run.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
+import { planBenchmarkRun } from "../../src/plugins/benchmarks/shared/plan-run.js";
 import type { VerificationRuntime, VerificationRuntimeSession } from "../../src/core/contracts/verification-runtime.js";
 import type { EnvironmentSpec } from "../../src/core/contracts/environment.js";
-import { createTaskPreparer } from "../../src/core/materialize-task.js";
+import { createTaskPreparer } from "../../src/core/preparation/materialize-task.js";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const close of cleanup.splice(0)) await close(); });
@@ -18,7 +19,7 @@ async function fixture(mode: "direct" | "batch" | "pipeline" = "direct") {
   const root = await mkdtemp(join(tmpdir(), "verification-runtime-"));
   const value = harness(root);
   const { components, config, events } = value;
-  cleanup.push(async () => { await components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanup.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   config.experiment.run.taskIds = ["a"];
   config.experiment.run.onError = "continue";
   const handle: VerificationRuntimeSession = {
@@ -133,11 +134,45 @@ test("a verifier handle returned after cancellation and cleanup deadline is stil
   const cancel = new AbortController(), released = Promise.withResolvers<void>(), disposed = Promise.withResolvers<void>();
   runtime.prepare = async () => { cancel.abort(new Error("cancel while opening verifier")); await released.promise; return handle; };
   handle.dispose = async signal => { signal.throwIfAborted(); disposed.resolve(); };
-  const record = await runTask(job, components, source, cancel.signal, { cleanupTimeoutMs: 20 });
+  const record = await runTask(onDemand(job), components, source, cancel.signal, { cleanupTimeoutMs: 20 });
   expect(record.cleanupStatus).toBe("unconfirmed");
   expect(record.environments.verificationRuntime).toBeUndefined();
   released.resolve(); await disposed.promise;
   expect(record.environments.verificationRuntime).toBeUndefined();
+});
+
+test("each step closes its private verifier before the next step can use the solve environment", async () => {
+  const { components, root, runtime, events } = await fixture();
+  const prepareTask = components.benchmark.prepare.bind(components.benchmark);
+  components.benchmark.prepare = async (...args) => {
+    const task = await prepareTask(...args);
+    return { ...task, steps: ["first", "second"].map(name => ({
+      name, task: { ...task, input: { ...task.input, prompt: name }, verificationMode: "shared" },
+    })) };
+  };
+  components.benchmark.evaluateSteps = (_task, steps) => ({ continue: steps.length < 2, verdict: steps.at(-1)!.verdict! });
+  const prepareEnvironment = components.environment.prepare;
+  components.environment.prepare = async (...args) => {
+    const session = await prepareEnvironment(...args);
+    session.transitionToVerification = async () => {};
+    session.transitionToSolve = async () => { events.push("next.solve"); };
+    return session;
+  };
+  runtime.prepare = async task => ({
+    metadata: {},
+    async verify() {
+      events.push(`verify:${task.input.prompt}`);
+      return { passed: true, score: 1, details: {} };
+    },
+    async dispose() { events.push(`close:${task.input.prompt}`); },
+  });
+  await components.store.create(join(root, "runs"), { ...storeRun, source, taskIds: ["a"] }, {});
+  const record = await runTask(onDemand(job), components, source, new AbortController().signal);
+  expect(record).toMatchObject({ executionStatus: "completed", cleanupStatus: "cleaned" });
+  expect(record.steps?.map(step => step.verdict?.score)).toEqual([1, 1]);
+  expect(events.filter(event => /^(verify:|close:|next\.solve|solve\.cleanup)/u.test(event))).toEqual([
+    "verify:first", "close:first", "next.solve", "verify:second", "close:second", "solve.cleanup",
+  ]);
 });
 
 test("ready tasks missing verifier receipts fail without rerunning preparation or the model", async () => {
@@ -145,7 +180,7 @@ test("ready tasks missing verifier receipts fail without rerunning preparation o
   await components.store.create(join(root, "runs"), { ...storeRun, source, taskIds: ["a"] }, {});
   const task = await components.benchmark.prepare(job.ref, source, new AbortController().signal);
   const materialize = vi.spyOn(runtime, "materialize");
-  const record = await runTask(job, components, source, new AbortController().signal, { preparedTask: task });
+  const record = await runTask({ job, preparation: { state: "ready", task } }, components, source, new AbortController().signal);
   expect(record.errors[0]?.message).toContain("verification runtime receipt");
   expect(materialize).not.toHaveBeenCalled(); expect(inputs).toHaveLength(0);
 });

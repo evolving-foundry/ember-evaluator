@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { artifactExcluded } from "../../src/plugins/environments/workspace-transfer.js";
+import { artifactExcluded } from "../../src/infrastructure/filesystem/workspace-transfer.js";
 
 test("artifact exclusions follow tar wildcard and directory semantics", () => {
   expect(artifactExcluded("src/nested/.cache.pyc", ["*.pyc"])).toBe(true);

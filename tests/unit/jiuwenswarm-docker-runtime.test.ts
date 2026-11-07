@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import * as uvBinary from "../../src/adapters/harness/uv-binary.js";
+import * as uvBinary from "../../src/infrastructure/runtime-installation/uv-binary.js";
 import {
   JIUWENSWARM_DOCKER_BUNDLE_TARGET,
   JIUWENSWARM_DOCKER_HOME_TARGET,
@@ -13,8 +13,8 @@ import {
   JIUWENSWARM_DOCKER_UV_TARGET,
   jiuwenswarmDockerRuntimeInstallation,
   jiuwenswarmRewriteRequirements,
-} from "../../src/adapters/harness/jiuwenswarm/runtime.js";
-import { runtimeInventory } from "../../src/plugins/environments/runtime-installation.js";
+} from "../../src/runtimes/jiuwenswarm/runtime.js";
+import { runtimeInventory } from "../../src/infrastructure/runtime-installation/install.js";
 
 const execFileAsync = promisify(execFile);
 const fixtureBundle = join(import.meta.dirname, "..", "fixtures", "agentbundle", "jiuwenswarm");

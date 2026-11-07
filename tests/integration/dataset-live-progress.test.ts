@@ -6,18 +6,18 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import * as tar from "tar";
 import { afterEach, expect, test, vi } from "vitest";
-import { DatasetCache } from "../../src/adapters/datasets/cache.js";
-import { withDatasetActivity } from "../../src/adapters/datasets/activity.js";
-import { extractHttpArchive } from "../../src/adapters/datasets/sources/http/archive.js";
-import { HarborBenchmark } from "../../src/plugins/benchmarks/protocols/harbor/harbor-benchmark.js";
-import { parseHarborConfig } from "../../src/plugins/benchmarks/protocols/harbor/config.js";
+import { DatasetCache } from "../../src/infrastructure/datasets/cache.js";
+import { withDatasetActivity } from "../../src/infrastructure/datasets/activity.js";
+import { extractHttpArchive } from "../../src/infrastructure/datasets/sources/http/archive.js";
+import { HarborBenchmark } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/harbor-benchmark.js";
+import { parseHarborConfig } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/config.js";
 import { writeFixture } from "../fixtures/dataset-tasks.js";
-import { planBenchmarkRun } from "../../src/plugins/benchmarks/plan-run.js";
-import { progressOperation } from "../../src/core/progress-operation.js";
-import { enumerateSelectedTasks } from "../../src/core/task-selection.js";
-import { runEngine } from "../../src/core/engine.js";
+import { planBenchmarkRun } from "../../src/plugins/benchmarks/shared/plan-run.js";
+import { progressOperation } from "../../src/core/progress/progress-operation.js";
+import { enumerateSelectedTasks } from "../../src/core/selection/task-selection.js";
+import { runEngine } from "../../src/application/run-engine.js";
 import type { ComponentActivity } from "../../src/core/contracts/activity.js";
-import type { ProgressEvent } from "../../src/core/progress.js";
+import type { ProgressEvent } from "../../src/core/progress/progress.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
 
 const cleanup: (() => Promise<unknown>)[] = [];
@@ -156,7 +156,7 @@ test("archive validation and extraction expose counts without file names or cont
 
 test("planning reports each task before preparation ends, retains failures, and preserves the stage clock", async () => {
   const fixture = harness(await root());
-  cleanup.push(() => fixture.components.dispose());
+  cleanup.push(() => fixture.dispose());
   const gate = Promise.withResolvers<void>(); cleanup.push(async () => gate.resolve());
   const started = Promise.withResolvers<void>();
   const prepare = fixture.components.benchmark.prepare.bind(fixture.components.benchmark);
@@ -184,7 +184,7 @@ test("planning reports each task before preparation ends, retains failures, and 
 });
 
 test("engine forwards source and enumeration observations without persisting temporary events", async () => {
-  const fixture = harness(await root()); cleanup.push(() => fixture.components.dispose());
+  const fixture = harness(await root()); cleanup.push(() => fixture.dispose());
   fixture.components.benchmark.resolveSource = async (_previous, _signal, activity) => {
     activity?.({ lines: ["来源文件 3/7"] }); return source;
   };
@@ -224,7 +224,7 @@ test("real Harbor local source and batch planning forward directory, checksum an
 });
 
 test("fatal planning errors end the operation as failed without claiming all tasks were checked", async () => {
-  const fixture = harness(await root()); cleanup.push(() => fixture.components.dispose());
+  const fixture = harness(await root()); cleanup.push(() => fixture.dispose());
   fixture.components.benchmark.prepare = async () => { throw new Error("source changed"); };
   const events: ProgressEvent[] = [];
   const signal = new AbortController().signal;

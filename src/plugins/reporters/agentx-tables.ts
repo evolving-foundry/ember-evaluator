@@ -1,6 +1,6 @@
 import type { JsonValue } from "../../core/contracts/task.js";
-import { expectRecord } from "../../config/schema.js";
-import { parseAgentXSummary, type AgentXStatistic } from "../../adapters/harness/agentx/protocol.js";
+import { expectRecord } from "../../core/validation/input.js";
+import { parseAgentXSummary, type AgentXStatistic } from "../benchmarks/inference-engine/agentx/evidence/summary.js";
 
 const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
   .replace(/[\\`*_\[\]()|~]/gu, "\\$&").replace(/\r?\n/gu, " ");

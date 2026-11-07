@@ -6,16 +6,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { RunComponents } from "../../src/core/contracts/components.js";
-import { runTask } from "../../src/core/run-task.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
-import { DockerEnvironment } from "../../src/plugins/environments/docker.js";
-import { PINNED_NODE_IMAGE } from "../../src/plugins/environments/docker-runtime.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
+import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
+import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
-import { readProcess } from "../../src/adapters/verifiers/process.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
+import { readProcess } from "../../src/infrastructure/process/output.js";
 import { trajectoryLines } from "../fixtures/results/store-fixture.js";
-import { restoreLogOwnersSource } from "../../src/plugins/environments/docker-log-ownership.js";
-import { dshOutputRuntimeFile } from "../../src/adapters/harness/dsh/runtime.js";
+import { restoreLogOwnersSource } from "../../src/infrastructure/containers/log-ownership.js";
+import { dshOutputRuntimeFile } from "../../src/runtimes/dsh/runtime.js";
 
 const enabled = process.env.EVALUATOR_TEST_DOCKER === "1" && process.platform === "linux" && process.getuid?.() !== 0;
 
@@ -48,7 +49,7 @@ test.skipIf(!enabled).each(["success", "failure", "cancel"] as const)(
     const environment = new DockerEnvironment();
     const components: RunComponents = {
       store, environment, scheduler: new LocalScheduler(4), pluginVersions: { fixture: "1" }, metrics: [],
-      reporter: { async render() { return "fixture"; } }, async dispose() { await store.close(); },
+      reporter: { async render() { return "fixture"; } },
       benchmark: {
         async resolveSource() { return source; }, async *enumerate() { for (const id of ids) yield { id, recordKey: id }; },
         async prepare(ref) { return {
@@ -81,8 +82,8 @@ test.skipIf(!enabled).each(["success", "failure", "cancel"] as const)(
     try {
       await store.create(root, { schemaVersion: 1, evaluationKind: "quality", runId, source, taskIds: ids, configFingerprint: "fixture",
         pluginVersions: { fixture: "1" }, startedAt: new Date().toISOString(), finishedAt: null, durationMs: null, status: "running" }, {});
-      const records = await Promise.all(ids.map(taskId => runTask({ runId, taskId, attemptId: randomUUID(),
-        configFingerprint: "fixture", ref: { id: taskId, recordKey: taskId } }, components, source, controller.signal, { timeoutSeconds: 120 })));
+      const records = await Promise.all(ids.map(taskId => runTask(onDemand({ runId, taskId, attemptId: randomUUID(),
+        configFingerprint: "fixture", ref: { id: taskId, recordKey: taskId } }), components, source, controller.signal, { timeoutSeconds: 120 })));
       for (const record of records) {
         const attempt = join(root, runId, "tasks", safeTaskKey(record.key.taskId), "attempts", record.key.attemptId);
         expect(record.collection.trajectory).toBe(mode === "cancel" ? "partial" : "complete");

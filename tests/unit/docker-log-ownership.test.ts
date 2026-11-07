@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
-import { captureDockerLogOwnership, restoreDockerLogOwnership } from "../../src/plugins/environments/docker-log-ownership.js";
-import type { DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
+import { captureDockerLogOwnership, restoreDockerLogOwnership } from "../../src/infrastructure/containers/log-ownership.js";
+import type { DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
 
 const signal = () => AbortSignal.timeout(5000);
 const owners = [{ path: "/logs/agent", uid: 1000, gid: 1001, mode: 0o700 }, { path: "/logs/verifier", uid: 0, gid: 0, mode: 0o750 }];

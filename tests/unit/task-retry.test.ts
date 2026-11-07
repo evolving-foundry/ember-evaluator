@@ -1,9 +1,10 @@
-import { PhaseTimeoutError } from "../../src/core/phase-timeout.js";
+import { PhaseTimeoutError } from "../../src/core/policies/phase-timeout.js";
 import { expect, test } from "vitest";
-import { isManualRetryEligible } from "../../src/core/manual-retry.js";
-import { isStreamTaskRetryEligible } from "../../src/core/automatic-task-retry.js";
+import { isManualRetryEligible } from "../../src/core/recovery/manual-retry.js";
+import { isStreamTaskRetryEligible } from "../../src/core/recovery/automatic-task-retry.js";
 import { classifyError } from "../../src/core/errors/classify.js";
-import { TaskQueue } from "../../src/core/task-queue.js";
+import { TaskQueue } from "../../src/core/execution/task-queue.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { storeRecord } from "../fixtures/results/store-fixture.js";
 const job = { runId: "run-1", taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" }, configFingerprint: "config" };
 const failure = (error: unknown, context: Parameters<typeof classifyError>[1] = { phase: "solve" }) => ({
@@ -58,9 +59,11 @@ test("valid zero, forged retryable flag, mixed failure and unconfirmed cleanup n
 });
 test("terminal failures release slots without automatically creating another attempt", async () => {
   const coordinator = new TaskQueue();
-  coordinator.add(job); coordinator.add({ ...job, taskId: "b", ref: { id: "b", recordKey: "b" } }); coordinator.initialComplete();
+  coordinator.add(onDemand(job));
+  coordinator.add(onDemand({ ...job, taskId: "b", ref: { id: "b", recordKey: "b" } }));
+  coordinator.initialComplete();
   const seen: string[] = [];
-  for await (const next of coordinator) {
+  for await (const { job: next } of coordinator) {
     seen.push(next.taskId);
     const record = next.taskId === "a" ? failure(new Error("ECONNRESET")) : storeRecord(next);
     record.key = { runId: next.runId, taskId: next.taskId, attemptId: next.attemptId };
@@ -70,9 +73,9 @@ test("terminal failures release slots without automatically creating another att
 });
 test("manual additions deduplicate pending/active work and cancellation clears delayed work", async () => {
   const coordinator = new TaskQueue();
-  expect(coordinator.add(job)).toBe(true); expect(coordinator.add(job)).toBe(false);
+  expect(coordinator.add(onDemand(job))).toBe(true); expect(coordinator.add(onDemand(job))).toBe(false);
   const iterator = coordinator[Symbol.asyncIterator](); await iterator.next();
-  expect(coordinator.add(job)).toBe(false);
+  expect(coordinator.add(onDemand(job))).toBe(false);
   coordinator.complete(failure(new Error("ECONNRESET")));
   coordinator.close(); expect((await iterator.next()).done).toBe(true);
 });
@@ -80,15 +83,14 @@ test("manual additions deduplicate pending/active work and cancellation clears d
 test("a reserved retry prevents shutdown and duplicate admission until committed", async () => {
   const coordinator = new TaskQueue();
   coordinator.initialComplete();
-  const reservation = coordinator.reserve(job, "failed-attempt");
+  const reservation = coordinator.reserve(onDemand(job), "failed-attempt");
   expect(reservation).toBeDefined();
-  expect(coordinator.reserve(job, "failed-attempt")).toBeUndefined();
-  expect(coordinator.add(job)).toBe(false);
+  expect(coordinator.reserve(onDemand(job), "failed-attempt")).toBeUndefined();
+  expect(coordinator.add(onDemand(job))).toBe(false);
   const iterator = coordinator[Symbol.asyncIterator]();
   const pending = iterator.next();
   reservation?.commit(); reservation?.commit(); reservation?.release();
-  expect((await pending).value).toEqual(job);
-  expect(coordinator.expectedFailure(job.attemptId)).toBe("failed-attempt");
+  expect((await pending).value).toEqual({ ...onDemand(job), expectedFailure: "failed-attempt" });
   coordinator.complete(storeRecord(job));
   expect((await iterator.next()).done).toBe(true);
 });
@@ -96,7 +98,7 @@ test("a reserved retry prevents shutdown and duplicate admission until committed
 test("a rejected reservation releases shutdown without producing an attempt", async () => {
   const coordinator = new TaskQueue();
   coordinator.initialComplete();
-  const reservation = coordinator.reserve(job, "failed-attempt");
+  const reservation = coordinator.reserve(onDemand(job), "failed-attempt");
   const pending = coordinator[Symbol.asyncIterator]().next();
   reservation?.release(); reservation?.commit();
   expect((await pending).done).toBe(true);

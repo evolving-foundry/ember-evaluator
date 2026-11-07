@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parseArgs, runCli } from "../../src/cli.js";
+import { parseArgs, runCli } from "../../src/cli/main.js";
 
 test.each([
   ["benchmark list", "--json", "--patch"],

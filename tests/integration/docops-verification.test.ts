@@ -5,12 +5,13 @@ import type { Server } from "node:http";
 import { afterEach, expect, test } from "vitest";
 
 import type { RunComponents } from "../../src/core/contracts/components.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
 import type { EnvironmentSession } from "../../src/core/contracts/environment.js";
-import { runTask } from "../../src/core/run-task.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { DocOpsBenchmark, DocOpsDockerEnvironment } from "../../plugins/docops/index.js";
 import { runDockerCommand } from "ember-evaluator";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
 import { storeRun, trajectoryLines } from "../fixtures/results/store-fixture.js";
 import { startDocOpsFixtureSource } from "../fixtures/docops-source.js";
@@ -79,15 +80,14 @@ test.skipIf(process.env.EVALUATOR_TEST_DOCKER !== "1")(
     metrics: [],
     reporter: { async render() { return "docops fixture"; } },
     pluginVersions: { "docops-plugin": "fixture" },
-    async dispose() { await store.close(); },
   };
-  const record = await runTask({
+  const record = await runTask(onDemand({
     runId: manifest.runId,
     taskId,
     attemptId: "docops-pass",
     ref: { id: taskId, recordKey: taskId },
     configFingerprint: manifest.configFingerprint,
-  }, components, source, new AbortController().signal, { timeoutSeconds: 180, cleanupTimeoutMs: 15_000 });
+  }), components, source, new AbortController().signal, { timeoutSeconds: 180, cleanupTimeoutMs: 15_000 });
 
   expect(record.errors).toEqual([]);
   expect(record.executionStatus).toBe("completed");

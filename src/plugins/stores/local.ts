@@ -1,7 +1,7 @@
 import type { ErrorCode } from "../../core/errors/registry.js";
 import { validFailureMetadata } from "../../core/errors/validation.js";
-import { upgradeStoredResult } from "../../core/stored-result.js";
-import { registerRunLocation } from "../../core/retry-control.js";
+import { upgradeStoredResult } from "../../core/results/stored-result.js";
+import { registerRunLocation } from "../../infrastructure/filesystem/run-index.js";
 import { randomUUID } from "node:crypto";
 import { copyFile, mkdir, open, readFile, readdir, rename, rm, lstat, realpath } from "node:fs/promises";
 import { constants } from "node:fs";
@@ -21,17 +21,17 @@ import type {
 } from "../../core/contracts/result.js";
 import type { JsonValue } from "../../core/contracts/task.js";
 import type { MetricResults } from "../../core/contracts/metrics.js";
-import { fingerprintConfig } from "../../core/run-manifest.js";
-import { checkedPath, verifyFileManifest } from "../../core/artifacts.js";
-import { assertAttemptRecord, trajectoryType } from "../../core/record-validation.js";
+import { fingerprintConfig } from "../../core/results/run-manifest.js";
+import { checkedPath, verifyFileManifest } from "../../core/artifacts/artifacts.js";
+import { assertAttemptRecord, trajectoryType } from "../../core/results/record-validation.js";
 import { inspectReportPair } from "./report-state.js";
-import { safeTaskKey } from "../../core/artifacts.js";
-import { selectAttemptRecords } from "../../core/task-result-resolver.js";
-import { isEvaluationComplete } from "../../core/evaluation-outcome.js";
-import { assertSourceLock } from "../../core/source-lock.js";
-import { validateSolverProvenance } from "../../core/solver-provenance.js";
-import { assertRunIdentity } from "../../core/run-identity.js";
-import { assertPreparationDiagnostics, validPreparationBudget } from "../../core/preparation-validation.js";
+import { safeTaskKey } from "../../core/artifacts/artifacts.js";
+import { selectAttemptRecords } from "../../core/results/task-result-resolver.js";
+import { isEvaluationComplete } from "../../core/results/evaluation-outcome.js";
+import { assertSourceLock } from "../../core/results/source-lock.js";
+import { validateSolverProvenance } from "../../core/results/solver-provenance.js";
+import { assertRunIdentity } from "../../core/results/run-identity.js";
+import { assertPreparationDiagnostics, validPreparationBudget } from "../../core/preparation/preparation-validation.js";
 import type { TaskReportDocument } from "../../core/contracts/reporter.js";
 
 

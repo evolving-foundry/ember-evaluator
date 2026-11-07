@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { create } from "tar";
 import { afterEach, expect, test } from "vitest";
 import type { TransferArtifact, TransferSpec } from "../../src/core/contracts/environment.js";
-import { EVALUATOR_NODE_EXECUTABLE, type DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { restoreWorkspace, STATE_HELPER } from "../../src/plugins/environments/workspace-transfer.js";
+import { EVALUATOR_NODE_EXECUTABLE, type DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { restoreWorkspace, STATE_HELPER } from "../../src/infrastructure/filesystem/workspace-transfer.js";
 
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });

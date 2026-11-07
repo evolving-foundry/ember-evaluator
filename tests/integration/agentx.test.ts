@@ -1,32 +1,33 @@
 import "../fixtures/network-fetch.js";
-import { safeTaskKey } from "../../src/core/artifacts.js";
-import { expectRecord } from "../../src/config/schema.js";
+import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
+import { expectRecord } from "../../src/core/validation/input.js";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { AgentXBenchmark, parseAgentXConfig } from "../../src/plugins/benchmarks/protocols/agentx/agentx-benchmark.js";
+import { AgentXBenchmark, parseAgentXConfig } from "../../src/plugins/benchmarks/inference-engine/agentx/agentx-benchmark.js";
 import { AgentXPerformanceMetrics } from "../../src/plugins/metrics/agentx-performance.js";
-import { normalizeAgentXExport } from "../../src/adapters/harness/agentx/protocol.js";
-import { lockAgentXLexicon } from "../../src/adapters/harness/agentx/runtime.js";
-import { runEngine } from "../../src/core/engine.js";
-import { runTask } from "../../src/core/run-task.js";
-import { planResume } from "../../src/core/resume.js";
-import { saveReport, rebuildReport } from "../../src/report.js";
+import { normalizeAgentXExport } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/summary.js";
+import { lockAgentXLexicon } from "../../src/runtimes/agentx/runtime.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
+import { planResume } from "../../src/core/recovery/resume.js";
+import { saveReport, rebuildReport } from "../../src/application/report/index.js";
 import { MarkdownReporter } from "../../src/plugins/reporters/markdown.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
 import { workload, lexicon, profileExport } from "../fixtures/agentx/export.js";
 import type { SourceLock, TaskRef } from "../../src/core/contracts/task.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
 import { stringify } from "yaml";
-import { runCli } from "../../src/cli.js";
+import { runCli } from "../../src/cli/main.js";
 import { AgentXReplaySolver, parseAgentXReplayConfig } from "../../src/plugins/solvers/agentx-replay.js";
-import { LocalEnvironment } from "../../src/plugins/environments/local.js";
-import { validateTransferSpec } from "../../src/plugins/environments/workspace-transfer.js";
-import { normalizeTelemetry, type AgentXTelemetry } from "../../src/adapters/harness/agentx/telemetry.js";
+import { LocalEnvironment } from "../../src/plugins/environments/local/environment.js";
+import { validateTransferSpec } from "../../src/infrastructure/filesystem/workspace-transfer.js";
+import { normalizeTelemetry, type AgentXTelemetry } from "../../src/plugins/benchmarks/inference-engine/agentx/evidence/telemetry.js";
 import { serverMetricsEvidence, telemetryConfig } from "../fixtures/agentx/server-metrics.js";
 
 const cleanup: (() => Promise<void>)[] = [];
@@ -94,7 +95,7 @@ test("tokenizer resume reuses its pinned revision, and content changes alter its
 
 test("performance payload survives public projection; timeout remains incomplete and resume restarts it", async () => {
   const path = await root(), value = harness(path);
-  cleanup.push(() => value.components.dispose());
+  cleanup.push(() => value.dispose());
   value.components.benchmark = { ...value.components.benchmark, evaluationKind: "performance" };
   const prepare = value.components.benchmark.prepare.bind(value.components.benchmark);
   value.components.benchmark.prepare = async (...args) => {
@@ -123,7 +124,7 @@ test("performance payload survives public projection; timeout remains incomplete
 
 test.each(["none", "v1", "v2", "custom-duration"] as const)("offline reporting reproduces saved AgentX %s metrics without loading Python or credentials", async version => {
   const path = await root(), value = harness(path);
-  cleanup.push(() => value.components.dispose());
+  cleanup.push(() => value.dispose());
   value.components.benchmark = { ...value.components.benchmark, evaluationKind: "performance" };
   value.components.benchmark.verify = async () => ({ passed: null, details: {} });
   const solve = value.components.solver.solve.bind(value.components.solver);
@@ -147,7 +148,7 @@ test.each(["none", "v1", "v2", "custom-duration"] as const)("offline reporting r
   await value.components.store.create(join(path, "runs"), { ...storeRun, source: locked, taskIds: ["a"], evaluationKind: "performance" },
     { metrics: [{ name: "agentx-performance", config: {} }], reporter: { name: "markdown", config: {} } });
   const job = { runId: "run-1", taskId: "a", attemptId: "attempt-1", ref: { id: "a", recordKey: "a" }, configFingerprint: "config-hash" };
-  const record = await runTask(job, value.components, locked, signal());
+  const record = await runTask(onDemand(job), value.components, locked, signal());
   expect(record.executionStatus).toBe("completed");
   await value.components.store.updateRun({ status: "completed", finishedAt: new Date().toISOString(), durationMs: 1000 });
   if (version === "v1") {
@@ -177,7 +178,7 @@ test.each(["none", "v1", "v2", "custom-duration"] as const)("offline reporting r
 
 test("an explicit Agent timeout code still cannot create a zero-scored performance result", async () => {
   const path = await root(), value = harness(path);
-  cleanup.push(() => value.components.dispose());
+  cleanup.push(() => value.dispose());
   value.components.benchmark = { ...value.components.benchmark, evaluationKind: "performance" };
   value.components.benchmark.verify = async () => ({ passed: null, details: {} });
   value.components.solver.solve = async () => { throw new EvaluatorError("SOLVER_AGENT_TIMEOUT", "controlled timeout"); };

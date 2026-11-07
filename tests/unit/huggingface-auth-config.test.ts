@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { stringify } from "yaml";
 import { afterEach, expect, test, vi } from "vitest";
-import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/definitions/index.js";
-import { openPluginRegistry } from "../../src/plugin-runtime.js";
-import { loadConfig, loadSavedConfig } from "../../src/config/load.js";
+import { DEFINED_BENCHMARKS } from "../../src/plugins/benchmarks/agent-harness/definitions/index.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
+import { loadConfig, loadSavedConfig } from "../../src/application/config.js";
 import { exportConfig } from "../../src/config/export.js";
-import { bootstrapBenchmark } from "../../src/bootstrap.js";
-import { localizePortableSelection, projectPortableSelection, validatePortableSelection } from "../../src/adapters/ray/protocol.js";
-import { parseAgentXConfig } from "../../src/plugins/benchmarks/protocols/agentx/agentx-benchmark.js";
+import { createBenchmark } from "../../src/application/plugins/create-components.js";
+import { localizePortableSelection, projectPortableSelection, validatePortableSelection } from "../../src/infrastructure/ray/protocol.js";
+import { parseAgentXConfig } from "../../src/plugins/benchmarks/inference-engine/agentx/agentx-benchmark.js";
 import { parseAgentXReplayConfig } from "../../src/plugins/solvers/agentx-replay.js";
 
 const roots: string[] = [];
@@ -44,8 +44,8 @@ test.each(DEFINED_BENCHMARKS.map(entry => ({ name: entry.definition.name, source
         ? new Response(JSON.stringify({ sha: "a".repeat(40), siblings: paths.map(rfilename => ({ rfilename })) }))
         : new Response("fixture file bytes");
     });
-    const components = await bootstrapBenchmark(config, directory, undefined, registry);
-    await components.benchmark.resolveSource(null, AbortSignal.timeout(5000));
+    const benchmark = await createBenchmark(registry, config, directory);
+    await benchmark.resolveSource(null, AbortSignal.timeout(5000));
     expect(fetch).toHaveBeenCalledTimes(paths.length + 1);
     const lookup = (role: string, component: string) => registry.ctx.evaluator.configTransport(role, component);
     const portable = projectPortableSelection(config.experiment.benchmark, "benchmark", lookup);

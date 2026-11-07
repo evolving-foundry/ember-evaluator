@@ -4,7 +4,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
-import { DatasetCache } from "../../src/adapters/datasets/cache.js";
+import { DatasetCache } from "../../src/infrastructure/datasets/cache.js";
 
 const roots: string[] = [];
 afterEach(async () => {

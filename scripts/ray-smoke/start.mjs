@@ -29,7 +29,7 @@ if (role === "init") {
     await mkdir("/node", { recursive: true });
     const configDirectory = process.env.EVALUATOR_WORKER_PROFILE === "builtin" ? "/builtin-experiment" : "/experiment";
     await mkdir(configDirectory, { recursive: true });
-    await writeFile("/node/config.json", JSON.stringify({ nodeExecutable: "/usr/local/bin/node", workerEntry: "/opt/evaluator/dist/adapters/ray/node-worker.js", configDirectory, outputRoot: "/node/evidence", caFile: "/security/cert.pem", ...(configDirectory === "/experiment" ? { pluginPatchPath: "/experiment/cordis.patch.yaml" } : {}), dockerExecutable: "/usr/local/bin/docker" }));
+    await writeFile("/node/config.json", JSON.stringify({ nodeExecutable: "/usr/local/bin/node", workerEntry: "/opt/evaluator/dist/application/ray/node-worker.js", configDirectory, outputRoot: "/node/evidence", caFile: "/security/cert.pem", ...(configDirectory === "/experiment" ? { pluginPatchPath: "/experiment/cordis.patch.yaml" } : {}), dockerExecutable: "/usr/local/bin/docker" }));
     process.env.EVALUATOR_NODE_CONFIG = "/node/config.json";
   }
   // Deployment-layer capacity: each worker offers EVALUATOR_NODE_SLOTS evaluator slots.
@@ -41,7 +41,7 @@ if (role === "init") {
     for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
     child.on("exit", code => { process.exitCode = code ?? 1; });
   } else if (role === "gateway") {
-    await import("../../dist/adapters/ray/jobs-gateway.js");
+    await import("../../dist/application/ray/entries/jobs-gateway.mjs");
   } else if (role === "coordinator") {
     // docker compose exec does not inherit variables set by this process.
     setInterval(() => {}, 60_000);

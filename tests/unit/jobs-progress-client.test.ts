@@ -1,8 +1,8 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { JobsClient } from "../../src/adapters/ray/jobs-client.js";
-import { LiveOperation } from "../../src/core/live-progress.js";
-import { JobsProgressMailbox } from "../../src/adapters/ray/jobs-progress.js";
-import type { ProgressEvent } from "../../src/core/progress.js";
+import { JobsClient } from "../../src/infrastructure/ray/jobs-client.js";
+import { LiveOperation } from "../../src/core/progress/live-progress.js";
+import { JobsProgressMailbox } from "../../src/infrastructure/ray/jobs-progress.js";
+import type { ProgressEvent } from "../../src/core/progress/progress.js";
 
 vi.mock("node:timers/promises", () => ({ setTimeout: (ms: number, value: unknown, options?: { signal?: AbortSignal }) => new Promise((resolve, reject) => {
   const signal = options?.signal;

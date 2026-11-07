@@ -1,6 +1,6 @@
 import type { ErrorCause, ErrorDetails } from "../contracts/errors.js";
 import type { Failure, Phase } from "../contracts/result.js";
-import { redactDiagnostic } from "../diagnostics.js";
+import { redactDiagnostic } from "./diagnostics.js";
 import { EvaluatorError } from "./evaluator-error.js";
 import { ERROR_CODES, isErrorCode, type ErrorCode } from "./registry.js";
 import { identifyNetworkFailure } from "./network-failure.js";

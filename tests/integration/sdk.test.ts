@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { Evaluator, EvaluatorRunError, type EvaluatorRunOptions, type ProgressEvent } from "ember-evaluator";
-import { RayJobsDeployment } from "../../src/adapters/ray/deployment.js";
+import { RayJobsDeployment } from "../../src/application/ray/deployment.js";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
-import * as assembly from "../../src/bootstrap.js";
+import * as pluginRegistry from "../../src/application/plugins/open-registry.js";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -164,17 +164,17 @@ test("rejected resume does not overwrite the original report", async () => {
   expect(await readFile(first.reportPath, "utf8")).toBe(before);
 });
 
-test("component disposal failure still releases the shared registry", async () => {
+test("registry disposal failure is reported with the completed result", async () => {
   const { root, options } = await fixture();
-  const original = assembly.bootstrap;
-  vi.spyOn(assembly, "bootstrap").mockImplementation(async (...args) => {
-    const components = await original(...args);
-    const dispose = components.dispose;
-    components.dispose = async () => { await dispose(); throw new Error("component release failed"); };
-    return components;
+  const original = pluginRegistry.openPluginRegistry;
+  vi.spyOn(pluginRegistry, "openPluginRegistry").mockImplementation(async (...args) => {
+    const registry = await original(...args);
+    const dispose = registry.dispose;
+    registry.dispose = async () => { await dispose(); throw new Error("registry release failed"); };
+    return registry;
   });
   await expect(new Evaluator().run(options)).rejects.toMatchObject({ phase: "dispose", exitCode: 1,
-    message: "component release failed", result: { kind: "local" } });
+    message: "registry release failed", result: { kind: "local" } });
   await released(root);
 });
 

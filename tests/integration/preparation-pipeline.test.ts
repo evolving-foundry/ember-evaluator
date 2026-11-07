@@ -4,18 +4,18 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, expect, test, vi } from "vitest";
 import { harness } from "../fixtures/engine/fakes.js";
-import { runEngine } from "../../src/core/engine.js";
+import { runEngine } from "../../src/application/run-engine.js";
 import { parseEffectiveConfig } from "../../src/config/effective.js";
-import { planBenchmarkRun } from "../../src/plugins/benchmarks/plan-run.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
+import { planBenchmarkRun } from "../../src/plugins/benchmarks/shared/plan-run.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { computeDuration } from "../../src/plugins/metrics/duration.js";
 import { renderMarkdown } from "../../src/plugins/reporters/markdown.js";
-import { consumeDsh } from "../../src/adapters/harness/dsh/protocol.js";
+import { consumeDsh } from "../../src/runtimes/dsh/protocol.js";
 import { dshStream, interruptedResponse } from "../fixtures/engine/dsh-stream.js";
-import type { ProgressEvent } from "../../src/core/progress.js";
-import { HarborTaskError } from "../../src/plugins/benchmarks/protocols/harbor/compatibility.js";
-import { assertDockerCapacity } from "../../src/plugins/environments/docker-resources.js";
-import { createTaskPreparer } from "../../src/core/materialize-task.js";
+import type { ProgressEvent } from "../../src/core/progress/progress.js";
+import { HarborTaskError } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/compatibility.js";
+import { assertDockerCapacity } from "../../src/infrastructure/containers/resources.js";
+import { createTaskPreparer } from "../../src/core/preparation/materialize-task.js";
 import type { PreparationRound } from "../../src/core/contracts/result.js";
 import type { EnvironmentPreparationContext } from "../../src/core/contracts/environment.js";
 
@@ -24,7 +24,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(
 async function fixture(budget = 20) {
   const root = await mkdtemp(join(tmpdir(), "preparation-pipeline-"));
   const value = harness(root, { transfer: true });
-  cleanups.push(async () => { await value.components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   const { components, config } = value;
   config.experiment.run.preparation = { mode: "pipeline", concurrency: 2, lookahead: 2 };
   components.benchmark.planRun = (refs, source, signal) =>
@@ -492,7 +492,11 @@ test("model truncation replans a pipeline task with a batch preparation barrier"
   expect(snapshot.run.status).toBe("completed");
   expect(prepared).toBe(4);
   expect(calls).toBe(2);
-  expect(await components.store.listAttempts()).toHaveLength(2);
+  const attempts = await components.store.listAttempts();
+  expect(attempts).toHaveLength(2);
+  expect(attempts[0]?.record?.readiness?.roundId).toBe(snapshot.run.preparationRounds?.[0]?.id);
+  expect(attempts[1]?.record).toMatchObject({ executionStatus: "completed" });
+  expect(attempts[1]?.record?.readiness).toBeUndefined();
   expect(prepareTasks.mock.calls.map(call => call[2].settings?.mode)).toEqual(["pipeline", "batch"]);
 }, 15_000);
 

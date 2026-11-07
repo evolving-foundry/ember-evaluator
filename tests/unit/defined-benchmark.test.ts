@@ -1,8 +1,8 @@
 import "../fixtures/network-fetch.js";
 import { expect, test, vi } from "vitest";
 import { DefinedBenchmark, type DatasetRecordSource, type JsonValue, type SourceLock } from "../../src/index.js";
-import { gsm8kDefinition } from "../../src/plugins/benchmarks/definitions/gsm8k.js";
-import { dropDefinition } from "../../src/plugins/benchmarks/definitions/drop.js";
+import { gsm8kDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/gsm8k.js";
+import { dropDefinition } from "../../src/plugins/benchmarks/agent-harness/definitions/drop.js";
 
 const context = {
   model: { name: "unused", endpoint: null, provider: null, api: null },

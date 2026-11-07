@@ -13,7 +13,7 @@ Select the built-in profile with `benchmark.name: terminalbench`. The default ve
 | 2.0 | [SimpleAgent example](../../../playbook/terminalbench/terminalbench-simpleagent.yaml), Docker and task verifiers |
 | 4.0 | [Full example](../../../playbook/terminalbench/terminalbench-4.0.yaml), official v4.0.0 prebuilt archive, pinned SHA-256, amd64 task images |
 
-The 4.0 source contains 66 tasks at the pinned commit; this does not mean all have been executed or passed. Limit the first run to two tasks using the quick start. Default agent budget is 28800 seconds per task; the outer task budget is 86400 seconds. See the [profile](../../../src/plugins/benchmarks/profiles/terminalbench.yaml) for defaults.
+The 4.0 source contains 66 tasks at the pinned commit; this does not mean all have been executed or passed. Limit the first run to two tasks using the quick start. Default agent budget is 28800 seconds per task; the outer task budget is 86400 seconds. See the [profile](../../../src/plugins/benchmarks/agent-harness/profiles/terminalbench.yaml) for defaults.
 
 ## Environments and Support
 

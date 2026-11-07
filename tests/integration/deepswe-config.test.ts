@@ -1,11 +1,11 @@
 import { dirname, resolve } from "node:path";
 import { expect, test } from "vitest";
-import { loadConfig } from "../../src/config/load.js";
-import { bootstrap } from "../../src/bootstrap.js";
-import { solverBinding } from "../../src/config/schema.js";
-import { RayJobsDeployment } from "../../src/adapters/ray/deployment.js";
-import { RayScheduler } from "../../src/plugins/schedulers/ray.js";
-import { resolveManagedLocalBundlePath } from "../../src/adapters/ray/managed-local.js";
+import { loadConfig } from "../../src/application/config.js";
+import { bootstrap } from "../../src/application/plugins/bootstrap.js";
+import { solverBinding } from "../../src/core/policies/service-bindings.js";
+import { RayJobsDeployment } from "../../src/application/ray/deployment.js";
+import { RayScheduler } from "../../src/plugins/schedulers/ray/scheduler.js";
+import { resolveManagedLocalBundlePath } from "../../src/application/ray/managed-local.js";
 import { AgentBundleSolver, parseAgentBundleConfig } from "../../src/plugins/solvers/agentbundle.js";
 
 const playbook = (file: string) => resolve("playbook", file.startsWith("deepswe") ? "deepswe" : "workbuddy", file);

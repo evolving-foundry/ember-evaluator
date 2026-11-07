@@ -2,8 +2,8 @@ import type { BenchmarkRunPlan } from "./benchmark.js";
 import type { Failure, PreparationRound, TaskPreparationTiming } from "./result.js";
 import type { PreparedTask } from "./task.js";
 import type { RunStore } from "./run-store.js";
-import type { ProgressListener } from "../progress.js";
-import type { EffectiveConfig } from "../../config/schema.js";
+import type { ProgressListener } from "../progress/progress.js";
+import type { EffectiveConfig } from "./config.js";
 
 export type TaskPreparationContext = {
   roundId: string;

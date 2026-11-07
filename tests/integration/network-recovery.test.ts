@@ -3,27 +3,28 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { harness } from "../fixtures/engine/fakes.js";
-import { runEngine } from "../../src/core/engine.js";
-import { LocalScheduler } from "../../src/plugins/schedulers/local.js";
+import { runEngine } from "../../src/application/run-engine.js";
+import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { renderMarkdown } from "../../src/plugins/reporters/markdown.js";
 import { aggregateMetrics } from "../../src/plugins/metrics/aggregate.js";
-import { controlTransaction, locateRun, submitRetry } from "../../src/core/retry-control.js";
-import { isEvaluationComplete } from "../../src/core/evaluation-outcome.js";
-import type { ProgressEvent } from "../../src/core/progress.js";
+import { controlTransaction, submitRetry } from "../../src/application/retry-control/mailbox.js";
+import { locateRun } from "../../src/infrastructure/filesystem/run-index.js";
+import { isEvaluationComplete } from "../../src/core/results/evaluation-outcome.js";
+import type { ProgressEvent } from "../../src/core/progress/progress.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "network-recovery-"));
   const value = harness(root);
-  cleanups.push(async () => { await value.components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   value.config.experiment.run.onError = "continue";
   return value;
 }
 test.each(["solve", "verify"] as const)("a %s image build failure never starts a second attempt", async phase => {
   const root = await mkdtemp(join(tmpdir(), "build-no-task-retry-"));
   const value = harness(root, { transfer: true });
-  cleanups.push(async () => { await value.components.dispose(); await rm(root, { recursive: true, force: true }); });
+  cleanups.push(async () => { await value.dispose(); await rm(root, { recursive: true, force: true }); });
   value.config.experiment.run.taskIds = ["a"];
   value.config.experiment.run.onError = "continue";
   const prepare = value.components.environment.prepare.bind(value.components.environment);

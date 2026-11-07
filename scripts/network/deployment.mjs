@@ -2,12 +2,13 @@ import { readFile, writeFile, mkdir, cp, mkdtemp, rm } from "node:fs/promises";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
-import { loadNetworkConfig, storedNetworkTemplate } from "../../dist/config/network.js";
-import { NetworkRuntime } from "../../dist/adapters/network/runtime.js";
-import { dockerBuildNetwork } from "../../dist/adapters/containers/build-network.js";
-import { createDockerImagePuller } from "../../dist/plugins/environments/docker-image-pull.js";
-import { runDockerCommand } from "../../dist/plugins/environments/docker.js";
-import { PlatformCapabilityDetector } from "../../dist/plugins/environments/docker-platform.js";
+import { loadNetworkConfig } from "../../dist/config/network.js";
+import { storedNetworkTemplate } from "../../dist/config/network-schema.js";
+import { NetworkRuntime } from "../../dist/infrastructure/network/runtime.js";
+import { dockerBuildNetwork } from "../../dist/infrastructure/containers/build-network.js";
+import { createDockerImagePuller } from "../../dist/infrastructure/containers/image-pull.js";
+import { runDockerCommand } from "../../dist/infrastructure/containers/command.js";
+import { PlatformCapabilityDetector } from "../../dist/infrastructure/containers/platform.js";
 
 export async function deploymentNetwork(configPath) {
   const network = new NetworkRuntime(await loadNetworkConfig(configPath));

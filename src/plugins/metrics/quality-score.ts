@@ -1,6 +1,6 @@
 import type { Metrics } from "../../core/contracts/metrics.js";
 import type { ResultSnapshot } from "../../core/contracts/result.js";
-import { evaluationScore, isEvaluationComplete } from "../../core/evaluation-outcome.js";
+import { evaluationScore, isEvaluationComplete } from "../../core/results/evaluation-outcome.js";
 import { selectedRecords } from "./records.js";
 
 /** Continuous scores and categorical judge evidence use measured samples only. */

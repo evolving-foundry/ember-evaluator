@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(sys.argv.pop(1))
-submission_failure = runpy.run_path(str(ROOT / "src/adapters/verifiers/python/workbuddy.py"))["submission_failure"]
+submission_failure = runpy.run_path(str(ROOT / "src/plugins/verifiers/python/runtime/workbuddy.py"))["submission_failure"]
 FIXTURES = ROOT / "tests/fixtures/workbuddy-failures"
 IMPORT_PATH = "workbuddy_bench.judge:CompositeVerifier"
 

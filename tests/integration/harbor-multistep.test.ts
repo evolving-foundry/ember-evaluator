@@ -3,18 +3,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { afterEach, expect, test } from "vitest";
-import { loadGenericHarborTask } from "../../src/plugins/benchmarks/protocols/harbor/task.js";
-import { parseHarborConfig } from "../../src/plugins/benchmarks/protocols/harbor/config.js";
+import { loadGenericHarborTask } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/task.js";
+import { parseHarborConfig } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/config.js";
 import { HarborShellVerifier } from "../../src/plugins/verifiers/shell.js";
-import { evaluateHarborSteps } from "../../src/plugins/benchmarks/protocols/harbor/steps.js";
-import { runTask } from "../../src/core/run-task.js";
+import { evaluateHarborSteps } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/steps.js";
+import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { writeFixture } from "../fixtures/dataset-tasks.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun, fixtureFailure } from "../fixtures/results/store-fixture.js";
 import type { PreparedTask } from "../../src/core/contracts/task.js";
-import { assertAttemptRecord } from "../../src/core/record-validation.js";
-import { readTrajectoryPrefix } from "../../src/core/trajectory-recovery.js";
-import { PhaseTimeoutError } from "../../src/core/phase-timeout.js";
+import { assertAttemptRecord } from "../../src/core/results/record-validation.js";
+import { readTrajectoryPrefix } from "../../src/core/artifacts/trajectory-recovery.js";
+import { PhaseTimeoutError } from "../../src/core/policies/phase-timeout.js";
 import type { AttemptStepResult } from "../../src/core/contracts/result.js";
 
 const roots: string[] = [];
@@ -113,8 +114,8 @@ test.each([
   };
   await value.components.store.create(value.config.experiment.output.directory, { ...storeRun, source, taskIds: ["a"] }, {});
   try {
-    const record = await runTask({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" },
-      configFingerprint: storeRun.configFingerprint }, value.components, source, signal());
+    const record = await runTask(onDemand({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" },
+      configFingerprint: storeRun.configFingerprint }), value.components, source, signal());
     expect(record.errors).toHaveLength(failure === "none" ? 0 : 1);
     expect(record).toMatchObject({ executionStatus: score === null ? "failed" : "completed", scoreStatus: score === null ? "invalid" : "valid",
       verdict: score === null ? null : { score },
@@ -127,5 +128,5 @@ test.each([
     const output = join(value.config.experiment.output.directory, record.key.runId, "tasks", createHash("sha256").update("a").digest("hex"), "attempts", "first");
     expect((await readTrajectoryPrefix(output, record.key)).state).toBe("complete");
     expect(await readFile(join(output, "steps/first/agent/session.jsonl"), "utf8")).toContain("fixture");
-  } finally { await value.components.dispose(); }
+  } finally { await value.dispose(); }
 });

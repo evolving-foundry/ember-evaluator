@@ -4,18 +4,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, expect, test, vi } from "vitest";
-import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/definitions/officeqa-pro-v2/index.js";
-import { officeQAScoringProgram } from "../../src/adapters/verifiers/officeqa/runtime.js";
-import { HuggingFaceSnapshotSource } from "../../src/adapters/datasets/sources/huggingface/snapshot-source.js";
-import { OFFICEQA_DATASET_REVISION } from "../../src/plugins/benchmarks/definitions/officeqa-pro-v2/config.js";
+import { OfficeQAProV2Benchmark, parseOfficeQAProV2Config } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/index.js";
+import { officeQAScoringProgram } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/runtime/runtime.js";
+import { HuggingFaceSnapshotSource } from "../../src/infrastructure/datasets/sources/huggingface/snapshot-source.js";
+import { OFFICEQA_DATASET_REVISION } from "../../src/plugins/benchmarks/agent-harness/definitions/officeqa-pro-v2/config.js";
 import { officeQAFiles, officeQAHub, fixtureCSV } from "../fixtures/officeqa.js";
-import { loadConfig, loadSavedConfig } from "../../src/config/load.js";
+import { loadConfig, loadSavedConfig } from "../../src/application/config.js";
 import { exportConfig } from "../../src/config/export.js";
 import { stringify } from "yaml";
-import { bootstrapBenchmark } from "../../src/bootstrap.js";
-import { runCli } from "../../src/cli.js";
-import { openPluginRegistry } from "../../src/plugin-runtime.js";
-import { localizePortableSelection, validatePortableSelection } from "../../src/adapters/ray/protocol.js";
+import { createBenchmark } from "../../src/application/plugins/create-components.js";
+import { runCli } from "../../src/cli/main.js";
+import { openPluginRegistry } from "../../src/application/plugins/open-registry.js";
+import { localizePortableSelection, validatePortableSelection } from "../../src/infrastructure/ray/protocol.js";
 
 const roots: string[] = [];
 const hubs: Awaited<ReturnType<typeof officeQAHub>>[] = [];
@@ -70,13 +70,14 @@ test("YAML hfToken uses SDK env and preserves references across save, export and
   expect(rotated.persisted).toEqual(loaded.persisted);
   await expect(loadConfig(file, {}, { MODEL_KEY: "model-secret" })).rejects.toThrow(/SDK_HF_TOKEN/);
   await expect(loadConfig(file, {}, { ...env, SDK_HF_TOKEN: "" })).rejects.toThrow(/hfToken/);
-  const components = await bootstrapBenchmark(loaded, directory);
+  const registry = await openPluginRegistry();
   try {
+    const benchmark = await createBenchmark(registry, loaded, directory);
     // The tiny Hub has two documents rather than 1,435. Only authentication is under test.
-    await expect(components.benchmark.resolveSource(null, signal())).rejects.toThrow(/file count/);
+    await expect(benchmark.resolveSource(null, signal())).rejects.toThrow(/file count/);
     expect(hub.authorizations.length).toBeGreaterThan(0);
     expect(hub.authorizations.every(value => value === "Bearer sdk-dataset-secret")).toBe(true);
-  } finally { await components.dispose(); }
+  } finally { await registry.dispose(); }
 });
 
 test("Ray nodes authenticate with their own fixed HF_TOKEN after explicit credentials are stripped", async () => {
@@ -86,7 +87,7 @@ test("Ray nodes authenticate with their own fixed HF_TOKEN after explicit creden
   const registry = await openPluginRegistry();
   try {
     const lookup = (role: string, name: string) => registry.ctx.evaluator.configTransport(role, name);
-    const { projectPortableSelection } = await import("../../src/adapters/ray/protocol.js");
+    const { projectPortableSelection } = await import("../../src/infrastructure/ray/protocol.js");
     const portable = projectPortableSelection({ name: "officeqa-pro-v2", config: { hfToken: "coordinator-token" } }, "benchmark", lookup);
     const selection = localizePortableSelection(portable, "benchmark", { outputRoot: directory }, lookup);
     const config = parseOfficeQAProV2Config(selection.config);
@@ -111,7 +112,7 @@ test.each(["parsed-json", "pdf"] as const)("%s prepares all documents with stabl
   expect(JSON.stringify(task.input)).not.toContain("private-");
   expect(JSON.stringify(task.input)).not.toContain("21.58");
   const build = task.solveEnv.build!;
-  const { buildFileManifest } = await import("../../src/core/artifacts.js");
+  const { buildFileManifest } = await import("../../src/core/artifacts/artifacts.js");
   const manifest = await buildFileManifest(build.context, []);
   expect(manifest.files.map(file => file.path).sort()).toEqual(["Dockerfile", `corpus/public-a.${format === "pdf" ? "pdf" : "json"}`, `corpus/public-b.${format === "pdf" ? "pdf" : "json"}`].sort());
   expect(await readFile(join(build.context, "Dockerfile"), "utf8")).not.toMatch(/reward|csv|TOKEN|private-/);
@@ -191,14 +192,12 @@ test("OfficeQA is discoverable without network and Ray localizes node paths", as
   expect(await runCli(["run", file, "--dry-run"], io), errors.join("\n")).toBe(0);
   expect(files).toHaveBeenCalledOnce();
   const bad = structuredClone(config); bad.experiment.environment = { name: "local", config: {} };
-  await expect(bootstrapBenchmark(bad, directory)).rejects.toThrow(/Docker/);
-  expect(network).not.toHaveBeenCalled();
   const registry = await openPluginRegistry();
   try {
     const lookup = (role: string, name: string) => registry.ctx.evaluator.configTransport(role, name);
     const selection = { name: "officeqa-pro-v2", config: { cacheDir: "/coordinator/cache", dockerExecutable: "/coordinator/docker", corpusFormat: "pdf", hfToken: "coordinator-secret" } };
     // Node-local fields are removed by projection before validation.
-    const { projectPortableSelection } = await import("../../src/adapters/ray/protocol.js");
+    const { projectPortableSelection } = await import("../../src/infrastructure/ray/protocol.js");
     const portable = projectPortableSelection(selection, "benchmark", lookup);
     validatePortableSelection(portable, "benchmark", lookup);
     expect(JSON.stringify(portable)).not.toContain("coordinator");

@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { DockerRuntime, PINNED_NODE_IMAGE, type DockerCommand } from "../../src/plugins/environments/docker-runtime.js";
-import { CPU_VIEW_PATH, nodeCpuViewSource } from "../../src/plugins/environments/docker-cpu.js";
+import { DockerRuntime } from "../../src/infrastructure/containers/runtime.js";
+import { PINNED_NODE_IMAGE, type DockerCommand } from "../../src/infrastructure/containers/runtime-contract.js";
+import { CPU_VIEW_PATH, nodeCpuViewSource } from "../../src/infrastructure/containers/cpu.js";
 
 test.each(["", "nobody", "1001:1002"])("runtime helpers preserve USER %j when platform digests are not addressable", async user => {
   let built = false;

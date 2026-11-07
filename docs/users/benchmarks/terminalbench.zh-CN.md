@@ -13,7 +13,7 @@
 | 2.0 | [SimpleAgent 示例](../../../playbook/terminalbench/terminalbench-simpleagent.yaml)，使用 Docker 和任务内验证器 |
 | 4.0 | [全量示例](../../../playbook/terminalbench/terminalbench-4.0.yaml)，官方 v4.0.0 预构建归档、固定 SHA-256、amd64 任务镜像 |
 
-4.0 来源包含对应提交的 66 道任务；这是来源范围，不表示所有任务都已执行或通过。首次运行先按快速入门限制两题。默认 Agent 时限为每题 28800 秒，外层整题预算为 86400 秒；完整默认值见[Profile](../../../src/plugins/benchmarks/profiles/terminalbench.yaml)。
+4.0 来源包含对应提交的 66 道任务；这是来源范围，不表示所有任务都已执行或通过。首次运行先按快速入门限制两题。默认 Agent 时限为每题 28800 秒，外层整题预算为 86400 秒；完整默认值见[Profile](../../../src/plugins/benchmarks/agent-harness/profiles/terminalbench.yaml)。
 
 ## 环境与支持条件
 

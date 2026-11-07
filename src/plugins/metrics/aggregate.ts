@@ -1,7 +1,7 @@
 import type { Metrics, MetricResults } from "../../core/contracts/metrics.js";
 import type { ResultSnapshot } from "../../core/contracts/result.js";
 import type { JsonValue } from "../../core/contracts/task.js";
-import { assertJsonValue } from "../../config/schema.js";
+import { assertJsonValue } from "../../core/validation/input.js";
 
 export async function aggregateMetrics(snapshot: ResultSnapshot, plugins: Metrics[]): Promise<MetricResults> {
   if (!snapshot.run.source) return { initialization: { taskSet: "undetermined", selected: null, valid: null, coverage: null,

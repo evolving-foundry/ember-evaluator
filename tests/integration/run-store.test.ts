@@ -4,14 +4,14 @@ import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, expect, test } from "vitest";
 import { LocalRunStore } from "../../src/plugins/stores/local.js";
-import { buildFileManifest } from "../../src/core/artifacts.js";
+import { buildFileManifest } from "../../src/core/artifacts/artifacts.js";
 import { storeRun, storeKey, storeRecord, trajectoryLines } from "../fixtures/results/store-fixture.js";
-import { loadConfig as readConfig } from "../../src/config/load.js";
+import { loadConfig as readConfig } from "../../src/application/config.js";
 // These tests exercise assembly validation separately from structural configuration loading.
 const loadConfig = (path: string, overrides: Parameters<typeof readConfig>[1], env: Parameters<typeof readConfig>[2]) =>
   readConfig(path, overrides, env, { validatePlugins: false });
-import { bootstrap } from "../../src/bootstrap.js";
-import { saveReport } from "../../src/report.js";
+import { bootstrap } from "../../src/application/plugins/bootstrap.js";
+import { saveReport } from "../../src/application/report/index.js";
 import { MarkdownReporter } from "../../src/plugins/reporters/markdown.js";
 
 const roots: string[] = []; const stores: LocalRunStore[] = [];
