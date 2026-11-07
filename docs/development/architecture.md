@@ -68,7 +68,9 @@ Benchmark 准备公开输入和私有验证材料；Solver 只接收公开任务
 
 ## 补测、Ray 与 Docker
 
-Engine 在 `admitRetryRequests` 中读取结果、检查资格、预留队列并填写请求绑定，返回 `commit/release`；`prepareRetryTask` 重新规划并准备重试任务，返回准备结果或失败。队列、准备结果 Map、取消控制和调度循环仍由 `executeEngine` 持有。
+Engine 在 `admitRetryRequests` 中读取结果、检查资格、预留队列并填写请求绑定。`prepareRetryTask` 为新的 attempt 重新规划并准备依赖。内部队列把任务和准备结果一起传递，区分按需准备、已生成描述、依赖就绪和准备失败。执行器通过 `attemptId` 取回本次准备结果。流水线的就绪时间只属于对应的 attempt。 [准备状态定义](../../src/core/preparation/task-preparation.ts)
+
+公开 Scheduler 仍接收 `TaskJob`。Ray 的准备凭证保留在 worker 上，worker 验证凭证后才把任务作为依赖就绪交给执行器。
 
 补测由 [application/retry-control/mailbox.ts](../../src/application/retry-control/mailbox.ts) 负责请求文件、锁、事务和 IPC，core 负责资格检查与队列预留。交接接口在 [core/contracts/retry-control.ts](../../src/core/contracts/retry-control.ts)。在线请求先预留任务，保存请求状态和 attempt 绑定成功后才 `commit` 入队，最后通过 `finally release` 释放预留。保存失败不得留下已入队任务；相同请求不得重复调度。关闭控制通道前要停止接收并等待在途事务。
 

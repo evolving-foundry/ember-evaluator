@@ -112,6 +112,20 @@ test("all solve and verify environments become ready before any attempt starts",
   expect(events.indexOf("solve.cleanup")).toBeLessThan(events.indexOf("verify.environment"));
 });
 
+test("a batch scheduler that omits a task cannot dispatch it with unprepared dependencies", async () => {
+  const { components, config, inputs } = await fixture();
+  const prepare = components.scheduler.prepareTasks!.bind(components.scheduler);
+  components.scheduler.prepareTasks = async (...args) => {
+    const scheduled = await prepare(...args);
+    if (scheduled.pipeline) throw new Error("Expected a batch");
+    return { tasks: scheduled.tasks.slice(1) };
+  };
+  await expect(runEngine({ components, config, signal: new AbortController().signal }))
+    .rejects.toThrow("Batch preparation differs from locked task plan");
+  expect(inputs).toHaveLength(0);
+  expect(await components.store.listAttempts()).toHaveLength(0);
+});
+
 test("model truncation prepares another round only for the failed task", async () => {
   const { components, config, events } = await fixture();
   components.scheduler = new LocalScheduler(1);

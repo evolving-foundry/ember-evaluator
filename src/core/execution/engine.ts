@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import type { RunComponents } from "../contracts/components.js";
 import { solverBinding } from "../policies/service-bindings.js";
 import { type ExecutionConfig } from "../contracts/config.js";
-import type { AttemptRecord, Failure, ResultSnapshot, RunManifest } from "../contracts/result.js";
+import type { AttemptRecord, ResultSnapshot, RunManifest } from "../contracts/result.js";
 import type { TaskExecutor, TaskJob } from "../contracts/scheduler.js";
 import { fingerprintConfig, fingerprintResumeConfig } from "../results/run-manifest.js";
 import { runTask } from "./run-task.js";
@@ -12,6 +12,7 @@ import { createTaskPreparer } from "../preparation/materialize-task.js";
 import { preparationConcurrency } from "../preparation/preparation-timeout.js";
 import type { PreparationPipeline } from "../contracts/preparation.js";
 import { prepareDispatch } from "../preparation/prepare-dispatch.js";
+import { onDemand, type DispatchEntry, type TaskPreparation } from "../preparation/task-preparation.js";
 
 import { resolveRunStatus } from "../results/task-result-resolver.js";
 import { TaskQueue } from "./task-queue.js";
@@ -23,7 +24,7 @@ import { enumerateSelectedTasks } from "../selection/task-selection.js";
 import { assertResumeSolverProvenance, resolveSolverProvenance } from "../results/solver-provenance.js";
 import type { ProgressListener } from "../progress/progress.js";
 import { progressOperation } from "../progress/progress-operation.js";
-import type { SourceLock, PreparedTask } from "../contracts/task.js";
+import type { SourceLock } from "../contracts/task.js";
 import { attemptStatus, attemptTimeoutKind, evaluationScore, hasUnconfirmedCleanup, isAgentTimeout, isEvaluationComplete } from "../results/evaluation-outcome.js";
 import { formatError, redactDiagnostic } from "../errors/diagnostics.js";
 import { classifyError, failureMessage } from "../errors/classify.js";
@@ -58,7 +59,7 @@ async function admitRetryRequests(
     for (const request of requests) {
       for (const record of records.filter(item => isManualRetryEligible(item) && (!request.taskIds.length || request.taskIds.includes(item.key.taskId)))) {
         const original = originals.get(record.key.taskId);
-        const reservation = original ? queue.reserve({ ...original, attemptId: randomUUID() }, record.key.attemptId) : undefined;
+        const reservation = original ? queue.reserve(onDemand({ ...original, attemptId: randomUUID() }), record.key.attemptId) : undefined;
         if (reservation) {
           reservations.push(reservation);
           request.bindings = { ...request.bindings, [record.key.taskId]: record.key.attemptId };
@@ -81,11 +82,8 @@ async function admitRetryRequests(
   }
 }
 
-type RetryPreparation = { task?: PreparedTask; failure?: Failure };
-
 async function prepareRetryTask(
   job: TaskJob,
-  initialAttemptId: string | undefined,
   { components, source, signal, run, sensitiveValues, onProgress }: {
     components: RunComponents;
     source: SourceLock;
@@ -94,14 +92,14 @@ async function prepareRetryTask(
     sensitiveValues: readonly string[];
     onProgress: ProgressListener;
   },
-): Promise<RetryPreparation | undefined> {
-  if (initialAttemptId === job.attemptId || !components.benchmark.planRun) return undefined;
+): Promise<TaskPreparation> {
+  if (!components.benchmark.planRun) return { state: "on-demand" };
   const planRun = components.benchmark.planRun.bind(components.benchmark);
   const plan = await progressOperation(onProgress, {
     phase: "prepare", message: "Replanning task environments", taskId: job.taskId, attemptId: job.attemptId,
   }, signal, activity => planRun([job.ref], source, signal, activity));
   const rejected = plan.preparationFailures?.find(item => item.taskId === job.taskId);
-  if (rejected) return { failure: rejected.failure };
+  if (rejected) return { state: "failed", failure: rejected.failure };
   try {
     const history = (await components.store.snapshot()).run.preparationRounds ?? [];
     if (!components.scheduler.prepareTasks) throw new Error("Scheduler must implement prepareTasks() for planned retries");
@@ -118,11 +116,14 @@ async function prepareRetryTask(
       await prepared.pipeline.completion;
       throw new Error("Scheduler returned streaming preparation for a batch retry");
     }
-    const task = prepared.tasks[0];
     const failure = plan.preparationFailures?.find(item => item.taskId === job.taskId)?.failure;
-    return { ...(task ? { task } : {}), ...(failure ? { failure } : {}) };
+    if (failure) return { state: "failed", failure };
+    const task = prepared.tasks[0];
+    if (prepared.tasks.length !== 1 || task?.input.id !== job.taskId)
+      throw new TypeError("Retry preparation differs from locked task plan");
+    return { state: components.scheduler.executionLocation === "remote" ? "described" : "ready", task };
   } catch (error) {
-    return { failure: classifyError(error, { phase: "prepare", component: "environment", secrets: sensitiveValues }) };
+    return { state: "failed", failure: classifyError(error, { phase: "prepare", component: "environment", secrets: sensitiveValues }) };
   }
 }
 
@@ -279,10 +280,9 @@ export async function executeEngine({
   const sensitiveValues = [...Object.values(config.auths).map(auth => auth.value)];
   const savePreparationFailure = async (job: TaskJob, error: unknown) => {
     const message = redactDiagnostic(formatError(error), sensitiveValues);
-    const record = await runTask(job, components, source, signal, {
-      preparationFailure: classifyError(error, { phase: "prepare", component: "environment", fallbackCode: "ENV_PREPARATION_FAILED", secrets: sensitiveValues }),
-      sensitiveValues, onProgress: taskProgress,
-    });
+    const failure = classifyError(error, { phase: "prepare", component: "environment", fallbackCode: "ENV_PREPARATION_FAILED", secrets: sensitiveValues });
+    const record = await runTask({ job, preparation: { state: "failed", failure } },
+      components, source, signal, { sensitiveValues, onProgress: taskProgress });
     taskProgress({ phase: "prepare", taskId: job.taskId, attemptId: job.attemptId, error: true,
       ...(record.errors[0] ? { failure: record.errors[0] } : {}), message: `Environment preparation failed; task is invalid: ${message}` });
     return record;
@@ -337,14 +337,13 @@ export async function executeEngine({
     }
     const dispatch = await prepareDispatch(components, jobs, source, schedulerSignal, {
       run: config.experiment.run, previous: previous?.preparationRounds ?? [], sensitiveValues,
-      batchPreparation, onProgress: taskProgress, savePreparationFailure,
+      onProgress: taskProgress, savePreparationFailure,
     });
-    const { plannedTasks, preparationFailures, readiness, readyJobs, dispatchJobs, planningRecords } = dispatch;
-    pipeline = dispatch.pipeline;
     if (dispatch.failed) {
       await components.store.updateRun({ status: "error", finishedAt: new Date().toISOString(), durationMs: elapsed() });
       return await components.store.snapshot();
     }
+    pipeline = dispatch.pipeline;
     const originals = new Map(selected.map(ref => [ref.id, jobs.find(job => job.taskId === ref.id) ?? {
       runId: manifest.runId, taskId: ref.id, ref, attemptId: randomUUID(), configFingerprint: manifest.configFingerprint,
     }]));
@@ -363,16 +362,18 @@ export async function executeEngine({
       "execute",
       `Starting evaluation of ${jobs.length} tasks; solver=${config.experiment.solver.name}; environment=${config.experiment.environment.name}`,
     );
+    // The public scheduler passes TaskJob back to the executor. Keep preparation private and keyed by attempt.
+    const dispatched = new Map<string, DispatchEntry>();
     const executor: TaskExecutor = async (job, taskSignal) => {
-      const preparedTask = plannedTasks.get(job.taskId);
-      const admission = readiness.get(job.taskId);
-      const preparationFailure = preparationFailures.get(job.taskId);
-      const record = await runTask(job, components, source, taskSignal, {
-        ...(preparedTask ? { preparedTask } : {}), ...(preparationFailure ? { preparationFailure } : {}),
+      const entry = dispatched.get(job.attemptId);
+      if (!entry || entry.job.taskId !== job.taskId || entry.job.runId !== job.runId)
+        throw new TypeError("Scheduler executor received an unknown attempt");
+      dispatched.delete(job.attemptId);
+      const record = await runTask(entry, components, source, taskSignal, {
         preparationConcurrency: preparationConcurrency(
           Number(config.experiment.scheduler.config.concurrency ?? 1), selected.length),
         ...(config.experiment.run.preparation?.environmentTimeoutSeconds === undefined ? {} : { environmentTimeoutSeconds: config.experiment.run.preparation.environmentTimeoutSeconds }),
-        ...(admission ? { readiness: admission } : {}), timeoutSeconds: config.experiment.run.timeoutSeconds,
+        timeoutSeconds: config.experiment.run.timeoutSeconds,
         ...(config.experiment.run.solveTimeoutSeconds === undefined ? {} : { solveTimeoutSeconds: config.experiment.run.solveTimeoutSeconds }),
         ...(config.experiment.run.verifyTimeoutSeconds === undefined ? {} : { verifyTimeoutSeconds: config.experiment.run.verifyTimeoutSeconds }),
         includeTaskAnswer: config.experiment.run.includeTaskAnswer === true, sensitiveValues, onProgress: taskProgress,
@@ -384,9 +385,10 @@ export async function executeEngine({
       return record;
     };
     // Initial readiness, automatic stream recovery and manual reruns share slots.
-    if (readyJobs) retry.setInitialSource(readyJobs);
+    if (dispatch.pipeline) retry.setInitialSource(dispatch.entries);
     else {
-      for (const job of dispatchJobs) retry.add(job, retryTaskIds ? current.find(record => record.key.taskId === job.taskId)?.key.attemptId : undefined);
+      for (const entry of dispatch.entries)
+        retry.add(entry, retryTaskIds ? current.find(record => record.key.taskId === entry.job.taskId)?.key.attemptId : undefined);
       retry.initialComplete();
     }
     try {
@@ -397,28 +399,30 @@ export async function executeEngine({
     const recoveryPreparation = new AbortController();
     const recoverySignal = AbortSignal.any([schedulerSignal, recoveryPreparation.signal]);
     const recoveryProducer = (async function* () {
-      for await (const job of retry) {
-        const expected = retry.expectedFailure(job.attemptId);
+      for await (const { job, preparation, expectedFailure: expected } of retry) {
         if (expected) {
           const current = components.store.currentTaskResult ? await components.store.currentTaskResult(job.taskId)
             : (await components.store.snapshot()).records.find(record => record.key.taskId === job.taskId);
           if (!current || current.key.attemptId !== expected || !isManualRetryEligible(current)) { retry.discard(job); continue; }
         }
-        const prepared = await prepareRetryTask(job, originals.get(job.taskId)?.attemptId, {
-          components, source, signal: recoverySignal, run: config.experiment.run, sensitiveValues, onProgress: taskProgress,
-        });
-        if (prepared) {
-          plannedTasks.delete(job.taskId);
-          preparationFailures.delete(job.taskId);
-          readiness.delete(job.taskId);
-          if (prepared.task) plannedTasks.set(job.taskId, prepared.task);
-          if (prepared.failure) preparationFailures.set(job.taskId, prepared.failure);
-        }
-        yield prepared?.failure ? { ...job, preparationFailure: prepared.failure } : job;
+        if (preparation.state === "on-demand" && originals.get(job.taskId)?.attemptId !== job.attemptId) {
+          const prepared = await prepareRetryTask(job, {
+            components, source, signal: recoverySignal, run: config.experiment.run, sensitiveValues, onProgress: taskProgress,
+          });
+          yield { job, preparation: prepared };
+        } else yield { job, preparation };
       }
     })();
     const dynamicJobs: AsyncIterable<TaskJob> = { [Symbol.asyncIterator]: () => ({
-      next: () => recoveryProducer.next(),
+      async next() {
+        const next = await recoveryProducer.next();
+        if (next.done) return { done: true, value: undefined };
+        const entry = next.value;
+        const { job, preparation } = entry;
+        dispatched.set(job.attemptId, entry);
+        // Remote schedulers route a preparation failure back to the coordinator's executor.
+        return { done: false, value: preparation.state === "failed" ? { ...job, preparationFailure: preparation.failure } : job };
+      },
       async return() {
         retry.close(); recoveryPreparation.abort(new DOMException("Dispatch closed", "AbortError")); pipeline?.cancel();
         await recoveryProducer.return(undefined);
@@ -426,14 +430,15 @@ export async function executeEngine({
       },
     }) };
     const scheduled = components.scheduler.executeReady(dynamicJobs, executor, schedulerSignal);
-    const records = (async function* () { yield* planningRecords; yield* scheduled; })();
+    const records = (async function* () { yield* dispatch.planningRecords; yield* scheduled; })();
     for await (const record of records) {
+      dispatched.delete(record.key.attemptId);
       retry.complete(record);
       const original = originals.get(record.key.taskId);
       // Enqueue synchronously with complete(), before the queue can close or a
       // manual retry can reserve the same task. The failed attempt is persisted.
       const automaticRetry = canRetryStream(record) && original !== undefined &&
-        retry.add({ ...original, attemptId: randomUUID() }, record.key.attemptId);
+        retry.add(onDemand({ ...original, attemptId: randomUUID() }), record.key.attemptId);
       if (automaticRetry) streamFailures.set(record.key.taskId, (streamFailures.get(record.key.taskId) ?? 0) + 1);
       else completedTaskIds.add(record.key.taskId);
       for (const error of record.errors)

@@ -8,6 +8,7 @@ import { parseHarborConfig } from "../../src/plugins/benchmarks/agent-harness/pr
 import { HarborShellVerifier } from "../../src/plugins/verifiers/shell.js";
 import { evaluateHarborSteps } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/steps.js";
 import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { writeFixture } from "../fixtures/dataset-tasks.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun, fixtureFailure } from "../fixtures/results/store-fixture.js";
@@ -113,8 +114,8 @@ test.each([
   };
   await value.components.store.create(value.config.experiment.output.directory, { ...storeRun, source, taskIds: ["a"] }, {});
   try {
-    const record = await runTask({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" },
-      configFingerprint: storeRun.configFingerprint }, value.components, source, signal());
+    const record = await runTask(onDemand({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" },
+      configFingerprint: storeRun.configFingerprint }), value.components, source, signal());
     expect(record.errors).toHaveLength(failure === "none" ? 0 : 1);
     expect(record).toMatchObject({ executionStatus: score === null ? "failed" : "completed", scoreStatus: score === null ? "invalid" : "valid",
       verdict: score === null ? null : { score },

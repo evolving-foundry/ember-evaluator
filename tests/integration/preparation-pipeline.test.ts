@@ -492,7 +492,11 @@ test("model truncation replans a pipeline task with a batch preparation barrier"
   expect(snapshot.run.status).toBe("completed");
   expect(prepared).toBe(4);
   expect(calls).toBe(2);
-  expect(await components.store.listAttempts()).toHaveLength(2);
+  const attempts = await components.store.listAttempts();
+  expect(attempts).toHaveLength(2);
+  expect(attempts[0]?.record?.readiness?.roundId).toBe(snapshot.run.preparationRounds?.[0]?.id);
+  expect(attempts[1]?.record).toMatchObject({ executionStatus: "completed" });
+  expect(attempts[1]?.record?.readiness).toBeUndefined();
   expect(prepareTasks.mock.calls.map(call => call[2].settings?.mode)).toEqual(["pipeline", "batch"]);
 }, 15_000);
 

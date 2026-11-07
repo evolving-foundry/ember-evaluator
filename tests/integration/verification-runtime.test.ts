@@ -6,6 +6,7 @@ import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
 import { runEngine } from "../../src/application/run-engine.js";
 import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { planBenchmarkRun } from "../../src/plugins/benchmarks/shared/plan-run.js";
 import type { VerificationRuntime, VerificationRuntimeSession } from "../../src/core/contracts/verification-runtime.js";
 import type { EnvironmentSpec } from "../../src/core/contracts/environment.js";
@@ -133,7 +134,7 @@ test("a verifier handle returned after cancellation and cleanup deadline is stil
   const cancel = new AbortController(), released = Promise.withResolvers<void>(), disposed = Promise.withResolvers<void>();
   runtime.prepare = async () => { cancel.abort(new Error("cancel while opening verifier")); await released.promise; return handle; };
   handle.dispose = async signal => { signal.throwIfAborted(); disposed.resolve(); };
-  const record = await runTask(job, components, source, cancel.signal, { cleanupTimeoutMs: 20 });
+  const record = await runTask(onDemand(job), components, source, cancel.signal, { cleanupTimeoutMs: 20 });
   expect(record.cleanupStatus).toBe("unconfirmed");
   expect(record.environments.verificationRuntime).toBeUndefined();
   released.resolve(); await disposed.promise;
@@ -145,7 +146,7 @@ test("ready tasks missing verifier receipts fail without rerunning preparation o
   await components.store.create(join(root, "runs"), { ...storeRun, source, taskIds: ["a"] }, {});
   const task = await components.benchmark.prepare(job.ref, source, new AbortController().signal);
   const materialize = vi.spyOn(runtime, "materialize");
-  const record = await runTask(job, components, source, new AbortController().signal, { preparedTask: task });
+  const record = await runTask({ job, preparation: { state: "ready", task } }, components, source, new AbortController().signal);
   expect(record.errors[0]?.message).toContain("verification runtime receipt");
   expect(materialize).not.toHaveBeenCalled(); expect(inputs).toHaveLength(0);
 });

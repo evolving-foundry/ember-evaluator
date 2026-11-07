@@ -4,7 +4,6 @@ import { DEFAULT_TASK_TIMEOUT_SECONDS } from "../policies/timeouts.js";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import type { RunComponents } from "../contracts/components.js";
-import type { TaskJob } from "../contracts/scheduler.js";
 import type { PreparedTask, SourceLock, PhaseTimeoutOverrides } from "../contracts/task.js";
 import type {
   EnvironmentSession,
@@ -16,6 +15,7 @@ import type { PreparedSolver } from "../contracts/solver.js";
 import type { VerificationRuntimeSession } from "../contracts/verification-runtime.js";
 import { withPreparationTimeout, DEFAULT_PREPARATION_TIMEOUT_SECONDS } from "../preparation/preparation-timeout.js";
 import { materializeVerificationRuntime } from "../preparation/verification-runtime.js";
+import type { DispatchEntry } from "../preparation/task-preparation.js";
 import {
   TRAJECTORY_EVIDENCE_PATH,
   type AttemptRecord,
@@ -42,11 +42,6 @@ import { assertSolveResult, assertVerifyResult } from "../results/record-validat
 import { readCollectOutput } from "../artifacts/collect-output.js";
 
 export type RunTaskOptions = PhaseTimeoutOverrides & {
-  /** Already materialized by batch or readiness-based preparation. */
-  preparedTask?: PreparedTask;
-  /** A preparation failure, recorded without starting a solver or retrying preparation. */
-  preparationFailure?: Failure;
-  readiness?: AttemptRecord["readiness"];
   timeoutSeconds?: number;
   cleanupTimeoutMs?: number;
   preparationConcurrency?: number;
@@ -91,12 +86,14 @@ async function trajectoryState(
 }
 
 export async function runTask(
-  job: TaskJob,
+  { job, preparation }: DispatchEntry,
   components: RunComponents,
   source: SourceLock,
   signal: AbortSignal,
   options: RunTaskOptions = {},
 ): Promise<AttemptRecord> {
+  const dependenciesReady = preparation.state === "ready";
+  const readiness = preparation.state === "ready" ? preparation.readiness : undefined;
   const timeoutSeconds = options.timeoutSeconds ?? DEFAULT_TASK_TIMEOUT_SECONDS;
   const cleanupTimeoutMs = options.cleanupTimeoutMs ?? 60_000;
   if (
@@ -127,7 +124,7 @@ export async function runTask(
   const taskSignal = AbortSignal.any([signal, deadline.signal]);
   const record: AttemptRecord = {
     evaluationKind: components.benchmark.evaluationKind ?? "quality",
-    ...(options.readiness === undefined ? {} : { readiness: structuredClone(options.readiness) }),
+    ...(readiness === undefined ? {} : { readiness: structuredClone(readiness) }),
     key,
     executionStatus: "failed", scoreStatus: "invalid", cleanupStatus: "cleaned",
     solve: null,
@@ -170,8 +167,8 @@ export async function runTask(
   let transferTarget: string | null = null;
   const failure = (at: Phase, error: unknown, fallback?: ErrorCode, context = "", cancellation?: ErrorContext["cancellation"]) => {
     let item: Failure;
-    if (at === "prepare" && options.preparationFailure) {
-      item = normalizeFailure(options.preparationFailure, options.sensitiveValues);
+    if (at === "prepare" && preparation.state === "failed") {
+      item = normalizeFailure(preparation.failure, options.sensitiveValues);
     } else {
       const fallbackCode = error instanceof VerificationError ? "VERIFY_RESULT_INVALID" : fallback;
       item = classifyError(error, {
@@ -254,7 +251,7 @@ export async function runTask(
   ) => {
     const spec = which === "solve" ? prepared!.solveEnv : prepared!.verifyEnv!;
     const environmentSpec: EnvironmentSpec =
-      which === "solve" && !options.preparedTask
+      which === "solve" && !dependenciesReady
         ? {
             ...spec,
             runtime: [...spec.runtime, ...components.solver.requirements()],
@@ -293,7 +290,7 @@ export async function runTask(
       await bounded(() => solverHandle!.dispose!(quiesceSignal), quiesceSignal);
       preparedSolvers.splice(preparedSolvers.indexOf(solverHandle), 1);
     }
-    if (options.preparedTask && !solveSession.quiesce)
+    if (dependenciesReady && !solveSession.quiesce)
       throw new Error("Batch execution requires EnvironmentSession.quiesce()");
     await solveSession.quiesce?.(quiesceSignal);
   };
@@ -339,15 +336,17 @@ export async function runTask(
     }
   };
   try {
-    if (options.preparationFailure) {
-      const error = new Error(options.preparationFailure.message);
-      Object.assign(error, { code: options.preparationFailure.code });
+    if (preparation.state === "failed") {
+      const error = new Error(preparation.failure.message);
+      Object.assign(error, { code: preparation.failure.code });
       throw error;
     }
-    prepared = await stage("prepare", () => options.preparedTask ? Promise.resolve(options.preparedTask) : components.benchmark.prepare(job.ref, source, taskSignal, activity));
+    prepared = await stage("prepare", () => preparation.state === "on-demand"
+      ? components.benchmark.prepare(job.ref, source, taskSignal, activity)
+      : Promise.resolve(preparation.task));
     if (prepared.input.id !== job.taskId) throw new TypeError("Prepared task identity differs from locked selection");
     const prepareEnvironment = <T>(purpose: "solve" | "verify", work: (signal: AbortSignal) => Promise<T>) => {
-      if (options.preparedTask) return work(taskSignal);
+      if (dependenciesReady) return work(taskSignal);
       phase = "environment";
       const started = performance.now();
       return withPreparationTimeout(purpose,
@@ -356,10 +355,10 @@ export async function runTask(
         timing => progress("environment", `${purpose} preparation timeout ${timing.timeoutSeconds}s (base ${timing.baseSeconds}s × ${timing.multiplier}; concurrency ${timing.concurrency})`), preparationElapsedMs[purpose])
         .finally(() => { preparationElapsedMs[purpose] += performance.now() - started; });
     };
-    if (!options.preparedTask && components.benchmark.verificationRuntime)
+    if (!dependenciesReady && components.benchmark.verificationRuntime)
       prepared = await prepareEnvironment("verify", preparationSignal =>
         stage("environment", stageSignal => materializeVerificationRuntime(prepared!, components.benchmark, stageSignal, activity), preparationSignal));
-    if (options.preparedTask && components.benchmark.verificationRuntime && prepared.verificationRuntime === undefined)
+    if (dependenciesReady && components.benchmark.verificationRuntime && prepared.verificationRuntime === undefined)
       throw new Error("Prepared task lacks its verification runtime receipt");
     if (prepared.steps) {
       if (!components.benchmark.evaluateSteps) throw new Error("Multi-step Benchmark must implement evaluateSteps()");
@@ -381,7 +380,7 @@ export async function runTask(
     if (artifactName !== null) transferTarget = join(paths.artifacts, artifactName);
     const solverEnvironment = prepared.solveEnv;
     await prepareEnvironment("solve", async preparationSignal => {
-      const installation = !options.preparedTask && components.solver.runtimeInstallation
+      const installation = !dependenciesReady && components.solver.runtimeInstallation
         ? await stage("install", async stageSignal => {
             const described = await components.solver.runtimeInstallation!(stageSignal);
             stageSignal.throwIfAborted();
@@ -464,7 +463,7 @@ export async function runTask(
         await stage("transfer", async () => { await Promise.allSettled([...pending]); });
       }
       await finishSolve(taskSignal);
-      if (prepared.verificationMode !== "shared" && (solveSession!.quiesce || options.preparedTask))
+      if (prepared.verificationMode !== "shared" && (solveSession!.quiesce || dependenciesReady))
         await stage("transfer", quiesceSolve);
       let verifier: EnvironmentSession | null = null;
       if (prepared.verificationMode === "shared") {

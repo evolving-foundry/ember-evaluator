@@ -12,6 +12,7 @@ import { normalizeAgentXExport } from "../../src/plugins/benchmarks/inference-en
 import { lockAgentXLexicon } from "../../src/runtimes/agentx/runtime.js";
 import { runEngine } from "../../src/application/run-engine.js";
 import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { planResume } from "../../src/core/recovery/resume.js";
 import { saveReport, rebuildReport } from "../../src/application/report/index.js";
 import { MarkdownReporter } from "../../src/plugins/reporters/markdown.js";
@@ -147,7 +148,7 @@ test.each(["none", "v1", "v2", "custom-duration"] as const)("offline reporting r
   await value.components.store.create(join(path, "runs"), { ...storeRun, source: locked, taskIds: ["a"], evaluationKind: "performance" },
     { metrics: [{ name: "agentx-performance", config: {} }], reporter: { name: "markdown", config: {} } });
   const job = { runId: "run-1", taskId: "a", attemptId: "attempt-1", ref: { id: "a", recordKey: "a" }, configFingerprint: "config-hash" };
-  const record = await runTask(job, value.components, locked, signal());
+  const record = await runTask(onDemand(job), value.components, locked, signal());
   expect(record.executionStatus).toBe("completed");
   await value.components.store.updateRun({ status: "completed", finishedAt: new Date().toISOString(), durationMs: 1000 });
   if (version === "v1") {

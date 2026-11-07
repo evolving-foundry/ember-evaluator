@@ -6,6 +6,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { setTimeout as delay } from "node:timers/promises";
 import { runEngine } from "../../src/application/run-engine.js";
 import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { planResume } from "../../src/core/recovery/resume.js";
 import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { computeSuccessRate } from "../../src/plugins/metrics/success-rate.js";
@@ -87,7 +88,7 @@ test("runTask without an explicit whole-task budget can solve past the old 300-s
   value.components.solver.solve = async (...args) => { const result = await solve(...args); vi.advanceTimersByTime(301_000); return result; };
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   try {
-    const record = await runTask({ runId: storeRun.runId, taskId: "a", attemptId: "default-budget", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint },
+    const record = await runTask(onDemand({ runId: storeRun.runId, taskId: "a", attemptId: "default-budget", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint }),
       value.components, source, new AbortController().signal);
     expect(record.executionStatus).toBe("completed");
   } finally { vi.useRealTimers(); }
@@ -244,8 +245,8 @@ test("Ray infrastructure cancellation cannot be misclassified by an aborting har
     controller.abort(Object.assign(new Error("Ray coordinator heartbeat unavailable"), { code: "RAY_HEARTBEAT_TIMEOUT" }));
     throw Object.assign(new Error("harness stopped"), { code: "SOLVER_AGENT_TIMEOUT" });
   };
-  const result = await runTask({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" },
-    configFingerprint: storeRun.configFingerprint }, value.components, source, controller.signal);
+  const result = await runTask(onDemand({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" },
+    configFingerprint: storeRun.configFingerprint }), value.components, source, controller.signal);
   expect(result).toMatchObject({ executionStatus: "failed", verdict: null });
   expect(computeSuccessRate(await value.components.store.snapshot())).toMatchObject({ denominator: 0, invalid: 1 });
 });

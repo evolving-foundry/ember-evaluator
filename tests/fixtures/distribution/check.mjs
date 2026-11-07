@@ -153,6 +153,27 @@ if (spawnSync(openssl, ["version"], { windowsHide: true }).status !== 0) {
     assert.equal(accepted.length, 1); assert.equal(accepted[0].result.executionStatus, "completed");
     assert.equal(accepted[0].result.verdict.score, 1);
     record("legacy workerEntry executes a real attempt and uploads evidence over HTTPS");
+    const batch = { ...remote, schemaVersion: 2, job: { ...remote.job, runId: randomUUID(), attemptId: randomUUID() },
+      preparation: { mode: "prepare", roundId: randomUUID(), nodeId: "controlled-node", deadlineAt: null, digest: null,
+        concurrency: 1, defaultTimeoutSeconds: 30, environmentTimeoutSeconds: null } };
+    const workerInput = job => JSON.stringify({ remote: job, nodeId: "controlled-node", hostname: "controlled-host" });
+    const ready = await run("dist/adapters/ray/node-worker.js", [], workerInput(batch), workerEnv);
+    assert.equal(ready.code, 0, ready.stderr + ready.stdout);
+    const { preparationDigest } = JSON.parse(ready.stdout);
+    assert.match(preparationDigest, /^[a-f0-9]{64}$/u);
+    assert.equal(accepted.length, 1);
+    const execute = { ...batch, preparation: { ...batch.preparation, mode: "execute", digest: preparationDigest } };
+    const invalidReceipt = await run("dist/adapters/ray/node-worker.js", [],
+      workerInput({ ...execute, preparation: { ...execute.preparation, digest: "0".repeat(64) } }), workerEnv);
+    assert.equal(invalidReceipt.code, 1);
+    assert.equal(JSON.parse(invalidReceipt.stdout).errorCode, "ENV_PREPARATION_FAILED");
+    assert.equal(accepted.length, 1);
+    const preparedWorker = await run("dist/adapters/ray/node-worker.js", [], workerInput(execute), workerEnv);
+    assert.equal(preparedWorker.code, 0, preparedWorker.stderr + preparedWorker.stdout);
+    assert.equal(accepted.length, 2);
+    assert.equal(accepted[1].result.executionStatus, "completed");
+    assert.equal(accepted[1].result.verdict.score, 1);
+    record("Ray worker prepares on-node dependencies, rejects the wrong receipt and executes the ready attempt");
     const bad = await run("dist/adapters/ray/node-worker.js", [], JSON.stringify({ remote: { ...remote, packageDigest: "sha256:" + "0".repeat(64) }, nodeId: "controlled-node", hostname: "controlled-host" }), workerEnv);
     assert.equal(bad.code, 1); assert.equal(JSON.parse(bad.stdout).errorCode, "SOURCE_CHANGED");
     record("worker rejects a coordinator with a different package digest");

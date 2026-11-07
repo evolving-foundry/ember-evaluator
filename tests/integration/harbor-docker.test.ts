@@ -9,6 +9,7 @@ import type { EnvironmentSession, EnvironmentSpec } from "../../src/core/contrac
 import { writeFixture } from "../fixtures/dataset-tasks.js";
 import { HarborBenchmark, parseHarborConfig } from "../../src/plugins/benchmarks/agent-harness/protocols/harbor/index.js";
 import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { harness } from "../fixtures/engine/fakes.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
 import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
@@ -43,7 +44,7 @@ test.skipIf(!enabled).each(["shared", "separate"] as const)("Harbor Docker %s gr
       return solve(input, session, context);
     };
     await value.components.store.create(value.config.experiment.output.directory, { ...storeRun, source, taskIds: [ref.id] }, {});
-    const record = await runTask({ runId: storeRun.runId, taskId: ref.id, attemptId: "first", ref, configFingerprint: storeRun.configFingerprint },
+    const record = await runTask(onDemand({ runId: storeRun.runId, taskId: ref.id, attemptId: "first", ref, configFingerprint: storeRun.configFingerprint }),
       value.components, source, signal());
     expect(record).toMatchObject({ executionStatus: "completed", scoreStatus: "valid", verdict: { score: 1 },
       cleanupStatus: "cleaned", collection: { artifacts: "not-produced", trajectory: "complete" } });

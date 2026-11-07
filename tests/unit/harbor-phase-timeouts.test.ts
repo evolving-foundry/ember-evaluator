@@ -12,6 +12,7 @@ import { openPluginRegistry } from "../../src/application/plugins/open-registry.
 import { createBenchmark } from "../../src/application/plugins/create-components.js";
 import { setTimeout as delay } from "node:timers/promises";
 import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
 
@@ -96,7 +97,7 @@ test("a longer YAML verification ceiling also replaces the Shell verifier's inte
   };
   try {
     await value.components.store.create(value.config.experiment.output.directory, { ...storeRun, source, taskIds: ["a"] }, {});
-    const result = await runTask({ runId: storeRun.runId, taskId: "a", attemptId: "yaml-grading-override", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint },
+    const result = await runTask(onDemand({ runId: storeRun.runId, taskId: "a", attemptId: "yaml-grading-override", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint }),
       value.components, source, new AbortController().signal, { timeoutSeconds: 2, verifyTimeoutSeconds: 1 });
     expect(result.executionStatus, JSON.stringify(result.errors)).toBe("completed");
     expect(result.verdict?.score).toBe(1);

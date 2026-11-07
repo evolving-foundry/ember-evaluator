@@ -1,8 +1,9 @@
 import { performance } from "node:perf_hooks";
 import type { RunComponents } from "../contracts/components.js";
 import type { EnvironmentSpec, RuntimeInstallation } from "../contracts/environment.js";
-import type { TaskPreparer } from "../contracts/preparation.js";
+import type { TaskPreparationContext, TaskPreparer } from "../contracts/preparation.js";
 import type { ProgressListener } from "../progress/progress.js";
+import type { DescribedTask, ReadyDependencies } from "./task-preparation.js";
 import { imagePreparationProgress } from "./preparation-progress.js";
 import { LiveOperation } from "../progress/live-progress.js";
 import { materializeVerificationRuntime } from "./verification-runtime.js";
@@ -20,12 +21,12 @@ async function waitForInstallation<T>(work: Promise<T>, signal: AbortSignal): Pr
 }
 
 /** Reuse the solver installation within one round; placement and queues belong to the scheduler. */
-export function createTaskPreparer(
+export function createTaskMaterializer(
   components: Pick<RunComponents, "benchmark" | "environment" | "solver">,
   options: { sensitiveValues?: readonly string[]; onProgress?: ProgressListener } = {},
-): TaskPreparer {
+) {
   let installation: Promise<RuntimeInstallation | undefined> | undefined;
-  return async (task, signal, context) => {
+  return async ({ task }: DescribedTask, signal: AbortSignal, context: TaskPreparationContext): Promise<ReadyDependencies> => {
     signal.throwIfAborted();
     if (!components.environment.materialize) throw new Error("Environment must implement materialize() for planned preparation");
     const { onProgress, sensitiveValues } = options;
@@ -70,8 +71,9 @@ export function createTaskPreparer(
         runtime: [...task.solveEnv.runtime, ...components.solver.requirements()], ...(runtime ? { installation: runtime } : {}),
       }, "solve", stageSignal);
     });
-    if (!task.verifyEnv && !task.steps?.some(step => step.task.verifyEnv) && !components.benchmark.verificationRuntime) return { ...task, solveEnv };
-    return stage("verify", async stageSignal => {
+    if (!task.verifyEnv && !task.steps?.some(step => step.task.verifyEnv) && !components.benchmark.verificationRuntime)
+      return { state: "ready", task: { ...task, solveEnv } };
+    const preparedTask = await stage("verify", async stageSignal => {
       const verifyEnv = task.verifyEnv ? await materialize(task.verifyEnv, "verify", stageSignal) : null;
       const prepared = { ...task, solveEnv, verifyEnv };
       if (task.steps) {
@@ -95,5 +97,12 @@ export function createTaskPreparer(
         if (timing) timing.phaseDurationMs.verifyEnvironment = (timing.phaseDurationMs.verifyEnvironment ?? 0) + performance.now() - started;
       }
     });
+    return { state: "ready", task: preparedTask };
   };
+}
+
+/** Scheduler plugins still exchange PreparedTask through their public preparation callback. */
+export function createTaskPreparer(...args: Parameters<typeof createTaskMaterializer>): TaskPreparer {
+  const materialize = createTaskMaterializer(...args);
+  return async (task, signal, context) => (await materialize({ state: "described", task }, signal, context)).task;
 }

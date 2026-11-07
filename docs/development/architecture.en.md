@@ -68,7 +68,9 @@ Offline reports use [application/report/](../../src/application/report) to load 
 
 ## Retry, Ray, and Docker
 
-Within Engine, `admitRetryRequests` reads results, checks eligibility, reserves queue slots, and fills request bindings, returning `commit/release`. `prepareRetryTask` replans and prepares a retry, returning the prepared task or failure. `executeEngine` retains the queue, preparation maps, cancellation controls, and scheduling loop.
+Within Engine, `admitRetryRequests` reads results, checks eligibility, reserves queue slots, and fills request bindings. `prepareRetryTask` replans and prepares dependencies for a new attempt. The internal queue carries the job and its preparation result together. The executor uses the attempt ID to retrieve that result and distinguish on-demand preparation, a task description, ready dependencies, or failed preparation. Pipeline readiness times belong to the corresponding attempt. [Preparation state types](../../src/core/preparation/task-preparation.ts)
+
+The public Scheduler still receives `TaskJob`. Ray workers retain their preparation receipts and validate them before handing a job with ready dependencies to the executor.
 
 [application/retry-control/mailbox.ts](../../src/application/retry-control/mailbox.ts) owns request files, locks, transactions, and IPC; core owns eligibility and queue reservations. The handoff contract is [core/contracts/retry-control.ts](../../src/core/contracts/retry-control.ts). Online retry requests reserve tasks, persist request state and attempt bindings, then `commit` admission only after persistence succeeds. `finally release` releases reservations. Failed persistence must not leave tasks queued; repeated requests must not schedule duplicates. Shutdown stops accepting requests and waits for in-flight transactions before closing the channel.
 

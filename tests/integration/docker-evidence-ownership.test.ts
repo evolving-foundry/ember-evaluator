@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { expect, test } from "vitest";
 import type { RunComponents } from "../../src/core/contracts/components.js";
 import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
 import { DockerEnvironment } from "../../src/plugins/environments/docker/environment.js";
 import { PINNED_NODE_IMAGE } from "../../src/infrastructure/containers/runtime-contract.js";
@@ -81,8 +82,8 @@ test.skipIf(!enabled).each(["success", "failure", "cancel"] as const)(
     try {
       await store.create(root, { schemaVersion: 1, evaluationKind: "quality", runId, source, taskIds: ids, configFingerprint: "fixture",
         pluginVersions: { fixture: "1" }, startedAt: new Date().toISOString(), finishedAt: null, durationMs: null, status: "running" }, {});
-      const records = await Promise.all(ids.map(taskId => runTask({ runId, taskId, attemptId: randomUUID(),
-        configFingerprint: "fixture", ref: { id: taskId, recordKey: taskId } }, components, source, controller.signal, { timeoutSeconds: 120 })));
+      const records = await Promise.all(ids.map(taskId => runTask(onDemand({ runId, taskId, attemptId: randomUUID(),
+        configFingerprint: "fixture", ref: { id: taskId, recordKey: taskId } }), components, source, controller.signal, { timeoutSeconds: 120 })));
       for (const record of records) {
         const attempt = join(root, runId, "tasks", safeTaskKey(record.key.taskId), "attempts", record.key.attemptId);
         expect(record.collection.trajectory).toBe(mode === "cancel" ? "partial" : "complete");

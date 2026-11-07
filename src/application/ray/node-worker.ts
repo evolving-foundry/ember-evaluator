@@ -26,7 +26,8 @@ import { parseNodeConfig, type NodeConfig } from "../../infrastructure/ray/node-
 import { ProgressPublisher } from "../../core/progress/progress-wire.js";
 import { progressOperation } from "../../core/progress/progress-operation.js";
 import { assertEnvironmentTimeouts } from "../../core/preparation/preparation-validation.js";
-import { createTaskPreparer } from "../../core/preparation/materialize-task.js";
+import { createTaskMaterializer } from "../../core/preparation/materialize-task.js";
+import type { TaskPreparation } from "../../core/preparation/task-preparation.js";
 
 export async function executeRemoteNode(input: unknown, node: NodeConfig, token: string, registry: PluginRegistry): Promise<unknown> {
   if (Number(process.versions.node.split(".")[0]) !== 24) throw new Error("Ray node requires Node 24");
@@ -161,7 +162,7 @@ export async function executeRemoteNode(input: unknown, node: NodeConfig, token:
     const preparationFile = remote.preparation
       ? join(node.outputRoot, "preparations", key.runId, remote.preparation.roundId, `${safeTaskKey(key.taskId)}.json`)
       : null;
-    let preparedTask: PreparedTask | undefined;
+    let preparation: TaskPreparation = { state: "on-demand" };
     if (remote.preparation?.mode === "prepare") {
       const source = await validateSource();
       if (!components.environment.materialize) throw new Error("Node environment lacks batch materialization");
@@ -172,12 +173,12 @@ export async function executeRemoteNode(input: unknown, node: NodeConfig, token:
         throw new Error("Invalid prepared task identity or transfer");
       const timing: TaskPreparationTiming = preparationTiming = { taskId: key.taskId, status: "preparing", queuedAt: new Date().toISOString(),
         startedAt: new Date().toISOString(), finishedAt: null, queueDurationMs: 0, durationMs: null, phaseDurationMs: {} };
-      preparedTask = await createTaskPreparer(components, { sensitiveValues: secrets, onProgress: progress.observe })(
-        task, cancellation.signal, { roundId: remote.preparation.roundId, attemptId: key.attemptId, timing,
+      const ready = await createTaskMaterializer(components, { sensitiveValues: secrets, onProgress: progress.observe })(
+        { state: "described", task }, cancellation.signal, { roundId: remote.preparation.roundId, attemptId: key.attemptId, timing,
           concurrency: remote.preparation.concurrency, defaultTimeoutSeconds: remote.preparation.defaultTimeoutSeconds,
           roundSignal: cancellation.signal,
           ...(remote.preparation.environmentTimeoutSeconds === null ? {} : { environmentTimeoutSeconds: remote.preparation.environmentTimeoutSeconds }) });
-      const evidence = { task: preparedTask, packageDigest, source, configFingerprint: remote.job.configFingerprint };
+      const evidence = { task: ready.task, packageDigest, source, configFingerprint: remote.job.configFingerprint };
       const digest = fingerprintConfig(evidence);
       cancellation.signal.throwIfAborted();
       await mkdir(dirname(preparationFile!), { recursive: true });
@@ -198,7 +199,7 @@ export async function executeRemoteNode(input: unknown, node: NodeConfig, token:
       if (receipt.packageDigest !== packageDigest || receipt.configFingerprint !== remote.job.configFingerprint ||
         fingerprintConfig(receipt.source) !== fingerprintConfig(remote.source) || receipt.task.input.id !== key.taskId)
         throw new Error("Node preparation receipt differs from dispatch");
-      preparedTask = receipt.task;
+      preparation = { state: "ready", task: receipt.task };
     }
     const manifest: RunManifest = {
       schemaVersion: 1,
@@ -238,8 +239,7 @@ export async function executeRemoteNode(input: unknown, node: NodeConfig, token:
       const source = await validateSource();
       await components.environment.recoverAttempts?.(remote.previousAttempts, cancellation.signal);
       await components.benchmark.verificationRuntime?.recoverAttempts?.(remote.previousAttempts, cancellation.signal);
-      await runTask(remote.job, components, source, cancellation.signal, {
-        ...(preparedTask ? { preparedTask } : {}),
+      await runTask({ job: remote.job, preparation }, components, source, cancellation.signal, {
         timeoutSeconds: remote.safeConfig.timeoutSeconds,
         ...(remote.safeConfig.solveTimeoutSeconds === undefined ? {} : { solveTimeoutSeconds: remote.safeConfig.solveTimeoutSeconds }),
         ...(remote.safeConfig.verifyTimeoutSeconds === undefined ? {} : { verifyTimeoutSeconds: remote.safeConfig.verifyTimeoutSeconds }),

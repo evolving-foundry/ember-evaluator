@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { runTask, type RunTaskOptions } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import type { ProcessHandle } from "../../src/core/contracts/environment.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
 import { storeRun } from "../fixtures/results/store-fixture.js";
@@ -24,7 +25,7 @@ async function setup(shared: boolean, hookCode = 0) {
   };
   value.components.benchmark.verify = async (_task, _solve, session) => { value.events.push("verify"); expect(session?.id).toBe(shared ? "solve-id" : "verify-id"); return { score: 1, passed: true, details: {} }; };
   await value.components.store.create(value.config.experiment.output.directory, { ...storeRun, source, taskIds: ["a"] }, {});
-  const run = (options: RunTaskOptions = {}) => runTask({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint }, value.components, source, new AbortController().signal, options);
+  const run = (options: RunTaskOptions = {}) => runTask(onDemand({ runId: storeRun.runId, taskId: "a", attemptId: "first", ref: { id: "a", recordKey: "a" }, configFingerprint: storeRun.configFingerprint }), value.components, source, new AbortController().signal, options);
   return { ...value, run };
 }
 

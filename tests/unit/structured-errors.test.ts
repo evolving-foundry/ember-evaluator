@@ -1,5 +1,6 @@
 import { PhaseTimeoutError } from "../../src/core/policies/phase-timeout.js";
 import { TaskQueue } from "../../src/core/execution/task-queue.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { expect, test, vi } from "vitest";
 import { classifyError, declaredErrorCode, normalizeFailure, type ErrorContext } from "../../src/core/errors/classify.js";
 import { EvaluatorError } from "../../src/core/errors/evaluator-error.js";
@@ -129,9 +130,9 @@ test("Retry-After remains diagnostic evidence and never requeues a task", async 
   const record = { ...storeRecord(), executionStatus: "failed" as const, scoreStatus: "invalid" as const, solve: null, verdict: null, errors: [failure] };
   const job = { ...record.key, ref: { id: "a", recordKey: "a" }, configFingerprint: "test" };
   const coordinator = new TaskQueue();
-  coordinator.add(job); coordinator.initialComplete();
+  coordinator.add(onDemand(job)); coordinator.initialComplete();
   let count = 0;
-  for await (const next of coordinator) { count++; coordinator.complete({ ...record, key: next }); }
+  for await (const { job: next } of coordinator) { count++; coordinator.complete({ ...record, key: next }); }
   expect(count).toBe(1);
 });
 

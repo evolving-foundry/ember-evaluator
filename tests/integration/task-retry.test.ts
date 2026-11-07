@@ -7,6 +7,7 @@ import { consumeJiuwenswarm } from "../../src/runtimes/jiuwenswarm/protocol.js";
 import type { ProcessHandle } from "../../src/core/contracts/environment.js";
 import { runEngine } from "../../src/application/run-engine.js";
 import { runTask } from "../../src/core/execution/run-task.js";
+import { onDemand } from "../../src/core/preparation/task-preparation.js";
 import { LocalScheduler } from "../../src/plugins/schedulers/local/scheduler.js";
 import { safeTaskKey } from "../../src/core/artifacts/artifacts.js";
 import { harness, source } from "../fixtures/engine/fakes.js";
@@ -173,7 +174,7 @@ test("coordinator retries persisted scheduler results without relying on its loc
     executeReady(jobs, _executor, signal) {
       // Like Ray, execute outside the coordinator's executor and return the
       // persisted result. This tests admission, not Ray transport or deployment.
-      return scheduler.executeReady(jobs, (job, taskSignal) => runTask(job, value.components, source, taskSignal), signal);
+      return scheduler.executeReady(jobs, (job, taskSignal) => runTask(onDemand(job), value.components, source, taskSignal), signal);
     },
   };
   const result = await runEngine({ ...value, signal: new AbortController().signal });
