@@ -2,7 +2,7 @@
 
 > [English](./plugins.en.md) | 中文
 
-本文介绍八类组件接口、可运行的指标插件、显式 patch 与 Ray 节点部署。示例中的源码命令和 `experiments/` 目录均以 Evaluator 仓库根目录为基准。
+本文记录组件契约、内置注册、外部插件构建与 Ray 配置传输。第一次新增时，先看[新增 Solver](add-solver.md)、[新增内置组件](add-built-in-plugin.md)或[新增外部插件](add-external-plugin.md)的最小示例。
 
 [返回项目主页](../../README.zh-CN.md) · [用户手册](../users/README.zh-CN.md)
 
@@ -10,7 +10,7 @@
 
 仓库内组件在各角色的 index.ts 注册，Metrics 和 Reporter 分别使用 metrics/index.ts 和 reporters/index.ts；Benchmark 再分 agent-harness、inference-engine、operator 三个注册入口。application/plugins/open-registry.ts 创建 Cordis 注册表并注册插件，load-module.ts 定位和导入插件模块、读取版本，create-components.ts 使用已有注册表创建组件，bootstrap.ts 提供自行创建和释放注册表的公开入口；config/plugin-patch.ts 只读取 patch、校验条目和计算摘要，不执行插件模块。外部插件仍从 ember-evaluator 包根导入公共接口，不依赖这些内部目录。完整调用关系和资源所有权见[源码架构与执行流程](architecture.md)，新增 Benchmark 的具体位置和流程限制见[Benchmark 开发指南](benchmarks.md#新需求的修改入口)。
 
-运行 `pnpm check:dependencies` 检查导入、目录依赖和可执行模块循环；允许关系和未覆盖范围见[依赖规则](architecture.md#允许的源码依赖)。插件使用显式 patch 加载，不支持 manifest 自动发现或插件声明 CLI 命令。
+运行 `pnpm check:dependencies` 检查导入、目录依赖和可执行模块循环。允许关系和未覆盖范围见[依赖规则](architecture.md#允许的源码依赖)。仓库插件清单用于构建，外部组件在运行时通过显式 patch 加载。
 
 ### 发布进程入口
 
@@ -71,43 +71,16 @@ Benchmark 实现 `planRun()` 时，Scheduler 需要实现 `prepareTasks(jobs, pl
 
 Store 或 Scheduler 生成的 `AttemptRecord` 必须包含 `evaluationKind`、`executionStatus`、`scoreStatus` 和 `cleanupStatus`；当前类型不再接受 `status`、`timeoutKind`。指标插件直接读取这些字段；需要报告中的状态文字时可从包根导入 `attemptStatus()`、`attemptTimeoutKind()`，不要把显示值再写入记录。历史结果仅在本地 Store 的读取入口转换，新的提交和远端消息必须使用当前结构，字段组合规则见[结果与错误说明](../users/reference/errors.zh-CN.md)。
 
+## 新增内置组件
+
+1. 按[插件种类](#插件种类)选角色和契约。在 `src/plugins/<角色目录>/` 新增实现。新增 Benchmark 时，按[开发指南](benchmarks.md#新需求的修改入口)选择类别和注册入口。
+2. 在角色的 `index.ts` 导入实现，在 `apply(ctx)` 中加入 `ctx.evaluator.register(role, name, validate, factory)`。同一角色内使用唯一的 `name`。`validate` 检查 `config` 并返回工厂需要的值，`factory` 创建实例。工厂解析相对路径时用 `runtime.resolvePath()`，持有进程或连接时接入对应的释放流程。
+3. 在实验 YAML 中用注册名选择组件。字段位置见[在实验中选择组件](external-plugins.md#4-在实验中选择组件)。要让某个 Benchmark 默认使用新组件，在该 Benchmark 的 [Profile](benchmarks.md#发布默认-profile) 中设置选择项。`src/plugins/index.ts` 已调用各角色的 `apply(ctx)`，新增已有角色的实现只需要在对应角色注册。
+4. 运行 `pnpm check:dependencies`、`pnpm typecheck` 和 `pnpm build`，用 `node dist/cli.js inspect <实验.yaml>` 校验名称和参数。再运行一份受控实验验证组件实际行为。组件涉及外部进程或连接时，覆盖失败、取消和释放。
+
 ## 编写插件
 
-Solver 的 `runtimeInstallation()` 返回 `RuntimeInstallation` 时，可以设置 `cacheName`，例如 `agentx-1.0.7-py3.12`。本机托管目录为 `<缓存根目录>/<cacheName>/<12 位内容哈希>`；未设置时名称为 `runtime`。名称为 1～48 个小写 ASCII 字母、数字、点或连字符，首尾必须是字母或数字，不接受 Windows 设备保留名称。名称仅用于本机缓存目录，不参与内容摘要；完整摘要仍根据 `id`、平台、文件及命令计算，Docker 镜像身份不受名称影响。安装直接在最终目录执行，因此命令可以保存 `{root}` 的绝对路径。缓存位置及清理方法见[安装指南](../users/installation.zh-CN.md#本机运行时缓存与-windows-路径长度)。
-
 编写或修改 Benchmark 插件时，接口、代码职责、生命周期及受控示例见 [Benchmark 开发指南](benchmarks.md)。数据集的官方要求、镜像、平台、资源、超时配置和真实运行验收见 [Benchmark 评测要求与验收指南](benchmark-evaluation-requirements.md)。
-
-下面以“已完成任务数”指标为例，在仓库根目录创建 `custom-plugins/completed-count.mjs`：
-
-```js
-export const inject = ["evaluator"];
-
-export function apply(ctx) {
-  ctx.evaluator.register(
-    "metrics",
-    "completed-count",
-    (config) => {
-      if (
-        config === null || typeof config !== "object" ||
-        Array.isArray(config) || Object.keys(config).length > 0
-      ) {
-        throw new TypeError("completed-count 不接受配置参数");
-      }
-      return {};
-    },
-    () => ({
-      name: "completed-count",
-      async compute(snapshot) {
-        return {
-          completed: snapshot.records.filter(
-            (record) => record.executionStatus === "completed",
-          ).length,
-        };
-      },
-    }),
-  );
-}
-```
 
 `register(role, name, validate, factory)` 的四个参数分别是组件种类、注册名、配置校验函数和实例工厂。工厂可以接收 `(config, runtime)`，其中 runtime 提供模型配置、运行时认证和 `resolvePath()` 等上下文；认证只用于调用模型，不写入日志或结果。
 
@@ -175,46 +148,7 @@ dist/plugins/
 
 ## 用 `--patch` 引用外部插件
 
-在 `custom-plugins/` 下新建 `cordis.patch.yaml`：
-
-```yaml
-- insert:
-    - id: custom-metrics                    # 插件模块的唯一标识，用于来源与版本记录
-      name: ./completed-count.mjs            # 模块路径，相对本 patch 文件所在目录
-      # name 也可填已安装的 npm 包名；npm 包从 patch 文件目录解析。
-      # 当前 patch 仅支持 insert，条目只接受 id 和 name。
-```
-
-目录结构如下：
-
-```text
-<仓库根目录>/
-├── playbook/gsm8k/gsm8k-simpleagent.yaml
-└── custom-plugins/
-    ├── cordis.patch.yaml
-    └── completed-count.mjs
-```
-
-在仓库自带的 [GSM8K 示例](../../playbook/gsm8k/gsm8k-simpleagent.yaml) 中添加以下顶层 `metrics` 配置：
-
-```yaml
-metrics:                       # 显式列表会替换默认指标，需保留的内置指标也要列出
-  - name: success-rate
-  - name: duration
-  - name: usage
-  - name: completed-count      # register() 声明的组件名，不是 patch 的 id 或模块路径
-    # config: {}               # 组件参数写在这里；本示例插件不接受非空参数
-```
-
-在仓库根目录运行，并显式指定 patch：
-
-```bash
-ember-evaluator run playbook/gsm8k/gsm8k-simpleagent.yaml --patch custom-plugins/cordis.patch.yaml
-```
-
-`--dry-run` 也接受相同的 `--patch <path>` 参数。patch 路径相对当前工作目录解析；patch 内的本地模块和 npm 依赖相对 patch 文件目录解析。实验配置中的 `cacheDir`、输出目录等仍相对实验 YAML 所在目录解析。
-
-更多安装与构建说明见 [DocOps package README](../../plugins/docops/README.md)。
+使用 `--patch` 指定外部模块，文件方式的最小示例见[新增外部插件](add-external-plugin.md)。独立项目编译、包名加载、结果检查与续跑见[接入外部插件](external-plugins.md)。
 
 Ray 节点不会接收协调端的本机 patch 路径或源码。使用外部插件时，先将 patch 和模块安装到每个执行节点；在各节点 EVALUATOR_NODE_CONFIG 指向的 JSON 中设置 pluginPatchPath，该相对路径以节点配置文件所在目录为基准。所有节点的 patch 内容必须一致，worker 会在执行前校验 patch 与插件版本摘要。
 
