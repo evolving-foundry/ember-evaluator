@@ -1,13 +1,12 @@
 import type { Context } from "@deepseek-ai/cordis";
-import { expectRecord, rejectUnknown } from "../core/validation/input.js";
-import { SuccessRateMetrics } from "./metrics/success-rate.js";
-import { DurationMetrics } from "./metrics/duration.js";
-import { UsageMetrics } from "./metrics/usage.js";
-import { HarborScoreMetrics, parseHarborScoreConfig } from "./metrics/harbor-score.js";
-import { MarkdownReporter } from "./reporters/markdown.js";
-import { AgentXPerformanceMetrics } from "./metrics/agentx-performance.js";
-import { QualityScoreMetrics } from "./metrics/quality-score.js";
-import { KernelMetrics } from "./metrics/kernel.js";
+import { expectRecord, rejectUnknown } from "../../core/validation/input.js";
+import { SuccessRateMetrics } from "./success-rate.js";
+import { DurationMetrics } from "./duration.js";
+import { UsageMetrics } from "./usage.js";
+import { HarborScoreMetrics, parseHarborScoreConfig } from "./harbor-score.js";
+import { AgentXPerformanceMetrics } from "./agentx-performance.js";
+import { QualityScoreMetrics } from "./quality-score.js";
+import { KernelMetrics } from "./kernel.js";
 
 export const inject = ["evaluator"];
 export function apply(ctx: Context): void {
@@ -23,5 +22,4 @@ export function apply(ctx: Context): void {
   ctx.evaluator.register("metrics", "agentx-performance", empty, () => new AgentXPerformanceMetrics());
   ctx.evaluator.register("metrics", "quality-score", empty, () => new QualityScoreMetrics());
   ctx.evaluator.register("metrics", "kernel", empty, () => new KernelMetrics());
-  ctx.evaluator.register("reporter", "markdown", empty, () => new MarkdownReporter());
 }
