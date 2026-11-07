@@ -77,7 +77,7 @@ Solver 的 `runtimeInstallation()` 返回 `RuntimeInstallation` 时，可以设�
 
 编写或修改 Benchmark 插件时，接口、代码职责、生命周期及受控示例见 [Benchmark 开发指南](benchmarks.md)。数据集的官方要求、镜像、平台、资源、超时配置和真实运行验收见 [Benchmark 评测要求与验收指南](benchmark-evaluation-requirements.md)。
 
-下面以“已完成任务数”指标为例，新建 `experiments/plugins/completed-count.mjs`：
+下面以“已完成任务数”指标为例，在仓库根目录创建 `custom-plugins/completed-count.mjs`：
 
 ```js
 export const inject = ["evaluator"];
@@ -175,7 +175,7 @@ dist/plugins/
 
 ## 用 `--patch` 引用外部插件
 
-在独立目录新建 `cordis.patch.yaml`：
+在 `custom-plugins/` 下新建 `cordis.patch.yaml`：
 
 ```yaml
 - insert:
@@ -188,14 +188,14 @@ dist/plugins/
 目录结构如下：
 
 ```text
-experiments/
-├── gsm8k.yaml
-└── plugins/
+<仓库根目录>/
+├── playbook/gsm8k/gsm8k-simpleagent.yaml
+└── custom-plugins/
     ├── cordis.patch.yaml
     └── completed-count.mjs
 ```
 
-随后将 `gsm8k.yaml` 的 `metrics` 改为：
+在仓库自带的 [GSM8K 示例](../../playbook/gsm8k/gsm8k-simpleagent.yaml) 中添加以下顶层 `metrics` 配置：
 
 ```yaml
 metrics:                       # 显式列表会替换默认指标，需保留的内置指标也要列出
@@ -206,10 +206,10 @@ metrics:                       # 显式列表会替换默认指标，需保留�
     # config: {}               # 组件参数写在这里；本示例插件不接受非空参数
 ```
 
-运行时显式指定 patch；省略 `--patch` 时只加载内置组件：
+在仓库根目录运行，并显式指定 patch：
 
 ```bash
-ember-evaluator run experiments/gsm8k.yaml --patch <path>/plugins/cordis.patch.yaml
+ember-evaluator run playbook/gsm8k/gsm8k-simpleagent.yaml --patch custom-plugins/cordis.patch.yaml
 ```
 
 `--dry-run` 也接受相同的 `--patch <path>` 参数。patch 路径相对当前工作目录解析；patch 内的本地模块和 npm 依赖相对 patch 文件目录解析。实验配置中的 `cacheDir`、输出目录等仍相对实验 YAML 所在目录解析。

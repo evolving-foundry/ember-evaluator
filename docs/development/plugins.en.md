@@ -77,7 +77,7 @@ When Solver `runtimeInstallation()` returns `RuntimeInstallation`, it may set `c
 
 See [benchmark development](benchmarks.en.md) for interfaces/responsibilities/lifecycles/examples and [requirements/acceptance](benchmark-evaluation-requirements.en.md) for official images/platforms/resources/timeouts/real runs.
 
-Example completed-task metric: create `experiments/plugins/completed-count.mjs`:
+To count completed tasks, create `custom-plugins/completed-count.mjs` at the repository root:
 
 ```js
 export const inject = ["evaluator"];
@@ -175,7 +175,7 @@ dist/plugins/
 
 ## Reference External Plugins with `--patch`
 
-Create `cordis.patch.yaml` in a separate directory:
+Create `cordis.patch.yaml` in `custom-plugins/` at the repository root:
 
 ```yaml
 - insert:
@@ -188,14 +188,14 @@ Create `cordis.patch.yaml` in a separate directory:
 Layout:
 
 ```text
-experiments/
-├── gsm8k.yaml
-└── plugins/
+<repository root>/
+├── playbook/gsm8k/gsm8k-simpleagent.yaml
+└── custom-plugins/
     ├── cordis.patch.yaml
     └── completed-count.mjs
 ```
 
-Change `gsm8k.yaml` `metrics` to:
+Add the following top-level `metrics` setting to the [GSM8K example](../../playbook/gsm8k/gsm8k-simpleagent.yaml):
 
 ```yaml
 metrics:                       # Explicit lists replace defaults; include built-in metrics you want to retain
@@ -206,10 +206,10 @@ metrics:                       # Explicit lists replace defaults; include built-
     # config: {}               # Component options go here; this example rejects nonempty options
 ```
 
-Pass patches explicitly; omission loads built-ins only:
+Run from the repository root and pass the patch explicitly:
 
 ```bash
-ember-evaluator run experiments/gsm8k.yaml --patch <path>/plugins/cordis.patch.yaml
+ember-evaluator run playbook/gsm8k/gsm8k-simpleagent.yaml --patch custom-plugins/cordis.patch.yaml
 ```
 
 dry-run accepts identical --patch. Patch paths use current directory; local modules/npm resolve from patch directory. cacheDir/output/business paths remain YAML-relative.

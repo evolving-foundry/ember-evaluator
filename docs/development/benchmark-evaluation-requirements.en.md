@@ -371,7 +371,7 @@ Paths use the YAML directory. For Ray, replace local sources and check node imag
 After installation/build, run from the repository root with actual paths:
 
 ```bash
-ember-evaluator config explain experiment.yaml
+ember-evaluator inspect experiment.yaml
 ember-evaluator doctor experiment.yaml
 ember-evaluator run experiment.yaml --dry-run
 ember-evaluator run experiment.yaml

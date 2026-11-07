@@ -198,12 +198,12 @@ Select the Solver model service through `benchmark.solver.service`; a model-back
 Register `ember-evaluator` using the [installation guide](../users/installation.md#register-the-global-cli), then run from the plugin project:
 
 ```bash
-ember-evaluator config explain experiment.yaml --patch cordis.patch.yaml
+ember-evaluator inspect experiment.yaml --patch cordis.patch.yaml
 ember-evaluator run experiment.yaml --patch cordis.patch.yaml --dry-run
 ember-evaluator run experiment.yaml --patch cordis.patch.yaml
 ```
 
-- `config explain` checks configuration parsing, registered names, and validators, then displays resolved configuration and field origins. It does not compute metrics.
+- `inspect` validates the experiment configuration, registered component names, and plugin options. It prints the resolved experiment configuration and redacted network settings.
 - `--dry-run` also resolves the dataset, enumerates tasks, and selects them; it may download data. It does not call the Solver or validate metric computation, report rendering, and every runtime capability.
 - A real run calls the model. Inspect `metrics.valid-count` in the output run's `metrics.json`. This example selects one task; `valid` depends on its scoring status. The built-in Markdown reporter does not guarantee display of arbitrary custom metrics, so verify the JSON first.
 

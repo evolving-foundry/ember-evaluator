@@ -198,12 +198,12 @@ Solver 的模型服务通过 `benchmark.solver.service` 选择；需要模型的
 先按[安装指南](../users/installation.zh-CN.md#安装全局命令)注册 `ember-evaluator`，再在插件项目目录执行：
 
 ```bash
-ember-evaluator config explain experiment.yaml --patch cordis.patch.yaml
+ember-evaluator inspect experiment.yaml --patch cordis.patch.yaml
 ember-evaluator run experiment.yaml --patch cordis.patch.yaml --dry-run
 ember-evaluator run experiment.yaml --patch cordis.patch.yaml
 ```
 
-- `config explain` 检查配置解析、组件注册名和配置校验，显示最终配置及字段来源；不执行指标计算。
+- `inspect` 校验实验配置、组件注册名和插件参数，输出展开后的实验配置和脱敏后的网络配置。
 - `--dry-run` 还会解析数据来源、枚举并选择题目，可能联网下载数据。它不会调用 Solver，也不会验证指标计算、报告渲染及全部运行时能力。
 - 正式运行会调用模型。成功后检查输出 run 目录下 `metrics.json` 的 `metrics.valid-count`，本例选中数应为 1；`valid` 由实际评分状态决定。内置 Markdown 不保证展示任意自定义指标，先以 `metrics.json` 验证结果。
 

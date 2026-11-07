@@ -371,7 +371,7 @@ output:
 先完成安装与构建，再在仓库根目录执行；示例文件路径按实际位置替换：
 
 ```bash
-ember-evaluator config explain experiment.yaml
+ember-evaluator inspect experiment.yaml
 ember-evaluator doctor experiment.yaml
 ember-evaluator run experiment.yaml --dry-run
 ember-evaluator run experiment.yaml
