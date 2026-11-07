@@ -62,7 +62,7 @@ class BoundedTail implements AsyncIterable<Uint8Array> {
 
   constructor(
     stream: Readable,
-    private readonly limit = STREAM_BUFFER_BYTES,
+    private readonly limit: number | null = STREAM_BUFFER_BYTES,
   ) {
     void this.drain(stream);
   }
@@ -85,7 +85,7 @@ class BoundedTail implements AsyncIterable<Uint8Array> {
     }
     this.chunks.push(chunk);
     this.bytes += chunk.byteLength;
-    while (this.bytes > this.limit && this.chunks.length > 0) {
+    while (this.limit !== null && this.bytes > this.limit && this.chunks.length > 0) {
       const excess = this.bytes - this.limit;
       const first = this.chunks[0];
       if (!first) break;
@@ -427,6 +427,9 @@ export async function startLocalProcess(
   options: { inheritEnv?: boolean } = {},
 ): Promise<ProcessHandle> {
   if (signal.aborted) throw abortError();
+  if (command.outputBufferBytes !== undefined && command.outputBufferBytes !== null &&
+    (!Number.isSafeInteger(command.outputBufferBytes) || command.outputBufferBytes <= 0))
+    throw new TypeError("outputBufferBytes must be a positive integer or null");
   const inheritEnv = options.inheritEnv ?? command.inheritEnv ?? true;
   const inherited =
     inheritEnv === false
@@ -456,8 +459,8 @@ export async function startLocalProcess(
     throw error;
   }
 
-  const stdout = new BoundedTail(child.stdout);
-  const stderr = new BoundedTail(child.stderr);
+  const stdout = new BoundedTail(child.stdout, command.outputBufferBytes);
+  const stderr = new BoundedTail(child.stderr, command.outputBufferBytes);
   let rootExited = false;
   const closed = new Promise<ExitResult>((resolve, reject) => {
     child.once("error", reject);

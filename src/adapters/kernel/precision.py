@@ -200,7 +200,7 @@ def evaluate(request, profile_root=Path(".")):
                     compare_tree(expected, select_outputs(actual, request["outputIndices"]), torch, request["rtol"], request["atol"])
                     compare_tree(inputs, trial, torch, 0, 0)
                 except (AssertionError, ValueError, IndexError) as exc:
-                    return {"status": "incorrect", "error": str(exc)[:4000]}
+                    return {"status": "incorrect", "error": str(exc)}
             timing_inputs = inputs
 
         if reference is None or timing_inputs is None:
@@ -312,14 +312,14 @@ def run_precision_atom(problem_path, kernel_path, seeds, rtol, atol):
                         compare_tree(expected, select_outputs(actual, None), torch, rtol_used, atol)
                         compare_tree(inputs, trial, torch, 0, 0)
                     except (AssertionError, ValueError, IndexError) as exc:
-                        payload["error"] = f"numeric check failed (seed={seed}): {exc}"[:4000]
+                        payload["error"] = f"numeric check failed (seed={seed}): {exc}"
                         return payload
                 del reference
         payload["passed"] = True
     except CandidateError as exc:
-        payload["error"] = str(exc)[:4000]
+        payload["error"] = str(exc)
     except Exception as exc:  # noqa: BLE001 - record evaluation failure evidence without a nonzero exit
-        payload["error"] = f"{type(exc).__name__}: {exc}"[:4000]
+        payload["error"] = f"{type(exc).__name__}: {exc}"
     return payload
 
 
@@ -347,7 +347,7 @@ def main():
         except Exception as exc:  # noqa: BLE001 - environment failures exit 2 for TypeScript infrastructure handling
             traceback.print_exc()
             payload = {"problem": atom_args.problem, "kernel": atom_args.kernel,
-                       "passed": False, "error": f"{type(exc).__name__}: {exc}"[:4000]}
+                       "passed": False, "error": f"{type(exc).__name__}: {exc}"}
             _emit(Path(atom_args.out), payload)
             return 2
         _emit(Path(atom_args.out), payload)
@@ -371,16 +371,16 @@ def main():
             result.update(evaluate(request, output.parent))
         except CandidateError as exc:
             traceback.print_exc()
-            result.update(status="candidate_error", error=str(exc)[:4000])
+            result.update(status="candidate_error", error=str(exc))
         except Exception as exc:
             traceback.print_exc()
-            result.update(status="infrastructure_error", error=f"{type(exc).__name__}: {exc}"[:4000])
+            result.update(status="infrastructure_error", error=f"{type(exc).__name__}: {exc}")
             if "assessment" in result:
                 result["assessment"]["errorOwnership"] = "evaluation"
     try:
         verify_hashes(request["hashes"])
     except Exception as exc:
-        result.update(status="infrastructure_error", error=f"Locked source validation failed: {exc}"[:4000],
+        result.update(status="infrastructure_error", error=f"Locked source validation failed: {exc}",
                       referenceMs=None, candidateMs=None, speedup=None)
         if "assessment" in result:
             result["assessment"]["errorOwnership"] = "evaluation"

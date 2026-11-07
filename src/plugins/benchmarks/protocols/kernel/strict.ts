@@ -49,7 +49,7 @@ export function parseKernelAssessment(value: unknown, contract: KernelContract, 
     const key = `${c.seed}/${c.call}/${c.id}`;
     if (seen.has(key)) throw new TypeError("Duplicate kernel check");
     seen.add(key);
-    return { id: c.id as KernelCheckId, seed: c.seed as number, call: c.call, status: c.status as KernelCheck["status"], message: c.message.slice(0, 4000) };
+    return { id: c.id as KernelCheckId, seed: c.seed as number, call: c.call, status: c.status as KernelCheck["status"], message: c.message };
   });
   const p = expectRecord(r.effectiveProtocol, "effectiveProtocol");
   rejectUnknown(p, ["seeds", "rtol", "atol", "warmup", "repeat", "timingScope", "aggregation", "timingSeed"], "effectiveProtocol");

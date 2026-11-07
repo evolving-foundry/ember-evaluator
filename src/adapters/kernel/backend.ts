@@ -7,7 +7,10 @@ export type KernelExecutionOptions = {
   python: string;
   device: number;
   kernelRoot?: string;
-  profiling: Pick<KernelProfileArgs, "collection" | "warmup" | "attemptTimeoutSeconds" | "maxAttempts" | "cacheEnabled" | "cacheDir" | "msprofBin" | "deviceName"> & { enabled: boolean; roundNum: number };
+  outputLimitBytes?: number;
+  cleanupGraceMs?: number;
+  cleanupTimeoutMs?: number;
+  profiling: Pick<KernelProfileArgs, "collection" | "warmup" | "attemptTimeoutSeconds" | "maxAttempts" | "retryDelayMs" | "cacheEnabled" | "cacheDir" | "cacheMaxEntries" | "msprofBin" | "deviceName"> & { enabled: boolean; roundNum: number };
 };
 
 /** Hardware execution only; the benchmark owns task identity and verdicts. */

@@ -40,9 +40,9 @@ export type Command = (
   | { kind: "doctor"; file: string; overrides: CliOverrides; patchPath?: string }
   | { kind: "inspect"; file: string; overrides: CliOverrides; patchPath?: string }
   | { kind: "report"; directory: string }
-  | { kind: "kernel-profile"; problem: string; kernel: string; out: string; round: number; seed: number; warmup: number; device: number; python?: string }
-  | { kind: "kernel-precision"; problem: string; kernel: string; out: string; seeds: number[]; device: number; python?: string }
-  | { kind: "kernel-bench"; problem: string; kernel: string; out: string; device: number; python?: string }
+  | ({ kind: "kernel-profile"; problem: string; kernel: string; out: string; round: number; seed: number; warmup: number; device: number; python?: string; maxAttempts?: number; attemptTimeoutSeconds?: number; cacheMaxEntries?: number; retryDelayMs?: number } & KernelExecOptions)
+  | ({ kind: "kernel-precision"; problem: string; kernel: string; out: string; seeds: number[]; device: number; python?: string } & KernelExecOptions)
+  | ({ kind: "kernel-bench"; problem: string; kernel: string; out: string; device: number; python?: string; warmup?: number; repeat?: number } & KernelExecOptions)
   | { kind: "run"; file: string; overrides: CliOverrides; resume?: string | null; taskIdsFile?: string; patchPath?: string }
   | { kind: "warmup"; file: string; overrides: CliOverrides; taskIdsFile?: string; patchPath?: string }
   | { kind: "dry-run"; file: string; overrides: CliOverrides; taskIdsFile?: string; patchPath?: string }
@@ -278,6 +278,10 @@ async function runCliCommand(
   if (command.kind === "kernel-profile" || command.kind === "kernel-precision" || command.kind === "kernel-bench") {
     const options: KernelExecOptions = { signal,
       ...(command.python === undefined ? {} : { python: command.python }),
+      ...(command.timeoutMs === undefined ? {} : { timeoutMs: command.timeoutMs }),
+      ...(command.outputLimitBytes === undefined ? {} : { outputLimitBytes: command.outputLimitBytes }),
+      ...(command.cleanupGraceMs === undefined ? {} : { cleanupGraceMs: command.cleanupGraceMs }),
+      ...(command.cleanupTimeoutMs === undefined ? {} : { cleanupTimeoutMs: command.cleanupTimeoutMs }),
       ...(command.device === 0 ? {} : { device: command.device }) };
     try {
       const payload = command.kind === "kernel-profile" ? await kernelProfile(command, options)

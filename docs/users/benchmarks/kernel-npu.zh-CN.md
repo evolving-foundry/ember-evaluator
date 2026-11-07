@@ -6,7 +6,7 @@
 
 ## 硬件选择
 
-实验 YAML 使用顶层 `hardware: npu`，省略时也默认 NPU。`hardware: gpu` 会在读取候选和启动 Python 前报“Kernel GPU backend is not implemented”。内置计时只使用 NPU profiler，缺少 NPU 时失败，不回退 CUDA 或 CPU。现有 `kernel precision/bench/profile` 独立命令仍为 NPU 入口，参数和结果格式不变。配置示例见[已有 kernel 评测](../../../playbook/kernel/existing.yaml)。
+实验 YAML 使用顶层 `hardware: npu`，省略时也默认 NPU。`hardware: gpu` 会在读取候选和启动 Python 前报“Kernel GPU backend is not implemented”。内置计时只使用 NPU profiler，缺少 NPU 时失败，不回退 CUDA 或 CPU。`kernel precision/bench/profile` 独立命令仍为 NPU 入口。配置示例见[已有 kernel 评测](../../../playbook/kernel/existing.yaml)。
 
 ## 环境与运行
 
@@ -111,13 +111,29 @@ run:
 | `warmup` | 采集前重放 `25` 次，与用于计时的 `benchmark.config.warmup` 分开 |
 | `attemptTimeoutSeconds` | 每个 profiler 进程 `300` 秒 |
 | `maxAttempts` | `2`，包含首次；缺少必需 CSV 等结构性缺失不重试 |
+| `retryDelayMs` | 可选非负整数，控制每次重试前的等待；`0` 不等待。省略时按 2s、4s、… 指数退避，并拆成 Node 支持的定时间隔 |
 | `roundNum` | `1`；用于产物名和元数据，不代表重复采集次数 |
 | `msprofBin` | 可选的现有可执行文件路径；省略时依次尝试 `/usr/local/Ascend/ascend-toolkit/latest/bin/msprof` 和 PATH 中的 `msprof` |
 | `cacheEnabled` | 评测模式默认 `true`；独立 `operation: profile` 必须显式设为 `false` |
 | `cacheDir` | 可选缓存目录；该字段不会相对实验 YAML 重定位，应使用绝对路径 |
+| `cacheMaxEntries` | 可选正整数；只有显式配置容量时，写入后才淘汰最旧缓存条目 |
 | `deviceName` | 为已有配置保留；当前不会据此补入硬件分母或启用 UB/核利用率派生指标 |
 
 `benchmark.config.timeoutSeconds` 限制整个验证阶段，包括正确性、计时和 profiling。开启 profiling 时默认 `maxAttempts * attemptTimeoutSeconds + 300`，否则为 `300`。`run.timeoutSeconds` 必须大于此上限；开启 profiling 并使用默认 900 秒验证上限时，内置 Profile 的 360 秒 run 默认值不够。需为重试退避和解析留出时间；外层超时可能在完整回执写出前中断采集。
+
+`benchmark.config.seeds` 接受任意非空、无重复的无符号 32 位整数列表。计时 `warmup`、`repeat`、profiling 预热、尝试次数和超时均由调用方配置为正整数，不额外限制 seed 数量或迭代次数。独立 profiling 的采集回执仍要求单个 seed。
+
+以下进程控制字段直接放在 `benchmark.config`：
+
+| 字段 | 默认值与行为 |
+| --- | --- |
+| `outputLimitBytes` | 省略时保留完整 worker/profiler 输出；显式正整数分别限制 stdout/stderr，超出时采集失败 |
+| `cleanupGraceMs` | `100`；kernel 结果读取器与 profiler 清理使用的优雅停止等待时间 |
+| `cleanupTimeoutMs` | `3000`；停止 profiler 后确认其退出的等待时间；无法确认退出仍属于基础设施失败 |
+
+即使子进程在开始消费输出前已经退出，完整协议输出也会保留。原生 worker 错误和严格检查消息不按字符截断。Profiler 成功与非零退出均保留原始控制台日志。省略 `cacheMaxEntries` 时不自动淘汰缓存条目。
+
+超时与清理等待须在 Node 定时器的 2147483647 毫秒范围内，超出时在执行前拒绝。重试等待可超过单次定时范围，会分段等待而不缩短请求时长。
 
 Replay 使用未修改的 `problem.get_inputs()` 和配置中的第一个 seed，预热完成后仅在 MSTX 区间 `rsi_operator_profile` 内调用一次。SDK session 管理 profiler 子进程；取消信号传播至这些子进程，清理无法确认属于基础设施失败。
 
@@ -216,11 +232,13 @@ ember-evaluator kernel precision --problem <problem.py> --kernel <kernel.py> \
   --out <precision.json> [--seeds 0 1] [--python /usr/bin/python3]
 # 纯计时：与基准走同一 timing 模块（口径见上文"指标与结果"），不校验精度
 ember-evaluator kernel bench --problem <problem.py> --kernel <kernel.py> \
-  --out <bench.json> [--python /usr/bin/python3]
+  --out <bench.json> [--warmup 25] [--repeat 100] [--python /usr/bin/python3]
 # msprof 采集：attach 重放脚本采集硬件指标，带缓存与重试；roofline 分类一体返回
 ember-evaluator kernel profile --problem <problem.py> --kernel <kernel.py> \
   --out <profile.json> [--round 0] [--seed 42] [--warmup 25] [--python /usr/bin/python3]
 ```
+
+三个命令均支持 `--timeout-ms` 与 `--output-limit-bytes`。Bench/precision 默认总超时为 900000 ms；`--timeout-ms 0` 关闭该总超时。Profile 默认不另设总超时，`--max-attempts`（默认 2）与 `--attempt-timeout-seconds`（默认 300）分别控制采集尝试。Profile 还支持 `--retry-delay-ms`、`--cache-max-entries`、`--cleanup-grace-ms` 与 `--cleanup-timeout-ms`。
 
 输出均为单份 JSON：
 

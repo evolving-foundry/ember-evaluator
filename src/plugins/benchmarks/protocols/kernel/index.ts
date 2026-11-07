@@ -8,6 +8,7 @@ import type { SolveResult, VerifyResult, EvaluationKind } from "../../../../core
 import { expectRecord, expectNonEmptyString, expectPositiveInteger, rejectUnknown, type EffectiveConfig } from "../../../../config/schema.js";
 import type { HardwareKind } from "../../../../core/contracts/hardware.js";
 import { assertKernelHardware, createKernelBackend, type KernelBackend } from "../../../../adapters/kernel/backend.js";
+import { MAX_KERNEL_TIMER_MS, validateKernelExecOptions } from "../../../../adapters/kernel/cli.js";
 import { VerificationError } from "../../../../core/errors/verification-error.js";
 import { parseKernelContract, kernelContractDigest, parseKernelAssessment } from "./strict.js";
 import { kernelVerdict, kernelProfileVerdict } from "./result.js";
@@ -21,12 +22,14 @@ export function relativeFile(value: unknown, label: string): string {
 
 export function parseKernelConfig(value: unknown) {
   const c = expectRecord(value, "kernel");
-  rejectUnknown(c, ["operation", "manifest", "kernelRoot", "python", "device", "seeds", "rtol", "atol", "warmup", "repeat", "timeoutSeconds", "profiling"], "kernel");
+  rejectUnknown(c, ["operation", "manifest", "kernelRoot", "python", "device", "seeds", "rtol", "atol", "warmup", "repeat", "timeoutSeconds", "outputLimitBytes", "cleanupGraceMs", "cleanupTimeoutMs", "profiling"], "kernel");
   const p = expectRecord(c.profiling ?? {}, "profiling");
-  rejectUnknown(p, ["enabled", "collection", "warmup", "attemptTimeoutSeconds", "maxAttempts", "roundNum", "msprofBin", "deviceName", "cacheEnabled", "cacheDir"], "profiling");
+  rejectUnknown(p, ["enabled", "collection", "warmup", "attemptTimeoutSeconds", "maxAttempts", "retryDelayMs", "roundNum", "msprofBin", "deviceName", "cacheEnabled", "cacheDir", "cacheMaxEntries"], "profiling");
   if (p.enabled !== undefined && typeof p.enabled !== "boolean") throw new TypeError("profiling.enabled must be boolean");
   if (p.cacheEnabled !== undefined && typeof p.cacheEnabled !== "boolean") throw new TypeError("profiling.cacheEnabled must be boolean");
   if (p.roundNum !== undefined && !Number.isSafeInteger(p.roundNum)) throw new TypeError("profiling.roundNum must be an integer");
+  if (p.retryDelayMs !== undefined && (!Number.isSafeInteger(p.retryDelayMs) || Number(p.retryDelayMs) < 0))
+    throw new TypeError("profiling.retryDelayMs must be a non-negative integer");
   const operation = c.operation ?? "evaluate";
   if (operation !== "evaluate" && operation !== "profile") throw new TypeError("kernel.operation must be evaluate or profile");
   const collection = p.collection === undefined ? "PipeTimeline,Default" : p.collection;
@@ -38,14 +41,25 @@ export function parseKernelConfig(value: unknown) {
     warmup: expectPositiveInteger(p.warmup ?? 25, "profiling.warmup"),
     attemptTimeoutSeconds: expectPositiveInteger(p.attemptTimeoutSeconds ?? 300, "profiling.attemptTimeoutSeconds"),
     maxAttempts: expectPositiveInteger(p.maxAttempts ?? 2, "profiling.maxAttempts"),
+    ...(p.retryDelayMs === undefined ? {} : { retryDelayMs: p.retryDelayMs as number }),
     roundNum: p.roundNum === undefined ? 1 : p.roundNum as number,
     cacheEnabled: p.cacheEnabled !== false,
+    ...(p.cacheMaxEntries === undefined ? {} : { cacheMaxEntries: expectPositiveInteger(p.cacheMaxEntries, "profiling.cacheMaxEntries") }),
     ...(p.msprofBin === undefined ? {} : { msprofBin: expectNonEmptyString(p.msprofBin, "profiling.msprofBin") }),
     ...(p.deviceName === undefined ? {} : { deviceName: expectNonEmptyString(p.deviceName, "profiling.deviceName") }),
     ...(p.cacheDir === undefined ? {} : { cacheDir: expectNonEmptyString(p.cacheDir, "profiling.cacheDir") }),
   } as const;
   const timeoutSeconds = expectPositiveInteger(c.timeoutSeconds ??
     (profiling.enabled ? profiling.maxAttempts * profiling.attemptTimeoutSeconds + 300 : 300), "timeoutSeconds");
+  const processOptions = {
+    ...(c.outputLimitBytes === undefined ? {} : { outputLimitBytes: expectPositiveInteger(c.outputLimitBytes, "outputLimitBytes") }),
+    cleanupGraceMs: expectPositiveInteger(c.cleanupGraceMs ?? 100, "cleanupGraceMs"),
+    cleanupTimeoutMs: expectPositiveInteger(c.cleanupTimeoutMs ?? 3000, "cleanupTimeoutMs"),
+  };
+  validateKernelExecOptions(processOptions);
+  if (timeoutSeconds * 1000 > MAX_KERNEL_TIMER_MS) throw new TypeError("timeoutSeconds exceeds the Node timer range");
+  if (profiling.attemptTimeoutSeconds * 1000 > MAX_KERNEL_TIMER_MS)
+    throw new TypeError("profiling.attemptTimeoutSeconds exceeds the Node timer range");
   const nonnegative = (value: unknown, name: string) => {
     if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new TypeError(`${name} must be finite and nonnegative`);
     return value;
@@ -53,8 +67,8 @@ export function parseKernelConfig(value: unknown) {
   const device = nonnegative(c.device ?? 0, "device");
   if (!Number.isSafeInteger(device)) throw new TypeError("device must be an integer");
   const seeds = c.seeds ?? [0, 1, 2];
-  if (!Array.isArray(seeds) || !seeds.length || seeds.length > 100 || seeds.some(s => !Number.isSafeInteger(s) || s < 0 || s > 0xffffffff))
-    throw new TypeError("seeds must contain 1-100 unsigned 32-bit integers");
+  if (!Array.isArray(seeds) || !seeds.length || seeds.some(s => !Number.isSafeInteger(s) || s < 0 || s > 0xffffffff))
+    throw new TypeError("seeds must contain unsigned 32-bit integers");
   if (new Set(seeds).size !== seeds.length) throw new TypeError("seeds must be unique");
   if (operation === "profile") {
     if (seeds.length !== 1) throw new TypeError("Independent profile requires a single seed");
@@ -65,6 +79,7 @@ export function parseKernelConfig(value: unknown) {
     python: expectNonEmptyString(c.python ?? "python3", "python"), device, seeds: seeds as number[],
     rtol: nonnegative(c.rtol ?? 0.001, "rtol"), atol: nonnegative(c.atol ?? 0.001, "atol"),
     warmup: expectPositiveInteger(c.warmup ?? 5, "warmup"), repeat: expectPositiveInteger(c.repeat ?? 20, "repeat"),
+    ...processOptions,
     timeoutSeconds, profiling };
 }
 export type KernelConfig = ReturnType<typeof parseKernelConfig>;

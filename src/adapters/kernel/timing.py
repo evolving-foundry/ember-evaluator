@@ -284,10 +284,10 @@ def _bench_atom_main():
         else:
             payload["time_ms"] = float(ms)
     except CandidateError as exc:
-        payload["error"] = str(exc)[:4000]
+        payload["error"] = str(exc)
     except Exception as exc:  # noqa: BLE001 - record evaluation failure evidence without a nonzero exit
         traceback.print_exc()
-        payload["error"] = f"{type(exc).__name__}: {exc}"[:4000]
+        payload["error"] = f"{type(exc).__name__}: {exc}"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
     sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")

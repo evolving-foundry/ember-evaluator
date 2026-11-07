@@ -6,7 +6,7 @@
 
 ## Hardware Selection
 
-Use top-level `hardware: npu` in experiment YAML; omission also means NPU. `hardware: gpu` fails with “Kernel GPU backend is not implemented” before reading candidates or starting Python. Built-in timing uses only the NPU profiler and fails without an NPU instead of falling back to CUDA or CPU. Existing `kernel precision/bench/profile` commands remain NPU entry points with unchanged arguments and result formats. See the [existing kernel example](../../../playbook/kernel/existing.yaml).
+Use top-level `hardware: npu` in experiment YAML; omission also means NPU. `hardware: gpu` fails with “Kernel GPU backend is not implemented” before reading candidates or starting Python. Built-in timing uses only the NPU profiler and fails without an NPU instead of falling back to CUDA or CPU. The `kernel precision/bench/profile` commands remain NPU entry points. See the [existing kernel example](../../../playbook/kernel/existing.yaml).
 
 ## Environment and Execution
 
@@ -111,13 +111,29 @@ The following fields belong to `benchmark.config.profiling`:
 | `warmup` | `25` replay calls before capture; separate from `benchmark.config.warmup` used for timing |
 | `attemptTimeoutSeconds` | `300` seconds per profiler process |
 | `maxAttempts` | `2`, including the first attempt; structural omissions such as missing required CSVs are not retried |
+| `retryDelayMs` | Optional nonnegative integer before each retry; `0` skips waiting. Omitted: exponential 2s, 4s, …, split across valid Node timer intervals |
 | `roundNum` | `1`; labels artifacts and metadata, without repeating capture |
 | `msprofBin` | Optional existing executable path; otherwise try `/usr/local/Ascend/ascend-toolkit/latest/bin/msprof`, then `msprof` on PATH |
 | `cacheEnabled` | `true` for evaluation; independent `operation: profile` requires an explicit `false` |
 | `cacheDir` | Optional cache directory; use an absolute path because this field is not rebased to the experiment YAML |
+| `cacheMaxEntries` | Optional positive integer; evict the oldest cache entries after writes only when a capacity is configured |
 | `deviceName` | Accepted for existing configurations; it does not currently supply hardware denominators or enable UB/core-derived metrics |
 
 `benchmark.config.timeoutSeconds` caps the entire verification phase, including correctness, timing and profiling. It defaults to `maxAttempts * attemptTimeoutSeconds + 300` with profiling enabled, otherwise `300`. Set `run.timeoutSeconds` above that cap; the built-in profile's 360-second run default is insufficient when profiling uses its default 900-second verification cap. Allow time for retry backoff and parsing; an outer timeout can interrupt collection before a complete receipt exists.
+
+`benchmark.config.seeds` accepts any nonempty list of unique unsigned 32-bit integers. Timing `warmup` and `repeat`, profiling warmup, attempt count and timeouts are caller-controlled positive integers. There is no separate seed-count or iteration-count ceiling. Independent profiling still requires exactly one seed for its capture receipt.
+
+These process controls belong directly to `benchmark.config`:
+
+| Field | Default and behavior |
+| --- | --- |
+| `outputLimitBytes` | Omitted: retain complete worker/profiler output. An explicit positive integer caps each stdout/stderr stream and fails collection if exceeded |
+| `cleanupGraceMs` | `100`; graceful-stop period used by the kernel result reader and profiler cleanup |
+| `cleanupTimeoutMs` | `3000`; wait to confirm profiler exit after stopping it; an unconfirmed exit remains an infrastructure failure |
+
+Complete protocol output is retained even when the child exits before output consumption begins. Native worker errors and strict-check messages are stored without character clipping. Profiler console logs are retained for unsuccessful process exits as well as successful captures. Cache entries are retained without automatic eviction when `cacheMaxEntries` is omitted.
+
+Timeouts and cleanup waits must fit the Node timer range of 2147483647 milliseconds; larger values are rejected before execution. Retry delays can exceed one timer interval because they are split without shortening the requested wait.
 
 Replay uses the unchanged `problem.get_inputs()` and the first configured seed. Warmup completes before one call inside an MSTX range (`rsi_operator_profile`). SDK sessions own all profiler children. Cancellation propagates to those child processes; unconfirmed cleanup is an infrastructure failure.
 
@@ -216,11 +232,13 @@ ember-evaluator kernel precision --problem <problem.py> --kernel <kernel.py> \
   --out <precision.json> [--seeds 0 1] [--python /usr/bin/python3]
 # Timing only: same timing module as the benchmark (see Metrics and Results); no precision check
 ember-evaluator kernel bench --problem <problem.py> --kernel <kernel.py> \
-  --out <bench.json> [--python /usr/bin/python3]
+  --out <bench.json> [--warmup 25] [--repeat 100] [--python /usr/bin/python3]
 # msprof attaches to replay for hardware metrics, with cache/retries and roofline classification
 ember-evaluator kernel profile --problem <problem.py> --kernel <kernel.py> \
   --out <profile.json> [--round 0] [--seed 42] [--warmup 25] [--python /usr/bin/python3]
 ```
+
+All three commands accept `--timeout-ms` and `--output-limit-bytes`. Bench/precision default to a 900000 ms timeout; `--timeout-ms 0` disables that overall timeout. Profile has no additional overall timeout unless supplied; `--max-attempts` (default 2) and `--attempt-timeout-seconds` (default 300) control its capture attempts independently. Profile also accepts `--retry-delay-ms`, `--cache-max-entries`, `--cleanup-grace-ms` and `--cleanup-timeout-ms`.
 
 Each outputs one JSON object:
 

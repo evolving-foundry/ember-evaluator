@@ -135,6 +135,8 @@ export type CommandSpec = {
   env: Record<string, string>;
   /** Inherit the environment process/container defaults; true when omitted for compatibility. */
   inheritEnv?: boolean;
+  /** Pending output retained before consumption; null preserves complete protocol output. Defaults to a bounded diagnostic tail. */
+  outputBufferBytes?: number | null;
   input: Uint8Array | null;
 };
 

@@ -8,7 +8,7 @@ import { parseMsprofMetricsTable, rowsToMetrics, metricsToCsv, type MetricRow } 
 import { analyzeL2Cache, analyzeTraceEvents, extractTritonKernelName } from "../../plugins/benchmarks/protocols/kernel/msprof-analysis.js";
 import { analyzeRoofline } from "../../plugins/benchmarks/protocols/kernel/roofline.js";
 import { MsProfCache } from "../../plugins/benchmarks/protocols/kernel/msprof-cache.js";
-import { KernelExecError, resolveAtomDir, type KernelExecOptions } from "./cli.js";
+import { KernelExecError, MAX_KERNEL_TIMER_MS, resolveAtomDir, validateKernelExecOptions, type KernelExecOptions } from "./cli.js";
 
 import type { CommandSpec, EnvironmentSession } from "../../core/contracts/environment.js";
 import { startLocalProcess } from "../../plugins/environments/process.js";
@@ -16,20 +16,20 @@ import { readProcess } from "../verifiers/process.js";
 
 /** The SDK session owns all profiler children; standalone CLI calls own a process group. */
 export type KernelProfileExecution = { session: Pick<EnvironmentSession, "start" | "workdir">; atomDirectory: string };
-async function runProfileProcess(command: CommandSpec, signal: AbortSignal, execution?: KernelProfileExecution): Promise<{ stdout: string; stderr: string }> {
+async function runProfileProcess(command: CommandSpec, signal: AbortSignal, options: KernelExecOptions, consolePath: string, execution?: KernelProfileExecution): Promise<void> {
   const handle = execution ? await execution.session.start({ ...command, cwd: execution.session.workdir }, signal)
     : await startLocalProcess(command, signal);
   try {
-    const result = await readProcess(handle, signal, 64 * 1024 * 1024);
+    const result = await readProcess(handle, signal, options.outputLimitBytes ?? null, options.cleanupGraceMs);
+    await appendFileSafe(consolePath, `${result.stdout}${result.stderr}`);
     if (result.code !== 0) throw new ProfileStepError(`msprof exited with ${result.code}: ${result.stderr.slice(-4000)}`, true);
-    return result;
   } finally {
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await handle.stop(100);
+      await handle.stop(options.cleanupGraceMs ?? 100);
       closed = await Promise.race([handle.done.then(() => true, () => false),
-        new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 3000); })]);
+        new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), options.cleanupTimeoutMs ?? 3000); })]);
     } catch { /* The caller must retain the unconfirmed cleanup outcome. */ }
     finally { if (timer) clearTimeout(timer); }
     if (!closed) throw new KernelExecError("profile", null, "Profiling process cleanup unconfirmed", true, { cleanup: "unconfirmed" });
@@ -49,7 +49,19 @@ const DEFAULT_MSPROF_BIN = "/usr/local/Ascend/ascend-toolkit/latest/bin/msprof";
 
 export interface KernelProfileArgs { problem: string; kernel: string; out: string; round: number;
   seed?: number; warmup?: number; caseId?: string; contractSha256?: string; collection?: "Default" | "PipeTimeline,Default";
-  msprofBin?: string; deviceName?: string; maxAttempts?: number; attemptTimeoutSeconds?: number; cacheEnabled?: boolean; cacheDir?: string }
+  msprofBin?: string; deviceName?: string; maxAttempts?: number; attemptTimeoutSeconds?: number; retryDelayMs?: number; cacheEnabled?: boolean; cacheDir?: string; cacheMaxEntries?: number }
+
+/** Preserve the requested delay while respecting Node's signed 32-bit timer range. */
+export async function waitForProfileRetry(attempt: number, retryDelayMs: number | undefined, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
+  let remaining = retryDelayMs === undefined ? (1n << BigInt(attempt)) * 1000n : BigInt(retryDelayMs);
+  const maxTimerMs = BigInt(MAX_KERNEL_TIMER_MS);
+  while (remaining > 0n) {
+    const milliseconds = remaining > maxTimerMs ? maxTimerMs : remaining;
+    await delay(Number(milliseconds), undefined, signal === undefined ? {} : { signal });
+    remaining -= milliseconds;
+  }
+}
 
 export interface KernelProfileResult extends Record<string, unknown> {
   kernel: string; problem: string; round: number;
@@ -121,6 +133,9 @@ function validateReplayProtocol(value: unknown, seed: number, warmup: number): R
 
 /** Replay cached metrics on a hit; otherwise spawn msprof with bounded capture attempts. */
 export async function kernelProfile(args: KernelProfileArgs, options: KernelExecOptions = {}, execution?: KernelProfileExecution): Promise<KernelProfileResult> {
+  validateKernelExecOptions(options);
+  if (options.timeoutMs !== undefined && options.timeoutMs > 0)
+    options = { ...options, signal: AbortSignal.any([...(options.signal ? [options.signal] : []), AbortSignal.timeout(options.timeoutMs)]) };
   options.signal?.throwIfAborted();
   const seed = args.seed ?? 0;
   const warmup = args.warmup ?? 25;
@@ -133,6 +148,12 @@ export async function kernelProfile(args: KernelProfileArgs, options: KernelExec
   const attemptTimeoutSeconds = args.attemptTimeoutSeconds ?? 300;
   for (const [name, value] of [["maxAttempts", maxAttempts], ["attemptTimeoutSeconds", attemptTimeoutSeconds]] as const)
     if (!Number.isSafeInteger(value) || value <= 0) throw new TypeError(`${name} must be a positive integer`);
+  if (attemptTimeoutSeconds * 1000 > MAX_KERNEL_TIMER_MS)
+    throw new TypeError("attemptTimeoutSeconds exceeds the Node timer range");
+  if (args.cacheMaxEntries !== undefined && (!Number.isSafeInteger(args.cacheMaxEntries) || args.cacheMaxEntries <= 0))
+    throw new TypeError("cacheMaxEntries must be a positive integer");
+  if (args.retryDelayMs !== undefined && (!Number.isSafeInteger(args.retryDelayMs) || args.retryDelayMs < 0))
+    throw new TypeError("retryDelayMs must be a non-negative integer");
   const cacheEnabled = args.cacheEnabled !== false;
   const sub = "profile";
   const atomDir = execution?.atomDirectory ?? resolveAtomDir(sub, options);
@@ -186,7 +207,7 @@ export async function kernelProfile(args: KernelProfileArgs, options: KernelExec
       trace: { status: "unavailable", reason: collection === "Default" ? "not-requested-by-default-protocol" : "collection-not-completed" },
       hardwareDerived: { ubRatio: "unavailable", coreUtilization: "unavailable", reason: "No explicit hardware denominators provided" },
       cacheRequested: cacheEnabled, cacheHit: false,
-      retryPolicy: { maxAttempts, attemptTimeoutSeconds },
+      retryPolicy: { maxAttempts, attemptTimeoutSeconds, ...(args.retryDelayMs === undefined ? {} : { retryDelayMs: args.retryDelayMs }) },
     },
     artifacts: [],
   };
@@ -217,7 +238,7 @@ export async function kernelProfile(args: KernelProfileArgs, options: KernelExec
     // Only evidence from the same post-warmup capture protocol can satisfy a cache hit.
     const cacheScope = deviceScope === undefined ? undefined
       : `${deviceScope}:protocol=${JSON.stringify(metadata["diagnosticProtocol"])}:problem=${(request.hashes as Record<string, string>)[args.problem]}`;
-    const cache = cacheEnabled ? await MsProfCache.open(cacheScope, args.cacheDir, log) : null;
+    const cache = cacheEnabled ? await MsProfCache.open(cacheScope, args.cacheDir, log, args.cacheMaxEntries) : null;
     metadata["cacheEnabled"] = cache !== null;
     let metrics: Record<string, Record<string, unknown>> | null = null;
     let profileDir = "";
@@ -273,13 +294,12 @@ export async function kernelProfile(args: KernelProfileArgs, options: KernelExec
         try {
           const application = `${python} ${join(atomDir, "msprof_replay.py")} --request ${replayRequestPath} --output ${replayResultPath}`;
           const active = AbortSignal.any([...(options.signal ? [options.signal] : []), AbortSignal.timeout(attemptTimeout)]);
-          const { stdout, stderr } = await runProfileProcess({ executable: msprofBin,
+          await runProfileProcess({ executable: msprofBin,
             args: ["op", `--output=${outputDir}`, `--application=${application}`,
               `--kernel-name=${kernelName}`, `--aic-metrics=${collection}`,
               "--mstx=on", "--mstx-include=rsi_operator_profile"],
-            cwd: artifactsDir, env: Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)), input: null }, active, execution);
-          const consoleText = `${stdout}${stderr}`;
-          await appendFileSafe(join(logsDir, "console.log"), consoleText);
+            cwd: artifactsDir, env: Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)),
+            input: null, outputBufferBytes: null }, active, options, join(logsDir, "console.log"), execution);
           const profDirs = (await exists(outputDir))
             ? (await readdir(outputDir)).filter(name => name.startsWith("OPPROF_")).sort()
             : [];
@@ -325,7 +345,7 @@ export async function kernelProfile(args: KernelProfileArgs, options: KernelExec
           lastError = error instanceof Error ? error : new Error(message);
           log(`attempt ${attempt} failed: ${message}`);
           if (!retryable || attempt >= maxAttempts) break;
-          await delay(2 ** attempt * 1000, undefined, options.signal === undefined ? {} : { signal: options.signal }); // Exponential backoff: 2s, 4s.
+          await waitForProfileRetry(attempt, args.retryDelayMs, options.signal);
         }
       }
       if (metrics === null)
@@ -378,7 +398,7 @@ export async function kernelProfile(args: KernelProfileArgs, options: KernelExec
     if (error instanceof KernelExecError) throw error;
     options.signal?.throwIfAborted();
     result["error"] = `${error instanceof Error ? error.name : "Error"}: ${
-      error instanceof Error ? error.message : String(error)}`.slice(0, 4000);
+      error instanceof Error ? error.message : String(error)}`;
     log(`profiling failed: ${result["error"]}`);
   }
   metadata["durationSeconds"] = (Date.now() - started) / 1000;

@@ -88,7 +88,7 @@ def evaluate(request, profile_root, api):
 
     def mark(name, message=''):
         check = next(c for c in assessment['checks'] if c['seed'] == seed and c['call'] == call and c['id'] == name)
-        check.update(status='failed' if message else 'passed', message=message[:4000])
+        check.update(status='failed' if message else 'passed', message=message)
 
     def invoke(function, inputs, synchronize=True):
         try:

@@ -167,6 +167,12 @@ class WorkerCoreTests(unittest.TestCase):
         self.assertTrue(all(c['status'] == 'not-run' for c in self.last_assessment['checks'] if c['id'] != 'entry'))
         self.assertEqual(self.last_timings, [])
 
+    def test_native_candidate_failure_retains_the_complete_error(self):
+        message = 'x' * 5000
+        with self.assertRaises(Exception):
+            self.run_candidate(candidate_error=SyntaxError(message))
+        self.assertEqual(self.last_assessment['checks'][0]['message'], 'SyntaxError: ' + message)
+
     def test_reference_metadata_fault_is_an_evaluation_failure(self):
         with self.assertRaisesRegex(ValueError, 'Reference output'):
             self.run_candidate('reference-shape')

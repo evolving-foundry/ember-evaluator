@@ -30,6 +30,11 @@ test("strict assessment requires complete unique per-seed and per-call evidence"
   expect(() => parseKernelAssessment(assessment(), parsed, [43])).toThrow();
   expect(() => parseKernelAssessment({ ...assessment(), contractSha256: "bad" }, parsed, [42])).toThrow(/identity/);
 });
+test("strict assessment retains complete native failure messages", () => {
+  const value = assessment();
+  value.checks[0]!.message = "x".repeat(5000);
+  expect(parseKernelAssessment(value, parsed, [42]).checks[0]?.message).toHaveLength(5000);
+});
 test("strict verdict refuses not-run checks and unattributed candidate defects", () => {
   const value = { schemaVersion: 1, candidateSha256: "a".repeat(64), referenceKind: "pytorch", timingScope: "all-device-kernels",
     status: "passed", error: "", referenceMs: 2, candidateMs: 1, speedup: 2, assessment: assessment() };

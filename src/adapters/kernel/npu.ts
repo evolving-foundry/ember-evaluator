@@ -36,12 +36,12 @@ export class NpuKernelBackend implements KernelBackend {
     }
     const handle = await session.start({ executable: this.config.python,
       args: ["runtime/precision.py", "--output", join(session.verifierOutputDir, "kernel-result.json")], cwd: session.workdir,
-      env: {}, input: Buffer.from(JSON.stringify(request)) }, signal);
-    const process = await readProcess(handle, signal);
-    if (process.code !== 0) throw new VerificationError("Kernel worker did not return a result", { exitCode: process.code, stderr: process.stderr.slice(-4000) });
+      env: {}, input: Buffer.from(JSON.stringify(request)), outputBufferBytes: null }, signal);
+    const process = await readProcess(handle, signal, this.config.outputLimitBytes ?? null, this.config.cleanupGraceMs);
+    if (process.code !== 0) throw new VerificationError("Kernel worker did not return a result", { exitCode: process.code, stderr: process.stderr });
     let value: unknown;
     try { value = JSON.parse(process.stdout); }
-    catch { throw new VerificationError("Kernel worker returned invalid JSON", { stderr: process.stderr.slice(-4000) }); }
+    catch { throw new VerificationError("Kernel worker returned invalid JSON", { stderr: process.stderr }); }
     const record = expectRecord(value, "kernel result");
     const persisted: unknown = JSON.parse(await readFile(join(session.verifierOutputDir, "kernel-result.json"), "utf8"));
     if (!isDeepStrictEqual(value, persisted))
@@ -55,7 +55,7 @@ export class NpuKernelBackend implements KernelBackend {
   private async collectProfiling(request: Record<string, unknown>, session: EnvironmentSession,
     signal: AbortSignal, value: Record<string, unknown>): Promise<void> {
     const fail = (error: string): void => {
-      value.profiling = { schemaVersion: 1, status: "failed", error: error.slice(0, 4000), kernels: [], metadata: {}, artifacts: [] };
+      value.profiling = { schemaVersion: 1, status: "failed", error, kernels: [], metadata: {}, artifacts: [] };
     };
     try {
       const stem = "kernel-profile";
@@ -69,11 +69,16 @@ export class NpuKernelBackend implements KernelBackend {
         ...(request.contractSha256 === undefined ? {} : { contractSha256: String(request.contractSha256) }),
         ...(this.config.profiling.maxAttempts === undefined ? {} : { maxAttempts: this.config.profiling.maxAttempts }),
         ...(this.config.profiling.attemptTimeoutSeconds === undefined ? {} : { attemptTimeoutSeconds: this.config.profiling.attemptTimeoutSeconds }),
+        ...(this.config.profiling.retryDelayMs === undefined ? {} : { retryDelayMs: this.config.profiling.retryDelayMs }),
         ...(this.config.profiling.cacheEnabled === undefined ? {} : { cacheEnabled: this.config.profiling.cacheEnabled }),
         ...(this.config.profiling.cacheDir === undefined ? {} : { cacheDir: this.config.profiling.cacheDir }),
+        ...(this.config.profiling.cacheMaxEntries === undefined ? {} : { cacheMaxEntries: this.config.profiling.cacheMaxEntries }),
         ...(this.config.profiling.msprofBin === undefined ? {} : { msprofBin: this.config.profiling.msprofBin }),
         ...(this.config.profiling.deviceName === undefined ? {} : { deviceName: this.config.profiling.deviceName }),
       }, { python: this.config.python, signal,
+        ...(this.config.outputLimitBytes === undefined ? {} : { outputLimitBytes: this.config.outputLimitBytes }),
+        ...(this.config.cleanupGraceMs === undefined ? {} : { cleanupGraceMs: this.config.cleanupGraceMs }),
+        ...(this.config.cleanupTimeoutMs === undefined ? {} : { cleanupTimeoutMs: this.config.cleanupTimeoutMs }),
         env: this.environment() },
         { session, atomDirectory: join(session.workdir, "runtime") });
       const raw = JSON.parse(await readFile(join(session.verifierOutputDir, `${stem}.raw.json`), "utf8"));

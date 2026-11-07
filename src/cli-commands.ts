@@ -8,7 +8,9 @@ interface Options extends CliOverrides {
   all?: boolean; yes?: boolean; benchmark?: string; output?: string; json?: boolean;
   run?: string; taskId?: string[]; requestId?: string; reason?: string;
   problem?: string; kernel?: string; out?: string; round?: string; device?: string;
-  python?: string; seeds?: string; seed?: string; warmup?: string; network?: string;
+  python?: string; seeds?: string; seed?: string; warmup?: string; repeat?: string; network?: string;
+  timeoutMs?: string; outputLimitBytes?: string; cleanupGraceMs?: string; cleanupTimeoutMs?: string;
+  maxAttempts?: string; attemptTimeoutSeconds?: string; cacheMaxEntries?: string; retryDelayMs?: string;
 }
 
 export class CommandUsageError extends TypeError {
@@ -95,16 +97,40 @@ export function parseCommand(argv: string[]): Command {
       .requiredOption("--kernel <path>", "Kernel implementation path")
       .requiredOption("--out <json>", "Destination JSON result file")
       .option("--device <n>", "NPU device index", "0")
+      .option("--timeout-ms <n>", "Overall worker timeout in milliseconds; 0 disables it (bench/precision default: 900000)")
+      .option("--output-limit-bytes <n>", "Explicit per-stream output capacity; omitted preserves complete output")
       .option("--python <executable>", "Python interpreter used by the kernel executor");
     if (name === "profile") cmd.option("--round <n>", "Profiling round index", "0")
       .option("--seed <n>", "Replay input seed", "0")
-      .option("--warmup <n>", "Warmup calls before capture", "25");
+      .option("--warmup <n>", "Warmup calls before capture", "25")
+      .option("--max-attempts <n>", "Maximum profiler capture attempts including the first (default: 2)")
+      .option("--attempt-timeout-seconds <n>", "Timeout per profiler capture attempt (default: 300)")
+      .option("--retry-delay-ms <n>", "Wait before each capture retry; 0 disables waiting (default: exponential)")
+      .option("--cleanup-grace-ms <n>", "Grace period before forcing process termination (default: 100)")
+      .option("--cleanup-timeout-ms <n>", "Wait to confirm profiler cleanup (default: 3000)")
+      .option("--cache-max-entries <n>", "Maximum profiling cache entries; omitted disables eviction");
+    if (name === "bench") cmd.option("--warmup <n>", "Warmup timing calls", "25")
+      .option("--repeat <n>", "Measured timing calls", "100");
     if (name === "precision") cmd.option("--seeds <list>", 'Space-separated random seeds; quote the list, e.g. --seeds "0 1"', "0 1");
     cmd.action((opts: Options) => {
       const base = { problem: resolve(String(opts.problem)), kernel: resolve(String(opts.kernel)), out: resolve(String(opts.out)), device: integer(opts.device, 0, "--device"), ...(opts.python === undefined ? {} : { python: opts.python }) };
-      result = name === "profile" ? { kind: "kernel-profile", ...base, round: integer(opts.round, 0, "--round"), seed: integer(opts.seed, 0, "--seed"), warmup: integer(opts.warmup, 25, "--warmup") }
-        : name === "precision" ? { kind: "kernel-precision", ...base, seeds: (opts.seeds ?? "0 1").split(/\s+/).map(Number).filter(seed => Number.isSafeInteger(seed) && seed >= 0) }
-        : { kind: "kernel-bench", ...base };
+      const processOptions: { timeoutMs?: number; outputLimitBytes?: number; cleanupGraceMs?: number; cleanupTimeoutMs?: number } = {};
+      for (const [key, flag] of [["timeoutMs", "--timeout-ms"], ["outputLimitBytes", "--output-limit-bytes"], ["cleanupGraceMs", "--cleanup-grace-ms"], ["cleanupTimeoutMs", "--cleanup-timeout-ms"]] as const) {
+        if (opts[key] === undefined) continue;
+        const value = integer(opts[key], 0, flag);
+        if (key !== "timeoutMs" && value === 0) throw new TypeError(`${flag} must be a positive integer`);
+        processOptions[key] = value;
+      }
+      const profileOptions: { maxAttempts?: number; attemptTimeoutSeconds?: number; cacheMaxEntries?: number; retryDelayMs?: number } = {};
+      for (const [key, flag] of [["maxAttempts", "--max-attempts"], ["attemptTimeoutSeconds", "--attempt-timeout-seconds"], ["cacheMaxEntries", "--cache-max-entries"], ["retryDelayMs", "--retry-delay-ms"]] as const) {
+        if (opts[key] === undefined) continue;
+        const value = integer(opts[key], 0, flag);
+        if (key !== "retryDelayMs" && value === 0) throw new TypeError(`${flag} must be a positive integer`);
+        profileOptions[key] = value;
+      }
+      result = name === "profile" ? { kind: "kernel-profile", ...base, ...processOptions, ...profileOptions, round: integer(opts.round, 0, "--round"), seed: integer(opts.seed, 0, "--seed"), warmup: integer(opts.warmup, 25, "--warmup") }
+        : name === "precision" ? { kind: "kernel-precision", ...base, ...processOptions, seeds: (opts.seeds ?? "0 1").split(/\s+/).map(Number).filter(seed => Number.isSafeInteger(seed) && seed >= 0) }
+        : { kind: "kernel-bench", ...base, ...processOptions, warmup: integer(opts.warmup, 25, "--warmup"), repeat: integer(opts.repeat, 100, "--repeat") };
     });
   }
   // Preserve rejection of duplicate scalar options, which Commander otherwise overwrites.

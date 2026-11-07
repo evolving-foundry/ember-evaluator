@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const execFileAsync = promisify(execFile);
+export const MAX_KERNEL_TIMER_MS = 2147483647;
 
 /**
  * Execution bridge for the Evaluator CLI kernel subcommands.
@@ -37,7 +38,23 @@ export interface KernelExecOptions {
   /** Logical NPU index passed as KERNEL_NPU_DEVICE; the worker uses its environment when omitted. */
   device?: number;
   timeoutMs?: number;
+  /** Per stdout/stderr stream; omitted preserves complete output. */
+  outputLimitBytes?: number;
+  cleanupGraceMs?: number;
+  cleanupTimeoutMs?: number;
   signal?: AbortSignal;
+}
+
+export function validateKernelExecOptions(options: KernelExecOptions): void {
+  for (const name of ["outputLimitBytes", "cleanupGraceMs", "cleanupTimeoutMs"] as const) {
+    const value = options[name];
+    if (value !== undefined && (!Number.isSafeInteger(value) || value <= 0)) throw new TypeError(`${name} must be a positive integer`);
+  }
+  if (options.timeoutMs !== undefined && (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 0))
+    throw new TypeError("timeoutMs must be a non-negative integer");
+  for (const name of ["timeoutMs", "cleanupGraceMs", "cleanupTimeoutMs"] as const)
+    if (options[name] !== undefined && options[name] > MAX_KERNEL_TIMER_MS)
+      throw new TypeError(`${name} exceeds the Node timer range (${MAX_KERNEL_TIMER_MS} ms)`);
 }
 
 /**
@@ -101,13 +118,14 @@ export function parseAtomPayload(sub: string, stdout: string): Record<string, un
     return JSON.parse(last) as Record<string, unknown>;
   } catch (error) {
     throw new KernelExecError(sub, null, `kernel ${sub} printed no JSON: ${String(error)}`, true,
-      stdout.slice(0, 400));
+      stdout);
   }
 }
 
 /** Return worker payloads, including recorded evaluation failures with nonzero exit codes. */
 async function runEntry(sub: string, entry: string, argv: readonly string[], out: string,
   options: KernelExecOptions = {}): Promise<Record<string, unknown>> {
+  validateKernelExecOptions(options);
   const atomDir = resolveAtomDir(sub, options);
   const env = {
     ...process.env,
@@ -121,14 +139,14 @@ async function runEntry(sub: string, entry: string, argv: readonly string[], out
   try {
     const { stdout } = await execFileAsync(options.python ?? "python",
       [join(atomDir, entry), ...argv], {
-        cwd: atomDir, env, maxBuffer: 64 * 1024 * 1024, windowsHide: true,
+        cwd: atomDir, env, maxBuffer: options.outputLimitBytes ?? Infinity, windowsHide: true,
         timeout: options.timeoutMs ?? 900_000,
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
     payload = parseAtomPayload(sub, stdout);
   } catch (error) {
     const cause = error instanceof Object ? error as ExecFailure : {};
-    if (cause.killed === true || (error instanceof Error && error.name === "AbortError"))
+    if (cause.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" || cause.killed === true || (error instanceof Error && error.name === "AbortError"))
       throw kernelFailure(sub, error);
     // Evaluation failures may already have written --out with an error field; read that payload.
     payload = await readJson(out);
@@ -143,7 +161,7 @@ const num = (value: unknown): number | null =>
 
 // ---------------- Three measurement operations: two Python workers and one TS orchestrator ----------------
 
-export interface KernelBenchArgs { problem: string; kernel: string; out: string }
+export interface KernelBenchArgs { problem: string; kernel: string; out: string; warmup?: number; repeat?: number }
 
 export interface KernelBenchResult extends Record<string, unknown> {
   problem: string; kernel: string; out: string;
@@ -152,8 +170,12 @@ export interface KernelBenchResult extends Record<string, unknown> {
 
 /** Benchmark Triton kernels only; the precision worker owns correctness checks. */
 export async function kernelBench(args: KernelBenchArgs, options: KernelExecOptions = {}): Promise<KernelBenchResult> {
+  for (const name of ["warmup", "repeat"] as const)
+    if (args[name] !== undefined && (!Number.isSafeInteger(args[name]) || args[name] <= 0)) throw new TypeError(`${name} must be a positive integer`);
   const payload = await runEntry("bench", "timing.py",
-    ["--problem", args.problem, "--kernel", args.kernel, "--out", args.out],
+    ["--problem", args.problem, "--kernel", args.kernel, "--out", args.out,
+      ...(args.warmup === undefined ? [] : ["--warmup", String(args.warmup)]),
+      ...(args.repeat === undefined ? [] : ["--repeat", String(args.repeat)])],
     args.out, options);
   return { problem: args.problem, kernel: args.kernel, out: args.out,
     time_ms: num(payload["time_ms"]), error: str(payload["error"]) };

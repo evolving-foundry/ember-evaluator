@@ -11,8 +11,6 @@ import { homedir } from "node:os";
  * 历史条目继续命中。
  */
 
-const MAX_ENTRIES = 512;
-
 export interface CachedMsProfResult {
   metrics: Record<string, unknown>;
   metricsRecords: Record<string, unknown>[] | null;
@@ -37,7 +35,7 @@ function entryPath(cacheDir: string, keyHash: string): string {
   return join(cacheDir, `${keyHash}.json`);
 }
 
-const isHexKey = (name: string): boolean => /^[0-9a-fA-F]{64}$/.test(name);
+const isCacheEntry = (name: string): boolean => /^[0-9a-fA-F]{64}\.json$/.test(name);
 
 /** py 版 _backup_profile_dir 语义：首次命中/落缓存时把 profile 目录备份进缓存区。 */
 async function backupProfileDir(cacheDir: string, keyHash: string, profileDir: string): Promise<string> {
@@ -64,12 +62,14 @@ async function cacheRoot(cacheDir?: string): Promise<string | null> {
 export class MsProfCache {
   private readonly dir: string;
 
-  private constructor(dir: string) {
+  private constructor(dir: string, private readonly maxEntries?: number) {
     this.dir = dir;
   }
 
   /** 构建缓存；缓存被禁用时返回 null。device 缺失时与原版一致地禁用（key 不完整宁可重采）。 */
-  static async open(deviceId: string | undefined, cacheDir?: string, log?: (line: string) => void): Promise<MsProfCache | null> {
+  static async open(deviceId: string | undefined, cacheDir?: string, log?: (line: string) => void, maxEntries?: number): Promise<MsProfCache | null> {
+    if (maxEntries !== undefined && (!Number.isSafeInteger(maxEntries) || maxEntries <= 0))
+      throw new TypeError("cacheMaxEntries must be a positive integer");
     const root = await cacheRoot(cacheDir);
     if (root === null) return null;
     if (deviceId === undefined || deviceId === "") {
@@ -77,7 +77,7 @@ export class MsProfCache {
       return null;
     }
     await mkdir(root, { recursive: true });
-    return new MsProfCache(root);
+    return new MsProfCache(root, maxEntries);
   }
 
   private async keyHash(kernelBytes: Buffer, deviceId: string): Promise<string> {
@@ -155,16 +155,17 @@ export class MsProfCache {
 
   /** 超容量时按 mtime 淘汰最旧条目及其 profile 备份目录。 */
   private async prune(): Promise<void> {
-    const names = (await readdir(this.dir)).filter(isHexKey);
-    if (names.length <= MAX_ENTRIES) return;
+    if (this.maxEntries === undefined) return;
+    const names = (await readdir(this.dir)).filter(isCacheEntry);
+    if (names.length <= this.maxEntries) return;
     const entries = await Promise.all(names.map(async name => ({
       name, mtime: (await stat(join(this.dir, name))).mtimeMs,
     })));
     entries.sort((a, b) => b.mtime - a.mtime);
-    for (const stale of entries.slice(MAX_ENTRIES)) {
+    for (const stale of entries.slice(this.maxEntries)) {
       try {
         await rm(join(this.dir, stale.name));
-        await rm(join(this.dir, "profiles", stale.name), { recursive: true, force: true });
+        await rm(join(this.dir, "profiles", stale.name.replace(/\.json$/u, "")), { recursive: true, force: true });
       } catch {
         // 淘汰失败留给下次。
       }

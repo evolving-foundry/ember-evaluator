@@ -6,7 +6,9 @@ import { kernelProfile } from "../../src/adapters/kernel/profile.js";
 import { KernelBenchmark, parseKernelConfig } from "../../src/plugins/benchmarks/protocols/kernel/index.js";
 import type { EnvironmentSession, CommandSpec, ProcessHandle } from "../../src/core/contracts/environment.js";
 
-async function fixture(mode: "complete" | "missing" | "cleanup" | "no-trace" | "missing-l2" | "wrong-seed" | "wrong-capture" = "complete", device = 0, operation: "evaluate" | "profile" = "profile", collection?: "Default" | "PipeTimeline,Default") {
+async function fixture(mode: "complete" | "missing" | "cleanup" | "no-trace" | "missing-l2" | "wrong-seed" | "wrong-capture" = "complete", device = 0, operation: "evaluate" | "profile" = "profile", collection?: "Default" | "PipeTimeline,Default",
+  processOptions: { outputBytes?: number; exitCode?: number; outputLimitBytes?: number; cleanupGraceMs?: number; cleanupTimeoutMs?: number } = {}) {
+  const { outputBytes = 0, exitCode = 0, ...limits } = processOptions;
   const dir = await mkdtemp(join(tmpdir(), "kernel-profile-sdk-"));
   const manifest = join(dir, "manifest.json");
   await writeFile(join(dir, "problem.py"), "class Model: pass\n");
@@ -17,6 +19,7 @@ async function fixture(mode: "complete" | "missing" | "cleanup" | "no-trace" | "
   await mkdir(verifierOutputDir, { recursive: true });
   const commands: CommandSpec[] = [];
   let stopped = 0;
+  const stopGrace: number[] = [];
   let replayRequest: unknown;
   const session: EnvironmentSession = {
     id: "session", workdir, verifierOutputDir, agentOutputDir: join(workdir, "agent"), metadata: null,
@@ -42,12 +45,12 @@ async function fixture(mode: "complete" | "missing" | "cleanup" | "no-trace" | "
         if (mode === "complete") await writeFile(join(profile, "trace.json"), JSON.stringify({ traceEvents: [{ pid: "core0.veccore0", tid: "VECTOR", ts: 0, dur: 10 }] }));
         await writeFile(resultPath, JSON.stringify({ seed: mode === "wrong-seed" ? 41 : 42, warmup: 7, requestedLogicalDevice: 0, logicalDevice: 0, deviceCount: 1, capture: { method: "mstx", range: "rsi_operator_profile", toolId: 4097, rangeId: 0, warmupCompleted: mode === "wrong-capture" ? 6 : 7, callsInRange: 1 }, deviceName: "Ascend950PR", inputContract: "unchanged problem.get_inputs", environment: { device: "fixture950 logical=0", visibleDevices: "0" } }));
       }
-      return { stdout: (async function* () {})(), stderr: (async function* () {})(), done: Promise.resolve({ code: 0, signal: null }),
-        async stop() { stopped++; if (mode === "cleanup") throw new Error("cannot stop"); } };
+      return { stdout: (async function* () { if (outputBytes) yield Buffer.from("x".repeat(outputBytes)); })(), stderr: (async function* () {})(), done: Promise.resolve({ code: exitCode, signal: null }),
+        async stop(grace) { stopped++; stopGrace.push(grace); if (mode === "cleanup") throw new Error("cannot stop"); } };
     },
   };
-  const benchmark = new KernelBenchmark(parseKernelConfig({ operation, device, manifest, seeds: [42], timeoutSeconds: 20,
-    profiling: { enabled: true, warmup: 7, cacheEnabled: false, maxAttempts: 1, attemptTimeoutSeconds: 10, ...(collection === undefined ? {} : { collection }) } }));
+  const benchmark = new KernelBenchmark(parseKernelConfig({ operation, device, manifest, seeds: [42], timeoutSeconds: 20, ...limits,
+    profiling: { enabled: true, warmup: 7, cacheEnabled: false, maxAttempts: 1, attemptTimeoutSeconds: 10, retryDelayMs: 0, ...(collection === undefined ? {} : { collection }) } }));
   const signal = new AbortController().signal;
   const source = await benchmark.resolveSource(null, signal);
   const task = await benchmark.prepare({ id: "fixed", recordKey: "fixed" }, source, signal);
@@ -55,8 +58,27 @@ async function fixture(mode: "complete" | "missing" | "cleanup" | "no-trace" | "
   const payload = task.input.payload;
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || typeof payload.candidateSha256 !== "string") throw new Error("missing candidate hash");
   const solve = { finalText: payload.candidateSha256, usage: { inputTokens: null, outputTokens: null, totalTokens: null } };
-  return { dir, commands, benchmark, task, session, signal, solve, request: () => replayRequest, stopped: () => stopped };
+  return { dir, commands, benchmark, task, session, signal, solve, stopGrace, request: () => replayRequest, stopped: () => stopped };
 }
+
+test("profiling honors configured output capacity and cleanup grace", async () => {
+  const f = await fixture("complete", 0, "profile", "Default", { outputBytes: 1024, outputLimitBytes: 8, cleanupGraceMs: 43 });
+  try {
+    const verdict = await f.benchmark.verify(f.task, f.solve, f.session, f.signal);
+    expect(verdict).toMatchObject({ passed: null, details: { status: "unavailable", profiling: { error: expect.stringContaining("output exceeds limit") } } });
+    expect(f.stopGrace).toEqual([43, 43]);
+  } finally { await rm(f.dir, { recursive: true, force: true }); }
+});
+
+test("failed profiler preserves complete native console output", async () => {
+  const f = await fixture("complete", 0, "profile", "Default", { outputBytes: 5000, exitCode: 1 });
+  try {
+    const verdict = await f.benchmark.verify(f.task, f.solve, f.session, f.signal);
+    expect(verdict).toMatchObject({ passed: null, details: { status: "unavailable" } });
+    const consoleText = await readFile(join(f.session.verifierOutputDir, "kernel-profile_profiling_root/profiling/logs/console.log"), "utf8");
+    expect(consoleText).toBe("x".repeat(5000));
+  } finally { await rm(f.dir, { recursive: true, force: true }); }
+});
 
 test("independent profile uses the SDK session and frozen seed without running precision or benchmark", async () => {
   const f = await fixture();
@@ -66,7 +88,7 @@ test("independent profile uses the SDK session and frozen seed without running p
     expect(verdict.passed).toBeNull(); expect(verdict).not.toHaveProperty("score");
     expect(verdict.details).toMatchObject({ operation: "profile", protocol: "kernel-profile/v1", status: "completed", cleanup: "confirmed",
       diagnosticProtocol: { caseId: "fixed", seeds: [42], warmup: 7, collection: "PipeTimeline,Default", capture: "after-warmup-mstx-range", selectionPolicy: "last" },
-      profiling: { status: "completed", metadata: { attempts: 1, trace: { status: "available", artifact: "trace.json" }, hardwareDerived: { ubRatio: "unavailable", coreUtilization: "unavailable" } } } });
+      profiling: { status: "completed", metadata: { attempts: 1, retryPolicy: { retryDelayMs: 0 }, trace: { status: "available", artifact: "trace.json" }, hardwareDerived: { ubRatio: "unavailable", coreUtilization: "unavailable" } } } });
     expect(verdict.details).not.toHaveProperty("candidateMs");
     expect(f.request()).toMatchObject({ seeds: [42], warmup: 7 });
     expect(f.request()).not.toHaveProperty("repeat"); expect(f.request()).not.toHaveProperty("rtol");
