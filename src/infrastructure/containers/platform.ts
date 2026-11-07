@@ -87,7 +87,7 @@ export class PlatformCapabilityDetector {
       const name = `ember-platform-probe-${randomUUID()}`;
       const probeSignal = AbortSignal.any([active, AbortSignal.timeout(30_000)]);
       try {
-        await this.command(["create", "--name", name, "--label", "ember.role=platform-probe",
+        await this.command(["create", "--pull", "never", "--name", name, "--label", "ember.role=platform-probe",
           "--network", "none", "--read-only", "--cpus", "1", "--memory", "256m", "--platform", resolution.platform,
           "--entrypoint", "/usr/local/bin/node", image, "-e",
           "process.stdout.write(process.platform + '/' + process.arch)"], { signal: probeSignal });

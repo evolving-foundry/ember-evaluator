@@ -113,6 +113,7 @@ export class DockerSession implements EnvironmentSession {
     private readonly command: DockerCommand,
     metadata: DockerMetadata,
     private readonly logOwners: Awaited<ReturnType<typeof captureDockerLogOwnership>>,
+    private readonly releaseImageLease: () => Promise<void>,
     gateway?: GatewayHandle,
     private readonly project?: DockerComposeProject,
   ) {
@@ -402,10 +403,10 @@ export class DockerSession implements EnvironmentSession {
     this.disposed = true;
     this.disposal = (async () => {
       this.quiesced = true;
-      await Promise.allSettled(this.starting);
-      await Promise.all([...this.processes].map(handle => handle.stop(PROCESS_STOP_GRACE_MS).catch(() => {})));
       const failures: unknown[] = [];
       try {
+        await Promise.allSettled(this.starting);
+        await Promise.all([...this.processes].map(handle => handle.stop(PROCESS_STOP_GRACE_MS).catch(() => {})));
         // Stop detached writers before handing private 0600 evidence back to
         // its original host owner; collection runs after this session ends.
         await this.project?.enterMaintenance(signal);
@@ -418,6 +419,8 @@ export class DockerSession implements EnvironmentSession {
       try { await (this.project ? this.project.dispose(signal) : removeDockerContainer(this.command, this.id, signal)); }
       catch (error) { failures.push(error); }
       try { await this.gateway?.dispose(signal); }
+      catch (error) { failures.push(error); }
+      try { await this.releaseImageLease(); }
       catch (error) { failures.push(error); }
       if (failures.length > 0) throw new DockerEnvironmentError("CLEANUP_FAILED",
         `failed to remove Docker session ${this.id}`, new AggregateError(failures));

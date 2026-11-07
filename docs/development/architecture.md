@@ -87,7 +87,7 @@ Engine 在 `admitRetryRequests` 中读取结果、检查资格、预留队列并
 
 Ray Jobs 部署与 RayScheduler 的任务调度处于不同层次。Jobs 入口直接调用 application 的操作函数，不通过 CLI 参数解析执行。Docker 准备实现仍包含多种镜像策略；现有拆分不表示每种策略已有独立模块。
 
-Docker 的 `prepareObserved` 按顺序调用凭证读取、镜像校验、日志挂载、启动参数、文件和执行用户准备等函数。`DockerPreparationReceipt` 描述现有凭证字段。网关、Compose 项目与容器句柄保留在外层，由同一个 `catch` 处理准备失败回收；Compose 清理失败后仍尝试释放网关，并保留原始错误和清理错误。
+Docker 的 `materialize()` 和按需 `prepare()` 共用 `prepareDependencies()`，准备主容器、网关和 Compose 服务的镜像及运行时。`prepare()` 有凭证时先校验本地镜像，再把已确定的镜像交给 `startSession()`。启动主容器和网关时使用 `--pull never`，Compose 还使用 `--no-build`。启动失败时先清理已创建的容器、Compose 项目和网关，再释放镜像租约。启动成功时，容器、网关、Compose 项目和租约交给 `DockerSession.dispose()`。
 
 ## Benchmark 与插件注册
 

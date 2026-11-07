@@ -87,7 +87,7 @@ The public Scheduler still receives `TaskJob`. Ray workers retain their preparat
 
 Ray Jobs deployment and RayScheduler task dispatch operate at different levels. Jobs entries call application operations directly rather than going through CLI argument parsing. Docker preparation still contains several image strategies; they are not each implemented as separate modules.
 
-Docker's `prepareObserved` calls specific functions for receipt reading, image checks, log mounts, launch options, file staging, and execution users. `DockerPreparationReceipt` names the existing receipt fields. Gateway, Compose project, and container handles remain in the outer function, whose single `catch` cleans up failed preparation. Gateway cleanup still runs after a Compose cleanup failure, and both the original and cleanup errors are retained.
+Docker's `materialize()` and on-demand `prepare()` share `prepareDependencies()` to resolve images and runtimes for the main container, gateway, and Compose services. With a receipt, `prepare()` checks the local images before passing the resolved images to `startSession()`. Main and gateway containers start with `--pull never`. Compose also uses `--no-build`. On startup failure, the startup code cleans up containers, the Compose project, and the gateway before the image lease is released. On success, `DockerSession.dispose()` owns that cleanup and lease release.
 
 ## Benchmarks and Plugin Registration
 

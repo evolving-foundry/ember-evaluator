@@ -5,6 +5,7 @@ import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 import type { DockerCommand } from "./runtime-contract.js";
 import type { ImageCleanupRequest, ImageCleanupNode, ImageCleanupItem } from "../../core/contracts/image-cleanup.js";
+import { DockerEnvironmentError } from "./error.js";
 import { acquireRuntimeLock } from "../runtime-installation/lock.js";
 import { applicationCacheRoot } from "../runtime-installation/install.js";
 
@@ -86,12 +87,18 @@ export class DockerImageInventory {
     const held = await this.hold(owner, signal, action);
     try { return held.value; } finally { await held.release(); }
   }
-  async hold<T>(owner: Owner | undefined, signal: AbortSignal, action: () => Promise<T>) {
+  async hold<T>(owner: Owner | undefined, signal: AbortSignal, action: (release: () => Promise<void>) => Promise<T>) {
     signal.throwIfAborted();
     const scope: Scope = { ...(owner ? { owner } : {}), touched: new Set(), seen: new Set() };
     const release = async () => { if (scope.lease) await (await scope.lease)(); };
-    try { return { value: await this.scope.run(scope, action), release }; }
-    catch (error) { await release(); throw error; }
+    try { return { value: await this.scope.run(scope, () => action(release)), release }; }
+    catch (error) {
+      try { await release(); }
+      catch (cleanup) {
+        if (cleanup !== error) throw new DockerEnvironmentError("CLEANUP_FAILED", "Failed to release Docker image lease", new AggregateError([error, cleanup]));
+      }
+      throw error;
+    }
   }
   private async inspect(reference: string, signal: AbortSignal): Promise<{ id: string; tags: string[]; digests: string[] } | undefined> {
     try {
