@@ -1,0 +1,389 @@
+:root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--txt:#e6edf3;--dim:#8b949e;--namew:280px;--detw:420px;--navw:210px;
+--agent:#1f6feb;--agent2:#388bfd;--user:#8957e5;--system:#6e7681;--tool:#2ea043;--tool2:#3fb950}
+*{box-sizing:border-box}
+html,body{height:100%}
+/* Header height varies with content (it wraps on narrow screens), so use flex instead of hard-coding calc(100vh - 56px). */
+body{margin:0;font:15px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt);display:flex;flex-direction:column;overflow:hidden}
+header{padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:600}
+/* Language toggle is pinned to the far right regardless of how many header items render. */
+#langBtn{margin-left:auto}
+#meta{color:var(--dim);font-size:13px}
+#meta code{color:#e6edf3;font-weight:600;background:#21262d;padding:1px 5px;border-radius:4px;max-width:220px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+button{background:#21262d;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px;transition:background-color .15s,border-color .15s,color .15s}
+button:hover{background:#30363d}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:disabled:hover{background:#21262d}
+.epochpick{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim)}
+.epochpick select{background:#21262d;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:13px}
+/* Open run directory: the offline entry point when the store has no data. */
+.epov{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+.epov th,.epov td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.epov th{color:var(--dim);font-weight:500}
+.epov td.num,.epov th.num{text-align:right;font-variant-numeric:tabular-nums}
+.epov tbody tr{cursor:pointer}
+.epov tbody tr:hover{background:#1c2230}
+main{display:flex;flex-direction:column;flex:1;min-height:0}
+#bar{display:flex;flex-direction:column;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line)}
+.barrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#summary{display:flex;gap:18px;flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;font-size:12px;color:var(--dim)}
+.stat b{font-size:17px;color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums}
+#body{flex:1;display:flex;min-height:0;overflow:hidden}
+#wfNames{width:var(--namew);min-width:120px;display:flex;flex-direction:column;min-height:0}
+.wf-head{height:28px;flex:none}
+.wf-scroll{flex:1;overflow:auto;padding:8px 16px 0}
+#wfNames .wf-scroll{padding:8px 4px 0}
+#wfTracks{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+#axis{position:relative;height:22px;margin:0 16px 6px;border-bottom:1px dashed var(--line);flex:none}
+.splitter{width:6px;flex:none;cursor:col-resize;z-index:5}
+.splitter:hover{background:#1f6feb55}
+#axis .tick{position:absolute;top:0;height:100%;border-left:1px solid #30363d80;font-size:11px;color:var(--dim)}
+#axis .tick span{position:absolute;top:2px;left:4px}
+.wf-row{display:flex;align-items:center;height:26px;cursor:pointer;border-radius:6px}
+.wf-row:hover{background:#1c2230}
+.wf-name{flex:1;min-width:0;display:flex;align-items:center;gap:6px;overflow:hidden;white-space:nowrap;padding-right:8px}
+.wf-name small{color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.wf-name.d1{padding-left:22px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--system)}
+.dot.agent{background:var(--agent2)}.dot.user{background:var(--user)}.dot.system{background:var(--system)}.dot.tool{background:var(--tool2)}
+/* Step category tags: one source mixes model decisions, tool calls, and tool results, so color tells them apart.
+   Tagged rows drop the dot to avoid two redundant color blocks on one line. */
+.cat{flex:none;font-size:10px;line-height:15px;padding:0 5px;border-radius:3px;margin-right:6px;white-space:nowrap}
+.cat.sys{color:#56d4dd;background:#39c5cf24}
+.cat.user{color:#79c0ff;background:#1f6feb30}
+.cat.llm_req,.cat.llm_resp{color:#d2a8ff;background:#a371f72e}
+.cat.tool_req{color:#e3b341;background:#d299222e}
+.cat.tool_resp{color:#56d364;background:#3fb9502b}
+.cat.msg{color:#56d4dd;background:#39c5cf24}
+.wf-track{position:relative;flex:1;height:100%;border-left:1px solid #21262d;overflow:hidden}
+.wf-bar{position:absolute;top:4px;height:16px;border-radius:4px;display:flex;align-items:center;padding:0 6px;overflow:hidden;color:#fff;font-size:11px;white-space:nowrap;min-width:4px;transition:filter .15s;background:#444c56}
+.wf-row:hover .wf-bar{filter:brightness(1.2)}
+.wf-bar.agent{background:linear-gradient(90deg,var(--agent),var(--agent2))}
+.wf-bar.user{background:linear-gradient(90deg,#6e40c9,var(--user))}
+.wf-bar.system{background:#444c56}
+.wf-bar.tool{background:linear-gradient(90deg,var(--tool),var(--tool2))}
+#details{width:var(--detw);min-width:240px;flex:none;border-left:1px solid var(--line);background:var(--panel);overflow:auto;padding:12px}
+#aiback{position:fixed;inset:0;background:#00000073;opacity:0;pointer-events:none;transition:opacity .2s;z-index:55}
+#aiback.on{opacity:1;pointer-events:auto}
+#aipanel{position:fixed;top:0;right:0;width:520px;max-width:94vw;height:100vh;background:var(--panel);border-left:1px solid var(--line);transform:translateX(103%);transition:transform .2s;z-index:60;display:flex;flex-direction:column;box-shadow:-8px 0 24px #0006}
+#aipanel.on{transform:none}
+.aihead{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:15px}
+#aibody{flex:1;overflow:auto;padding:12px 14px}
+.aiscore{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0}
+.fnd{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:8px;background:#0b0f14}
+.fnd .t{font-weight:600;margin:4px 0;font-size:14px}
+.sev{font-size:12px;padding:1px 7px;border-radius:10px;text-transform:uppercase}
+.sev.high{background:#f8514922;color:#f85149}.sev.medium{background:#d2992222;color:#d29922}.sev.low{background:#3fb95022;color:#3fb950}
+.fnd .ev{margin-top:6px}
+/* Deterministic signals collapse by default: only HIGH/MEDIUM/LOW count chips show; expand for details. */
+details.sigbox{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:8px 0;background:#0d1117}
+details.sigbox>summary{cursor:pointer;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px;font-weight:600;color:#c9d1d9;list-style:none}
+details.sigbox>summary::-webkit-details-marker{display:none}
+details.sigbox>summary::before{content:"▸";color:#8b949e;transition:transform .12s}
+details.sigbox[open]>summary::before{content:"▾"}
+details.sigbox[open]>summary{margin-bottom:8px}
+/* Status area on the right of a collapsed summary: keeps a fixed "title · note ... badge" structure. */
+details.sigbox>summary .sumr{margin-left:auto;display:flex;gap:4px;align-items:center}
+/* Subtext after a title stays muted: no bold and one size smaller. */
+details.sigbox>summary .hint{font-weight:400;font-size:13px}
+/* Shared summary slots: title + muted subtitle (scope/source) + status or action on the right. */
+details.sigbox>summary .ssub{font-weight:400;font-size:13px;color:#8b949e}
+.fnd .ev button{padding:2px 9px;font-size:13px}
+.dhead{font-size:16px;margin-bottom:6px}
+/* Key values in details (step/source/model, share, gap, window) are bold; labels stay muted. */
+#details .kv b{color:#e6edf3;font-variant-numeric:tabular-nums}
+.badge{font-size:12px;padding:1px 7px;border-radius:10px;background:#21262d;color:var(--dim);text-transform:uppercase}
+.kv{color:var(--dim);font-size:14px;margin-bottom:4px}
+section{margin-top:10px}
+section h4{display:flex;align-items:center;gap:6px;margin:0 0 6px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+section h4 .meta{margin-left:auto;font-size:11px;letter-spacing:0;text-transform:none;font-weight:400;color:#6e7681;font-variant-numeric:tabular-nums}
+pre{margin:0;background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:10px 12px;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow:auto;
+  font-family:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;font-size:13px;line-height:1.62;tab-size:2;color:#c9d1d9}
+/* Command blocks read like a terminal: $ prompt plus brighter text, layered apart from tool output. */
+pre.cmd{background:#0d1117;border-color:#30363d;color:#e6edf3}
+pre.cmd i{color:#3fb950;font-style:normal;user-select:none;margin-right:7px}
+pre.out{border-left:2px solid #2d333b;color:#adbac7}
+.toolname{display:inline-block;font-size:11px;padding:0 6px;border-radius:4px;background:#1b2129;color:#a5d6ff;margin:8px 0 4px}
+/* Execution constraints under a command block (timeout, etc.): muted single line, separate from the command itself. */
+.cmdmeta{margin-top:4px;font-size:12px;color:#6e7681;font-variant-numeric:tabular-nums}
+/* Metrics have only a few fields; two columns scan faster than one JSON blob. */
+.mgrid{display:grid;grid-template-columns:auto 1fr;gap:3px 16px;padding:9px 12px;background:#0b0f14;border:1px solid var(--line);border-radius:8px;font-size:13px;
+  font-family:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace}
+.mgrid b{color:var(--dim);font-weight:400}
+.mgrid span{text-align:right;color:var(--txt);font-variant-numeric:tabular-nums}
+/* Step header facts: no box; two aligned columns compact prose into a small table. */
+.fgrid{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0 0 12px;padding:0 0 10px;
+  border-bottom:1px solid #21262d;font-size:14px;font-variant-numeric:tabular-nums}
+.fgrid b{color:#6e7681;font-weight:400}
+.fgrid span{color:#c9d1d9;word-break:break-word}
+/* Explanatory note: thin color bar plus muted text, distinct from code and metric blocks. */
+.note{color:#8b949e;font-size:14px;line-height:1.6;padding:8px 12px;background:#0b0f14;border:1px solid var(--line);
+  border-left:2px solid #30363d;border-radius:0 8px 8px 0}
+/* Attribution metadata: muted footer text kept out of the main reading flow. */
+.ancestry{margin-top:12px;padding-top:9px;border-top:1px solid #21262d;font-size:13px;color:#6e7681;
+  font-variant-numeric:tabular-nums;word-break:break-word}
+.ancestry b{color:#adbac7;font-weight:500}
+.msg{background:#0b0f14;border:1px solid var(--line);border-radius:6px;padding:8px;white-space:pre-wrap;word-break:break-word;font-size:14px}
+#views{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+#views .viewbtn{border:0;border-radius:0;border-right:1px solid var(--line)}
+.viewbtn.on{background:#1f6feb;border-color:#1f6feb;color:#fff}
+#trajrail{width:var(--navw);min-width:150px;flex:none;display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+#railfoot{padding:8px;border-top:1px solid var(--line);flex:none}
+#railfoot button{width:100%}
+#wftools{flex:none;display:flex;gap:8px;align-items:center;padding:5px 16px;border-top:1px solid var(--line)}
+#wftools .hint{margin-left:auto}
+.railhead{padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim);display:flex;justify-content:space-between;align-items:center;flex:none}
+#trajList{flex:1;overflow:auto;padding:6px;display:flex;flex-direction:column;gap:6px}
+.trajitem{display:flex;flex-direction:column;gap:3px;align-items:stretch;width:100%;text-align:left;padding:8px 10px;border-left:2px solid transparent;transition:background-color .15s,border-color .15s}
+.trajitem.on{background:#1f6feb22;border-left-color:#1f6feb}
+.trajitem .tcode{font-weight:600;font-size:13px}
+.trajitem small{color:var(--dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trajitem .tmeta{display:flex;gap:4px;flex-wrap:wrap}
+.caret{width:12px;flex:none;color:var(--dim);font-size:11px;display:inline-block}
+.cnt{background:#21262d;color:var(--dim);border-radius:8px;padding:0 5px;font-size:11px}
+.dot.subagent{background:#db61a2}.wf-bar.subagent{background:linear-gradient(90deg,#a0356f,#db61a2)}
+.dot.flame{background:#f0883e}.wf-bar.flame{background:linear-gradient(90deg,#b35900,#f0883e)}
+.dot.traj{background:#39c5cf}.wf-bar.traj{background:linear-gradient(90deg,#1f6feb,#39c5cf)}
+#tabs{display:flex;gap:4px;padding:8px 16px 0;border-bottom:1px solid var(--line)}
+.tab{background:#21262d;color:var(--dim);border:1px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0;padding:7px 14px;cursor:pointer;font-size:13px}
+.tab.on{background:var(--panel);color:var(--txt);border-bottom:2px solid #1f6feb}
+#panes{flex:1;display:flex;flex-direction:column;min-height:0}
+.pane{display:none;flex:1;min-height:0;flex-direction:column}
+.pane.on{display:flex}
+.metrics{flex:1;overflow:auto;padding:16px}
+.metrics h3{margin:0 0 2px;font-size:17px}
+.metrics .mtitle{color:var(--dim);font-size:13px;margin-bottom:14px}
+/* Merged metrics page: inference and hardware each get a section whose heading ranks below the page title but above cards. */
+.metrics h4.msec{margin:20px 0 10px;font-size:15px;font-weight:600;color:#c9d1d9}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.card .lbl{color:var(--dim);font-size:12px}
+.card .val{font-size:22px;font-weight:600;margin:2px 0;font-variant-numeric:tabular-nums}
+.card .val small{font-size:12px;color:var(--dim);font-weight:400}
+.card .sub{color:var(--dim);font-size:11px}
+/* Measurement trust: incomplete or incomparable sampling is more dangerous than missing charts, so it sits above the numbers. */
+.trust{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px}
+.trust h4{display:flex;align-items:baseline;gap:8px;margin:0 0 9px;font-size:13px;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.trust h4 span{text-transform:none;letter-spacing:0;font-weight:400;font-size:12px;color:#6e7681}
+.trust .tgrid{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;font-size:14px}
+.trust .tgrid b{color:#6e7681;font-weight:400;white-space:nowrap}
+.trust .tgrid span{color:#c9d1d9;word-break:break-word}
+.trust .tgrid i{display:block;margin-top:2px;font-style:normal;font-size:12.5px;color:#7d8590}
+.trust .tgrid span.ok{color:#3fb950}
+.trust .tgrid span.warn{color:#d29922}
+.trust .tgrid span.bad{color:#f85149}
+/* Multi-level comparison: columns = concurrency levels, rows = metrics. The table shrinks to its content (inline-block)
+   instead of stretching level columns across the page; inline mini bars show magnitude without a separate chart. */
+.xcmp{display:inline-block;max-width:100%;vertical-align:top;background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:14px;overflow-x:auto}
+.xcmp table{border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;min-width:600px}
+.xcmp th,.xcmp td{padding:7px 16px;border-bottom:1px solid #21262d;text-align:right;white-space:nowrap}
+.xcmp thead th{color:#8b949e;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.xcmp th:first-child,.xcmp td:first-child{text-align:left;color:var(--dim);font-weight:400;min-width:196px;padding-right:30px}
+.xcmp tbody tr:last-child td{border-bottom:none}
+.xcmp tbody tr:hover td{background:#161b22}
+.xcmp td b{font-weight:500;color:var(--txt)}
+/* Mini bars live in a fixed 54px track and numbers fill the rest, right-aligned:
+   bar starts and number edges line up across rows regardless of 3- or 4-digit values. */
+.xcmp .vc{display:grid;grid-template-columns:54px minmax(0,1fr);align-items:center;column-gap:10px}
+.xcmp .vc b{text-align:right}
+.xcmp .vbar{height:4px;border-radius:2px;background:#21262d;overflow:hidden}
+.xcmp .vbar i{display:block;height:100%;border-radius:2px;opacity:.8}
+.xcmp .na{color:#6e7681}
+/* Metric comparison: row list with two adaptive columns. Height grows linearly with the metric count (~30px per row),
+   so adding inference and hardware metrics won't inflate it like cards would. */
+.mlist{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:0 28px;margin:2px 0 12px}
+.mrow{display:flex;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid #21262d;font-size:14px;font-variant-numeric:tabular-nums}
+.mrow .mk{flex:0 0 96px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrow .mv{font-weight:600;color:var(--txt)}
+.mrow .md{margin-left:auto;font-size:13px}
+.mrow .mp{flex:0 0 104px;text-align:right;font-size:12px;color:#6e7681}
+.mrow .dg{color:#3fb950}.mrow .db{color:#f85149}
+/* Without a parent epoch this degrades to a single-line value strip. */
+.cmpstrip{display:flex;gap:22px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:8px;font-variant-numeric:tabular-nums}
+.cmpstrip em{font-style:normal;color:var(--dim);font-size:13px;margin-right:6px}
+/* Level switcher: show one level at a time so six metrics x N levels don't fill the page vertically. */
+.ttabs{display:flex;gap:6px;margin:2px 0 6px}
+.ttab{background:#21262d;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:13px;font-variant-numeric:tabular-nums}
+.ttab.on{background:rgba(31,111,235,.16);color:var(--txt);border-color:#1f6feb}
+/* .mlist sets display:grid, which overrides the UA [hidden] style, so declare it explicitly. */
+.mlist[hidden]{display:none}
+/* Note under the table: status chips first, plain explanation second, so one small line doesn't carry two layers. */
+.cmpmeta{margin:6px 0 16px}
+.cmpchips{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.cmpwhy{font-size:13px;line-height:1.65;color:#8b949e}
+.bars{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:14px}
+.bars h4{margin:0 0 10px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+.bar-row .bl{width:130px;min-width:130px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-row .bt{flex:1;background:#0b0f14;border-radius:4px;height:14px;overflow:hidden}
+.bar-row .bf{height:100%;border-radius:4px}
+.bar-row .bv{width:78px;text-align:right;color:var(--txt);font-variant-numeric:tabular-nums}
+.empty{color:var(--dim);padding:28px 20px;text-align:center;font-size:15px;border:1px dashed #30363d;border-radius:8px;margin:10px 0}
+/* One global size bump: body 16, secondary 15, table/card labels 13-14. */
+body{font-size:16px}
+.kv{font-size:15px}
+.msg{font-size:15px}
+pre{font-size:13.5px}
+section h4{font-size:12.5px}
+.dhead{font-size:17px}
+.stat{font-size:13px}
+.stat b{font-size:18px}
+button,.tab,.viewbtn{font-size:14px}
+.epochpick,.epochpick select{font-size:14px}
+#meta{font-size:14px}
+.epov{font-size:14px}
+.epov th,.epov td{padding:8px 10px}
+.wf-name small{font-size:13px}
+.wf-bar{font-size:12px;height:18px;top:3px}
+.wf-row{height:30px}
+#axis .tick{font-size:12px}
+.railhead{font-size:13px}
+.trajitem .tcode{font-size:14px}
+.trajitem small{font-size:13px}
+.cnt,.caret{font-size:12px}
+.metrics h3{font-size:18px}
+.metrics .mtitle{font-size:14px}
+.card .lbl{font-size:15px}
+.card .val{font-size:28px}
+.card .val small,.card .sub{font-size:13px}
+.bars h4{font-size:13px}
+.bar-row{font-size:13px}
+.bar-row .bl{width:150px;min-width:150px}
+.bar-row .bv{width:86px}
+.sev,.badge{font-size:13px}
+.fnd .t{font-size:15px}
+.aihead{font-size:16px}
+.fnd .ev button{font-size:14px}
+/* Dark slim scrollbars: the default bright ones look jarring on a dark theme. */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#484f58}
+::-webkit-scrollbar-corner{background:transparent}
+/* Interaction helpers: copy button, toast, spinner, shortcut hint. */
+.hint{color:var(--dim);font-size:12px}
+.copybtn{padding:1px 8px;font-size:12px;margin-left:6px;text-transform:none}
+.toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#30363d;color:var(--txt);border:1px solid #f8514955;padding:8px 16px;border-radius:8px;z-index:100;font-size:14px;box-shadow:0 4px 16px #0008;opacity:0;transition:opacity .2s;pointer-events:none;max-width:80vw}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Hover time guide line. */
+#cursorline{position:absolute;top:0;bottom:0;width:1px;background:#58a6ff88;pointer-events:none;display:none;z-index:4}
+#cursortime{position:absolute;top:0;left:4px;background:#1f6feb;color:#fff;font-size:12px;padding:0 5px;border-radius:4px;white-space:nowrap}
+/* Selected-row highlight / error marker / duration in name column / status chip. */
+.wf-row.sel{background:#1f6feb1f;box-shadow:inset 2px 0 0 #1f6feb}
+.wf-row.sel:hover{background:#1f6feb2b}
+.wf-bar.err{background:linear-gradient(90deg,#8e1519,#f85149)}
+.errmark{color:#f85149;flex:none;font-size:12px;line-height:1}
+.wf-name .durv{margin-left:auto;flex:none;padding-left:8px;color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
+.wf-row.sel .wf-name .durv{color:var(--txt)}
+.stchip{font-size:12px;padding:1px 8px;border-radius:10px;background:#21262d;color:var(--dim)}
+.stchip.ok{background:#3fb95022;color:#3fb950}
+.stchip.warn{background:#d2992222;color:#d29922}
+.stchip.bad{background:#f8514922;color:#f85149}
+/* Verdict banner: the verdict is the panel's top priority; color only encodes accept/reject/inconclusive. */
+.verdict{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--line);border-left:4px solid var(--dim);border-radius:8px;padding:12px 14px;margin:0 0 14px;background:var(--panel)}
+.verdict.accept{border-left-color:#3fb950}.verdict.reject{border-left-color:#f85149}.verdict.inconclusive{border-left-color:#d29922}
+.verdict .vd{font-size:20px;font-weight:700}
+.verdict.accept .vd{color:#3fb950}.verdict.reject .vd{color:#f85149}.verdict.inconclusive .vd{color:#d29922}
+.verdict .vr{font-size:13px;color:var(--txt)}
+.verdict .vconf{margin-left:auto}
+/* Challenges to the verdict: visually weaker than the verdict itself, informational only. */
+.chal{list-style:none;padding:0;margin:-6px 0 14px}
+.chal li{display:flex;gap:8px;align-items:flex-start;font-size:12px;opacity:.75;padding:3px 0}
+/* Section heading: one step below the page title (18) and level with collapse titles (14) but stronger; the actions area is no longer weaker than its children. */
+.sec-h{font-size:14px;font-weight:600;color:#c9d1d9;margin:0 0 6px}
+/* Section subtitles are uniformly muted with spacing; otherwise they run into the heading. */
+.sec-h .ssub{font-weight:400;font-size:13px;color:#8b949e;margin-left:8px}
+.actions{list-style:none;padding:0;margin:0 0 16px}
+.actions li{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.actions li:last-child{border-bottom:0}
+.actions .abody{flex:1;min-width:0}
+/* Main line keeps only "goal + action"; evidence such as metric conclusions moves to a muted second line so it doesn't trail off the sentence. */
+.actions .aline{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+.actions .aline b{font-weight:600}
+.actions .areason{color:#8b949e;font-size:13px;line-height:1.6;margin-top:2px}
+.sv.ok{color:#3fb950}.sv.warn{color:#d29922}.sv.bad{color:#f85149}
+.dnav{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.dnav button{padding:2px 10px;font-size:13px}
+/* Filter box / hierarchy guides / aggregate marker / new-trajectory badge. */
+#filter{background:#21262d;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:14px;width:min(300px,38vw)}
+#filter::placeholder{color:#8b949e}
+/* Manual parent/child link: collapsed by default, expands via the link-parent-epoch action. */
+.linkrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 12px}
+.linkrow[hidden]{display:none}
+.linkrow select{background:#21262d;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:14px;max-width:380px}
+#fcount{font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+.wf-name{position:relative}
+.wf-name .guide{position:absolute;top:0;bottom:0;width:1px;background:#30363d}
+.wf-bar.agg{outline:1px solid #ffffff55;outline-offset:-1px}
+.statgrp{display:flex;gap:18px;padding-right:18px;border-right:1px solid var(--line)}
+.statgrp:last-child{border-right:0;padding-right:0}
+.stat b.nul{color:#6e7681}
+.stat b.ok{color:#3fb950}.stat b.bad{color:#f85149}
+.trajitem.error{border-left-color:#f85149}
+.trajitem .trow{display:flex;align-items:center;gap:6px}
+.tdot{width:7px;height:7px;border-radius:50%;flex:none;background:#3fb950}
+.tdot.bad{background:#f85149}.tdot.warn{background:#d29922}.tdot.none{background:#6e7681}
+.tnew{background:#1f6feb;color:#fff;border-radius:8px;padding:0 5px;font-size:11px;flex:none}
+/* Unified empty/error state: title + description; errors swap the green border for red. */
+.empty{display:flex;flex-direction:column;align-items:center;gap:4px}
+.empty b{font-size:15px;color:var(--txt);font-weight:600}
+.empty span{font-size:13px;line-height:1.5}
+.empty.error{border-color:#f8514966}
+.empty.error b{color:#f85149}
+/* Full-page empty state: vertically centered so the card doesn't hug the top and leave a big gap below. */
+.emptyfull{min-height:calc(100% - 20px);display:flex;align-items:center;justify-content:center}
+.emptyfull .empty{max-width:640px}
+/* Profiling runs: without step trajectories, show a run overview instead of an empty waterfall. */
+#profview{display:none;flex:1;min-height:0;overflow:auto;padding:18px 22px}
+#pane-traj.prof-on #bar,#pane-traj.prof-on #body{display:none}
+#pane-traj.prof-on #profview{display:block}
+#profview .phead{max-width:960px}
+#profview h3{margin:0 0 6px;font-size:18px}
+#profview h3 .cnt{margin-left:6px;color:var(--dim)}
+#profview .note{margin:10px 0 16px;max-width:960px}
+#profview .prof-kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 20px;max-width:960px;margin:14px 0 22px}
+#profview .prof-kv span{display:block;color:var(--dim);font-size:12.5px;margin-bottom:2px}
+#profview .prof-kv b{font-weight:500;color:var(--txt);word-break:break-word}
+#profview td.ok{color:#3fb950}#profview td.bad{color:#f85149}
+#profview .epov tbody tr{cursor:default}
+/* Details panel: JSON highlighting, lightweight markdown, long-text folding. */
+.hl-k{color:#79c0ff}.hl-s{color:#a5d6a7}.hl-n{color:#e3b341}.hl-b{color:#d2a8ff}
+.md b{color:#fff}
+.md code{background:#21262d;padding:1px 5px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px}
+.md pre.code{max-height:260px;background:#0b0f14;border:1px solid var(--line);border-radius:6px;padding:8px;margin:6px 0;white-space:pre-wrap;word-break:break-word;font-size:13px}
+pre.fold,.msg.fold{max-height:190px;overflow:hidden;position:relative}
+.expandbtn{margin-top:4px}
+/* Keyboard shortcut help overlay. */
+#helpbox{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000000aa;z-index:120}
+#helpbox.on{display:flex}
+#helpbox .hc{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px;min-width:340px;box-shadow:0 8px 32px #000a}
+#helpbox h3{margin:0 0 10px;font-size:16px}
+#helpbox table{width:100%;border-collapse:collapse;font-size:14px}
+#helpbox td{padding:5px 6px;border-bottom:1px solid #21262d}
+kbd{background:#21262d;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px;font-family:ui-monospace,monospace}
+/* Small-screen layout: narrow the three columns. */
+@media (max-width:1100px){
+  :root{--namew:180px;--navw:150px;--detw:320px}
+  .cards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  #aipanel{width:100vw}
+}
+/* Small screens: turn the trajectory list and details into drawers so hiding them still leaves an entry point. */
+#toggleRail,#toggleDet{display:none}
+#drawerback{position:fixed;inset:0;background:#00000066;z-index:70;display:none}
+#drawerback.on{display:block}
+@media (max-width:820px){
+  #trajrail{display:flex;position:fixed;left:0;top:0;bottom:0;width:min(300px,80vw);background:var(--panel);z-index:80;transform:translateX(-102%);transition:transform .2s;border-right:1px solid var(--line)}
+  #trajrail.open{transform:none}
+  #details{display:block;position:fixed;right:0;top:0;bottom:0;width:min(420px,92vw);background:var(--panel);z-index:80;transform:translateX(102%);transition:transform .2s;border-left:1px solid var(--line)}
+  #details.open{transform:none}
+  #toggleRail,#toggleDet{display:inline-block}
+  .splitter{display:none}
+  #wfNames{width:150px;min-width:110px}
+}
+/* Snapshot mode (single-file HTML from /v1/export): trajectories and feedback are inlined and all tabs work;
+   only online-service entries are hidden, so every button marked data-online is hidden in snapshots. */
+body.snap .epochpick{display:none}
+body.snap [data-online]{display:none}

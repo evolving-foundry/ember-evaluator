@@ -1,10 +1,12 @@
+import { readFile } from "node:fs/promises";
+import { parsePluginActivations, restorePluginActivations } from "./plugin-activation.js";
 import { networkSecrets } from "./config/network.js";
 import { dirname, join, resolve } from "node:path";
 import { bootstrap, bootstrapBenchmark, createPluginRuntime } from "./bootstrap.js";
 import { loadConfig } from "./config/load.js";
 import { assertJsonValue, solverBinding, type CliOverrides, type LoadedConfig } from "./config/schema.js";
 import type { RunComponents } from "./core/contracts/components.js";
-import type { ResultSnapshot } from "./core/contracts/result.js";
+import type { RunManifest, ResultSnapshot } from "./core/contracts/result.js";
 import { redactDiagnostic } from "./core/diagnostics.js";
 import { runEngine } from "./core/engine.js";
 import { normalizeFailure } from "./core/errors/classify.js";
@@ -32,6 +34,8 @@ export type EvaluatorRunOptions = {
   /** true selects the only existing run; a string selects a run ID. */
   resume?: boolean | string;
   onProgress?: ProgressListener;
+  /** Component warnings must go through the CLI writer so the live progress region is erased first. */
+  onWarning?: (message: string, level?: "info" | "warning") => void;
 };
 
 export type ExecutionDiagnostic = { phase: string; error: unknown };
@@ -44,7 +48,7 @@ export type ExecutionOutcome = {
 
 type ExecutionOptions = EvaluatorRunOptions & {
   taskIds?: string[];
-  execution?: { config: LoadedConfig; registry: PluginRegistry; runId?: string };
+  execution?: { config: LoadedConfig; registry: PluginRegistry; runId?: string; plugins?: import("./core/contracts/plugin-extension.js").PluginActivation[] };
   onLoaded?: (config: LoadedConfig) => void;
   onDiagnostic?: (diagnostic: ExecutionDiagnostic) => void;
   onDeploymentLog?: (text: string) => void;
@@ -101,6 +105,8 @@ export async function executeExperiment(options: ExecutionOptions): Promise<Exec
   };
   const file = resolve(options.configPath);
   const patchPath = options.patchPath === undefined ? undefined : resolve(options.patchPath);
+  let pluginSelections: import("./core/contracts/plugin-extension.js").PluginActivation[] = [];
+  let resumeDirectory: string | undefined;
   const resume = options.resume === undefined || options.resume === false ? undefined : options.resume === true ? null : options.resume;
   let registry: PluginRegistry | undefined = options.execution?.registry;
   let config: LoadedConfig | undefined;
@@ -115,8 +121,10 @@ export async function executeExperiment(options: ExecutionOptions): Promise<Exec
   };
   try {
     signal.throwIfAborted();
+    pluginSelections = parsePluginActivations(overrides.plugins ?? options.execution?.plugins);
     progress({ phase: "config", message: `Loading and validating ${file}` });
-    registry = options.execution?.registry ?? await openPluginRegistry(patchPath);
+    registry = options.execution?.registry ?? await openPluginRegistry(patchPath,
+      { plugins: pluginSelections.map(plugin => plugin.id) });
     config = options.execution?.config ?? await loadConfig(file, overrides, env, { registry,
       ...(options.networkConfigPath === undefined ? {} : { networkConfigPath: options.networkConfigPath }),
       ...(patchPath === undefined ? {} : { patchPath }) });
@@ -129,6 +137,20 @@ export async function executeExperiment(options: ExecutionOptions): Promise<Exec
       config.experiment.run = { ...run, maxTasks: null, taskIds: [...options.taskIds] };
     }
     const experiment = config.experiment;
+    if (resume !== undefined) {
+      try { resumeDirectory = await resolveResumeRun(experiment.output.directory, resume); }
+      catch (error) {
+        // Ray may follow a still-running job that has not downloaded its manifest yet.
+        if (!config.deployment || !(error instanceof ResumeError) || error.code !== "CONFIG_INVALID") throw error;
+      }
+      if (resumeDirectory) {
+        const saved = JSON.parse(await readFile(join(resumeDirectory, "manifest.json"), "utf8")) as RunManifest;
+        pluginSelections = restorePluginActivations(saved.pluginRuntime?.plugins, overrides.plugins ?? options.execution?.plugins);
+      }
+    }
+    await registry.loadPlugins(pluginSelections.map(plugin => plugin.id));
+    registry.prepareStoreDecorators(pluginSelections);
+
     progress({ phase: "bootstrap", message: `Initializing plugins: benchmark=${experiment.benchmark.name}, environment=${experiment.environment.name}, solver=${experiment.solver.name}, scheduler=${experiment.scheduler.name}; service=${experiment.solver.service}; model=${solverBinding(config).model.name}; endpoint=${solverBinding(config).model.endpoint ?? "provider default"}` });
     if (config.deployment) {
       const { RayJobsDeployment } = await import("./adapters/ray/deployment.js");
@@ -140,7 +162,7 @@ export async function executeExperiment(options: ExecutionOptions): Promise<Exec
         createPluginRuntime(config, dirname(file), patchPath), (role, name) => evaluator.configTransport(role, name));
       assertJsonValue(experiment);
       progress({ phase: "deployment", message: "Submitting and following the cluster evaluation job" });
-      const jobs = await deployment.runExperiment(experiment, registry.pluginVersions, { signal, onProgress: progress,
+      const jobs = await deployment.runExperiment(experiment, registry.pluginVersions, { signal, onProgress: progress, plugins: pluginSelections,
         ...(resume === undefined ? {} : { resume }), log(text) {
           const message = redactDiagnostic(text, secrets);
           if (options.onDeploymentLog) observe(() => options.onDeploymentLog?.(message));
@@ -156,9 +178,9 @@ export async function executeExperiment(options: ExecutionOptions): Promise<Exec
         diagnose(new Error(jobs.collectionError ?? jobs.reportError ?? "Ray Jobs result collection failed"));
       }
     } else {
-      components = await bootstrap(config, dirname(file), patchPath, undefined, registry);
+      components = await bootstrap(config, dirname(file), patchPath, options.onWarning, registry, undefined,
+        { plugins: pluginSelections, signal });
       if (resume !== undefined) progress({ phase: "resume", message: "Locating previous run" });
-      const resumeDirectory = resume === undefined ? undefined : await resolveResumeRun(experiment.output.directory, resume);
       const snapshot = await runEngine({ components, config, signal, onProgress: progress,
         ...(options.execution?.runId ? { runId: options.execution.runId } : {}),
         ...(resumeDirectory === undefined ? {} : { resumeDirectory }) });

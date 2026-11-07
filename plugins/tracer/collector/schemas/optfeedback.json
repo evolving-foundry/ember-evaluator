@@ -1,0 +1,352 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nemo-relay.local/schemas/optfeedback.json",
+  "title": "OptFeedback",
+  "description": "Optimization feedback for a single epoch. Response body of GET /v1/feedback.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "epoch",
+    "candidate",
+    "population",
+    "signals",
+    "delta_vs_parent",
+    "explain"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "OptFeedback"
+    },
+    "epoch": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Epoch ID"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "population": {
+      "$ref": "#/$defs/population"
+    },
+    "signals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/signal"
+      }
+    },
+    "delta_vs_parent": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/delta"
+        }
+      ],
+      "description": "null when there is no parent version or lineage is missing"
+    },
+    "explain": {
+      "type": ["string", "null"],
+      "description": "Human-readable explanation of the delta; null when there is no delta and no parent hint"
+    },
+    "analysis": {
+      "type": "object",
+      "description": "LLM explanation layer: model findings when source=llm, rule findings as fallback when source=rules",
+      "additionalProperties": true
+    },
+    "profiling": {
+      "type": "boolean",
+      "description": "Whether this is an agentx profiling run (no agent steps; metrics live in perf)"
+    },
+    "profiling_concurrency": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "description": "Concurrency tiers observed in a profiling run, ascending"
+    },
+    "perf": {
+      "type": "object",
+      "description": "Deterministic profiling metrics: per-tier inference/hardware data in tiers, rule advice in advice, per-tier parent deltas in parent",
+      "additionalProperties": true
+    },
+    "llm": {
+      "type": "object",
+      "description": "LLM call statistics (calls/cache_hits/failures/configured)",
+      "additionalProperties": true
+    },
+    "conclusion": {
+      "type": "object",
+      "description": "EvalConclusion object: deterministic verdict, evidence, attribution and next actions",
+      "additionalProperties": true
+    },
+    "tokens": {
+      "type": ["object", "null"],
+      "description": "Token usage totals; cost stays 0 when no price list is configured, so tokens are the meaningful magnitude",
+      "additionalProperties": true
+    },
+    "artifacts": {
+      "type": "object",
+      "description": "On-disk locations of deterministic outputs (signals/conclusion json|md paths)",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "required": ["candidate_id", "parent_id", "fingerprint"],
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {
+          "type": ["string", "null"]
+        },
+        "parent_id": {
+          "type": ["string", "null"]
+        },
+        "fingerprint": {
+          "type": ["object", "string"],
+          "description": "Config fingerprint; the raw string is kept when parsing fails"
+        }
+      }
+    },
+    "population": {
+      "type": "object",
+      "required": [
+        "tasks",
+        "success_rate",
+        "reward_mean",
+        "p50_latency_ms",
+        "p95_latency_ms",
+        "cost_usd",
+        "steps_mean",
+        "trajectories",
+        "top_spans"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tasks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of outcomes"
+        },
+        "success_rate": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reward_mean": {
+          "type": ["number", "null"]
+        },
+        "p50_latency_ms": {
+          "type": ["number", "null"]
+        },
+        "p95_latency_ms": {
+          "type": ["number", "null"]
+        },
+        "cost_usd": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "steps_mean": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "trajectories": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of trajectories"
+        },
+        "top_spans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/span"
+          }
+        }
+      }
+    },
+    "span": {
+      "type": "object",
+      "required": ["function", "mean_ms", "share_pct"],
+      "additionalProperties": false,
+      "properties": {
+        "function": {
+          "type": "string"
+        },
+        "mean_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "share_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "required": [
+        "id",
+        "severity",
+        "target",
+        "category",
+        "title",
+        "evidence",
+        "detail",
+        "suggestion"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z_]+\\.[a-z_]+$",
+          "description": "category.target"
+        },
+        "severity": {
+          "enum": ["high", "medium", "low"]
+        },
+        "target": {
+          "enum": ["agent", "harness", "model", "infra"]
+        },
+        "category": {
+          "enum": [
+            "quality",
+            "error",
+            "bottleneck",
+            "ttft",
+            "cache",
+            "utilization",
+            "latency",
+            "cost",
+            "efficiency"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "object",
+          "description": "Raw values backing the signal; structure depends on category"
+        },
+        "detail": {
+          "type": ["string", "null"]
+        },
+        "suggestion": {
+          "type": "object",
+          "required": ["direction"],
+          "additionalProperties": false,
+          "properties": {
+            "direction": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "required": [
+        "parent_epoch",
+        "success_rate",
+        "p50_latency_ms",
+        "p95_latency_ms",
+        "cost_per_task",
+        "steps_mean",
+        "samples",
+        "attribution",
+        "significant"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "parent_epoch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "success_rate": {
+          "type": ["number", "null"],
+          "description": "Current value minus parent value, as a fraction"
+        },
+        "p50_latency_ms": {
+          "type": ["number", "null"]
+        },
+        "p95_latency_ms": {
+          "type": ["number", "null"]
+        },
+        "cost_per_task": {
+          "type": ["number", "null"]
+        },
+        "steps_mean": {
+          "type": ["number", "null"]
+        },
+        "samples": {
+          "type": "object",
+          "required": ["current", "parent"],
+          "additionalProperties": false,
+          "properties": {
+            "current": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "parent": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "values": {
+          "type": "object",
+          "description": "Absolute before/after values so the verdict engine can render 'a -> b' without querying the parent epoch",
+          "additionalProperties": false,
+          "properties": {
+            "current": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "parent": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "success_rate_ci": {
+          "type": ["object", "null"],
+          "description": "95% Wilson interval for success rate and Newcombe interval for the difference; never significant when diff spans 0",
+          "additionalProperties": true
+        },
+        "attribution": {
+          "type": "object",
+          "required": ["changed", "keys", "unchanged", "note"],
+          "additionalProperties": false,
+          "properties": {
+            "changed": {
+              "enum": ["infra", "harness", "model", "benchmark", "mixed", "none", "hash", "unknown"],
+              "description": "hash means only a whole-config hash was reported, so the change cannot be narrowed to a domain"
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unchanged": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "significant": {
+          "type": "boolean",
+          "description": "Whether sample size and effect size reach the significance threshold"
+        }
+      }
+    }
+  }
+}

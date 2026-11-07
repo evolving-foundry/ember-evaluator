@@ -2,8 +2,11 @@ import { Command as Commander, CommanderError, Option } from "commander";
 import { resolve } from "node:path";
 import type { Command } from "./cli.js";
 import type { CliOverrides } from "./config/schema.js";
+import { pluginCommandArguments } from "./plugin-cli.js";
+import type { CliExtensions } from "./plugin-cli.js";
+import type { PluginActivation } from "./core/contracts/plugin-extension.js";
 
-interface Options extends CliOverrides {
+interface Options extends Omit<CliOverrides, "plugins"> {
   patch?: string; taskIdsFile?: string; resume?: boolean | string; dryRun?: boolean;
   all?: boolean; yes?: boolean; benchmark?: string; output?: string; json?: boolean;
   run?: string; taskId?: string[]; requestId?: string; reason?: string;
@@ -15,13 +18,16 @@ export class CommandUsageError extends TypeError {
   constructor(message: string, readonly helpText: string) { super(message); }
 }
 
-export function parseCommand(argv: string[]): Command {
+export function parseCommand(argv: string[], extensions: CliExtensions = { commands: [], options: [] }): Command {
+  const plugins = extensions.commands;
+  const pluginExamples = plugins.map(command => `  ember-evaluator ${command.name} <command> ...`).join("\n");
+  const activations = new Map<string, PluginActivation>();
   let result: Command | undefined;
   let help = "";
   const program = new Commander("ember-evaluator")
     .description("Run benchmark experiments, inspect configuration, and rebuild saved reports.")
     .exitOverride().configureOutput({ writeOut: text => { help += text; }, writeErr: text => { help += text; } });
-  program.addHelpText("after", "\nExamples:\n  ember-evaluator run experiment.yaml\n  ember-evaluator run --help\n  ember-evaluator report <run-dir>\n\nUse <command> --help for parameter details.");
+  program.addHelpText("after", `\nExamples:\n  ember-evaluator run experiment.yaml\n  ember-evaluator run --help\n  ember-evaluator report <run-dir>\n${pluginExamples ? pluginExamples + "\n" : ""}\nUse <command> --help for parameter details.`);
   const patch = (cmd: Commander) => cmd.option("--patch <path>", "Load an explicit plugin patch; path is relative to the current directory");
   const network = (cmd: Commander) => cmd.option("--network <yaml>", "Use this network YAML for source endpoints, proxies, and download settings");
   const networkOptions = (opts: Options) => opts.network === undefined ? {} : { networkConfigPath: resolve(opts.network) };
@@ -37,6 +43,7 @@ export function parseCommand(argv: string[]): Command {
       const value = opts[key];
       if (value !== undefined) overrides[key] = value;
     }
+    if (activations.size) overrides.plugins = [...activations.values()];
     return { overrides, ...networkOptions(opts), ...(opts.patch === undefined ? {} : { patchPath: resolve(opts.patch) }) };
   };
   for (const name of ["run", "warmup", "doctor", "inspect"] as const) {
@@ -107,6 +114,30 @@ export function parseCommand(argv: string[]): Command {
         : { kind: "kernel-bench", ...base };
     });
   }
+  const names = new Set(program.commands.map(command => command.name()));
+  names.add("help");
+  for (const plugin of plugins) {
+    if (!/^[a-z][a-z0-9-]*$/u.test(plugin.name) || names.has(plugin.name)) throw new TypeError(`Duplicate or reserved CLI command: ${plugin.name}`);
+    names.add(plugin.name);
+    program.command(plugin.name).description(plugin.description);
+  }
+  for (const { id, command, option: contribution } of extensions.options) {
+    const target = program.commands.find(item => item.name() === command);
+    if (!target || command !== "run") throw new TypeError(`Unsupported CLI extension target: ${command}`);
+    const option = new Option(contribution.flags, contribution.description);
+    if (!option.long || option.long === "--help" || option.short === "-h" || target.options.some(existing =>
+      (option.long && [existing.long, existing.short].includes(option.long)) ||
+      (option.short && [existing.long, existing.short].includes(option.short)) || existing.attributeName() === option.attributeName()))
+      throw new TypeError(`Duplicate or reserved CLI option: ${contribution.flags}`);
+    target.addOption(option);
+    target.on(`option:${option.name()}`, value => contribution.configure(value, {
+      enable(config) {
+        activations.set(id, { id, config: { ...activations.get(id)?.config, ...config } });
+      },
+    }));
+  }
+  const matched = plugins.find(command => command.name === argv[0]);
+  if (matched) return { kind: "plugin", plugin: matched, argv: pluginCommandArguments(argv.slice(1)) };
   // Preserve rejection of duplicate scalar options, which Commander otherwise overwrites.
   const configure = (cmd: Commander) => {
     cmd.exitOverride().allowExcessArguments(false).showHelpAfterError();

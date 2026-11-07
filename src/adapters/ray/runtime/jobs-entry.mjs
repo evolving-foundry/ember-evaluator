@@ -4,7 +4,7 @@ import { runCli } from "../../../../dist/cli.js";
 import { createJobsProgressPublisher } from "../../../../dist/adapters/ray/jobs-progress.js";
 import { loadSavedConfig } from "../../../../dist/config/load.js";
 import { openPluginRegistry } from "../../../../dist/plugin-runtime.js";
-import { assertWorkerVersions, localizePortableSelection } from "../../../../dist/adapters/ray/protocol.js";
+import { assertWorkerVersions, localizePortableSelection, validatePortablePluginActivations } from "../../../../dist/adapters/ray/protocol.js";
 import { PACKAGE_RUNTIME_ID } from "../../../../dist/core/package-provenance.js";
 import { resolvePluginPatchPath } from "../../../../dist/adapters/ray/node-config.js";
 
@@ -64,7 +64,9 @@ try {
     selected.apiKeyEnv = variable;
     delete selected.apiKey;
   }
-  registry = await openPluginRegistry(pluginPatchPath);
+  const plugins = validatePortablePluginActivations(input.plugins);
+  registry = await openPluginRegistry(pluginPatchPath, { plugins: plugins.map(plugin => plugin.id) });
+  await registry.loadRecordedPlugins(input.pluginVersions);
   assertWorkerVersions(input.pluginVersions, registry.pluginVersions,
     input.pluginVersions[PACKAGE_RUNTIME_ID], registry.pluginVersions[PACKAGE_RUNTIME_ID]);
   const lookup = (role, name) => registry.ctx.evaluator.configTransport(role, name);
@@ -130,7 +132,7 @@ try {
     runArgs,
     warmup ? { out(text) { warmupSummary = JSON.parse(text); }, error(text) { process.stderr.write(text + "\n"); } } : undefined,
     controller.signal,
-    { config: loaded, registry, runId: input.requestedRunId },
+    { config: loaded, registry, runId: input.requestedRunId, plugins },
     { onProgress: event => progress?.observe(event) },
   );
   if (warmup && warmupSummary) {

@@ -12,6 +12,8 @@ import { formatError, redactDiagnostic, summarizeDiagnostic } from "./core/diagn
 import type { ProgressEvent } from "./core/progress.js";
 import type { BenchmarkComponents } from "./core/contracts/components.js";
 import { openPluginRegistry, type PluginRegistry } from "./plugin-runtime.js";
+import type { PluginCliCommand, PluginCliResult } from "./core/contracts/plugin-extension.js";
+import { cliPatchPath, loadCliExtensions, type CliExtensions } from "./plugin-cli.js";
 import { enumerateSelectedTasks } from "./core/task-selection.js";
 import { classifyError, normalizeFailure } from "./core/errors/classify.js";
 import type { Phase } from "./core/contracts/result.js";
@@ -41,6 +43,7 @@ export type Command = (
   | { kind: "inspect"; file: string; overrides: CliOverrides; patchPath?: string }
   | { kind: "report"; directory: string }
   | { kind: "kernel-profile"; problem: string; kernel: string; out: string; round: number; seed: number; warmup: number; device: number; python?: string }
+  | { kind: "plugin"; plugin: PluginCliCommand; argv: string[] }
   | { kind: "kernel-precision"; problem: string; kernel: string; out: string; seeds: number[]; device: number; python?: string }
   | { kind: "kernel-bench"; problem: string; kernel: string; out: string; device: number; python?: string }
   | { kind: "run"; file: string; overrides: CliOverrides; resume?: string | null; taskIdsFile?: string; patchPath?: string }
@@ -83,13 +86,16 @@ export async function runCli(
   argv: string[],
   io: CliIO = defaultIO,
   signal: AbortSignal = new AbortController().signal,
-  execution?: { config: LoadedConfig; registry: PluginRegistry; runId?: string },
+  execution?: { config: LoadedConfig; registry: PluginRegistry; runId?: string; plugins?: import("./core/contracts/plugin-extension.js").PluginActivation[] },
   observers?: { onProgress?: ProgressListener },
 ): Promise<number> {
+  let extensions: CliExtensions;
+  try { extensions = await loadCliExtensions(cliPatchPath(argv)); }
+  catch (error) { io.error(formatError(error)); return 2; }
   let mode: ProgressMode = "auto";
   const args = [...argv];
   const index = args.indexOf("--progress");
-  if (index >= 0) {
+  if (index >= 0 && !extensions.commands.some(command => command.name === args[0])) {
     const value = args[index + 1];
     if (!["run", "retry", "warmup"].includes(args[0] ?? "") || index < 1 || !["auto", "tty", "plain"].includes(value ?? "") || args.lastIndexOf("--progress") !== index) {
       io.error("Invalid --progress option; expected auto, tty or plain on run/retry/warmup"); return 2;
@@ -102,7 +108,7 @@ export async function runCli(
   const wrapped: CliIO = { out: text => live ? live.write(() => io.out(text)) : io.out(text),
     error: text => live ? live.write(() => io.error(text)) : io.error(text) };
   try {
-    return await runCliCommand(args, wrapped, signal, execution, event => {
+    return await runCliCommand(args, extensions, wrapped, signal, execution, event => {
       live?.observe(event);
       observers?.onProgress?.(event);
     });
@@ -110,8 +116,8 @@ export async function runCli(
 }
 
 async function runCliCommand(
-  argv: string[], io: CliIO, signal: AbortSignal,
-  execution: { config: LoadedConfig; registry: PluginRegistry; runId?: string } | undefined,
+  argv: string[], extensions: CliExtensions, io: CliIO, signal: AbortSignal,
+  execution: { config: LoadedConfig; registry: PluginRegistry; runId?: string; plugins?: import("./core/contracts/plugin-extension.js").PluginActivation[] } | undefined,
   onProgress: ProgressListener,
 ): Promise<number> {
   const started = performance.now();
@@ -139,6 +145,8 @@ async function runCliCommand(
   let networkHintShown = false;
   let debugHintShown = false;
   const writeHint = (message: string) => io.error(`[hint] ${message}`);
+  const warning = (text: string, level: "info" | "warning" = "warning") =>
+    io.error(redactDiagnostic(`[${((performance.now() - started) / 1000).toFixed(1)}s] [${level}] ${text}`, secrets));
   const debugHint = () => {
     if (!debug && !debugHintShown) {
       debugHintShown = true;
@@ -198,7 +206,7 @@ async function runCliCommand(
   };
   let command: Command;
   try {
-    command = parseArgs(argv);
+    command = parseArgs(argv, extensions);
   } catch (error) {
     if (error instanceof CommandUsageError) { failure(error); io.error(error.helpText); return 2; }
     failure(error);
@@ -209,6 +217,32 @@ async function runCliCommand(
   if (command.kind === "help") {
     io.out(command.text);
     return command.exitCode ?? 0;
+  }
+  if (command.kind === "plugin") {
+    const label = command.plugin.name;
+    // Plugin operations are infrastructure failures, so they must not use the task-oriented error taxonomy
+    const report = (stage: string, error: unknown) => {
+      const text = formatError(error, secrets);
+      io.error(redactDiagnostic(`[${label}] ERROR during ${stage}:\n${text}`, secrets));
+      hint(text);
+    };
+    let result: PluginCliResult;
+    try {
+      result = await command.plugin.run(command.argv, io, signal);
+    } catch (error) {
+      report(`loading the ${label} plugin`, error);
+      return signal.aborted ? 130 : 1;
+    }
+    if (result.ok) return result.status;
+    if (result.usage) {
+      phase = "arguments";
+      detail = `Parsing ${label} arguments`;
+      failure(result.error);
+      io.error(`Use ember-evaluator ${label} <command> --help for usage and parameter details.`);
+      return 2;
+    }
+    report(`running the ${label} plugin`, result.error);
+    return signal.aborted ? 130 : 1;
   }
   if (command.kind === "cleanup-images") {
     try {
@@ -330,7 +364,8 @@ async function runCliCommand(
     try {
       const taskIds = await readTaskIds(command.taskIdsFile);
       progress({ phase: "config", message: `Loading and validating ${resolve(command.file)}` });
-      registry = await openPluginRegistry(command.patchPath);
+      registry = await openPluginRegistry(command.patchPath, { plugins: command.overrides.plugins?.map(plugin => plugin.id) ?? [] });
+      registry.prepareStoreDecorators(command.overrides.plugins ?? []);
       config = await loadConfig(resolve(command.file), command.overrides, process.env, { registry, allowMissingAuth: true, ...networkOptions, ...(command.patchPath === undefined ? {} : { patchPath: command.patchPath }) });
       applyTaskIds(config, taskIds);
       secrets.push(...networkSecrets(config.network), ...Object.values(config.auths).map(auth => auth.value));
@@ -383,6 +418,7 @@ async function runCliCommand(
       const result = await executeWarmup({ ...networkOptions, configPath: command.file, overrides: command.overrides, signal, onProgress: progress,
         ...(execution ? { execution } : {}),
         ...(command.patchPath ? { patchPath: command.patchPath } : {}), ...(taskIds ? { taskIds } : {}),
+        onWarning: warning,
         onLoaded: config => { secrets.push(...networkSecrets(config.network), ...Object.values(config.auths).map(auth => auth.value)); } });
       io.out(`Image warmup: ${result.readyTaskIds.length}/${result.taskIds.length} tasks ready; ${result.failures.length} failed`);
       for (const { taskId, failure } of result.failures) {
@@ -404,6 +440,7 @@ async function runCliCommand(
     ...(taskIds === undefined ? {} : { taskIds }),
     ...(execution === undefined ? {} : { execution }),
     onProgress: progress,
+    onWarning: warning,
     onLoaded: config => { secrets.push(...networkSecrets(config.network), ...Object.values(config.auths).map(auth => auth.value)); },
     onDiagnostic: diagnostic => { phase = diagnostic.phase; failure(diagnostic.error); },
     onDeploymentLog: io.out,

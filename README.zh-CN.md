@@ -82,6 +82,12 @@ ember-evaluator --help
 
 看到帮助信息即安装成功。详细步骤见[安装指南](docs/users/installation.zh-CN.md)，Linux 服务器也可使用[管理容器](docs/users/deployment/container-toolbox.zh-CN.md)。
 
+想直接以 TypeScript 源码运行 CLI，可使用 `pnpm dev`。全新源码树无需先手动构建：第一次执行需要加载插件注册表的命令时，会先一次性打包 Agent 运行时（`tsc` 加 `package-runtime`）再启动。
+
+```bash
+pnpm dev run --tracer http://127.0.0.1:8787 playbook/gsm8k/gsm8k-quick-start.yaml
+```
+
 #### 2. 安装 skill
 
 在要使用 skill 的项目目录中执行以下命令，并选择对应的编程 Agent。
@@ -147,6 +153,42 @@ ember-evaluator run playbook/terminalbench/terminalbench-4.0.yaml --network play
 ```
 
 先按 [Terminal-Bench 入门](docs/users/quick-start/terminalbench.zh-CN.md)准备 Docker、模型和选题。示例默认全量选题，仅能下载仓库中已发布的任务和平台；其他下载仍使用默认配置。如何选择镜像源、组合配置和设置默认文件，见 [--network 使用步骤](docs/users/network.zh-CN.md#1-先选一份网络配置)。
+
+## 🛰️ Tracer：轨迹展示、优化反馈与运维
+
+仓库内置的 `tracer` 插件会把每次 attempt 实时推送到本地 Collector：一个轻量 HTTP 服务，用于展示 Agent 轨迹与性能指标，产出确定性反馈（可选 LLM 归因），并导出文件供下游 RSI 使用。配置的 Store 始终是权威数据源，推送失败只产生告警，不会中断评测。
+
+按需为单次运行开启，插件会自动拉起 Collector：
+
+```bash
+ember-evaluator run playbook/gsm8k/gsm8k-quick-start.yaml --tracer
+```
+
+插件随主运行时一起发布：`pnpm build` 会把 `plugins/tracer` 编译到 `dist/external-plugins/tracer`，无需单独安装，也不需要额外的解释器。Collector 以 Node 子进程运行，内置 `node:sqlite`。
+
+用四个子命令管理 Collector：
+
+| 命令 | 作用 |
+| --- | --- |
+| `ember-evaluator tracer serve [--url <url>] [--db <path>] [--spool <path>] [--port <n>] [--timeout <ms>]` | 启动 Collector，或复用已健康的实例；在数据库同级写入 `tracer.pid` |
+| `ember-evaluator tracer status [--url <url>] [--db <path>] [--port <n>]` | 输出 JSON 状态；不健康时以非零码退出 |
+| `ember-evaluator tracer logs [--log <path>] [--lines <n>] [--follow]` | 输出 `collector.log` 末尾内容，可跟随新增日志 |
+| `ember-evaluator tracer stop [--url <url>] [--db <path>] [--port <n>]` | 按 `tracer.pid` 停止进程（先 SIGTERM，5 秒后升级为 SIGKILL） |
+
+`--url`、`--db`、`--spool` 对所有子命令通用；`--port` 除 `logs` 外均可用。
+
+默认值为 `http://127.0.0.1:8787`、`.cache/tracer/trace.db`、`.cache/tracer/spool`、`.cache/tracer/collector.log`，可用 `TRACER_URL`、`TRACER_DB`、`TRACER_SPOOL`、`TRACER_LOG`、`TRACER_COLLECTOR`、`TRACER_TOKEN` 覆盖。想保留旧数据时，把 `TRACER_DB` 指向原来的 `plugins/tracer/trace.db` 即可。Collector 以子进程启动，环境变量在启动那一刻继承，改动后先 `ember-evaluator tracer stop` 再 `ember-evaluator tracer serve`。
+
+LLM 分析是可选能力；未配置 provider 时 Collector 只走确定性规则，反馈页的 LLM 区块会标记为未配置。要启用，准备一个 OpenAI 兼容的 `/chat/completions` 服务：
+
+```bash
+export TRACER_LLM_BASE_URL="https://your-model-service.example/v1"
+export TRACER_LLM_MODEL="your-model-id"
+export TRACER_LLM_API_KEY="your-api-key"
+ember-evaluator tracer serve
+```
+
+`TRACER_LLM_BASE_URL`、`TRACER_LLM_MODEL`、`TRACER_LLM_API_KEY` 会分别回退到 `MODEL_ENDPOINT`、`MODEL_NAME`、`MODEL_API_KEY`。`TRACER_LLM_TIMEOUT` 默认 120 秒，`TRACER_LLM_MAX_TOKENS` 默认 8000（推理模型需要更大预算）。这些变量在 Collector 启动时读取，所以要在 `ember-evaluator tracer serve` 之前设置，或者改完后重启 Collector。
 
 ## 📖 使用指南
 

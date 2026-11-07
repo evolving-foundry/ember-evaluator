@@ -111,3 +111,5 @@ export type { KernelContract, KernelAssessment, KernelCheck, KernelEffectiveProt
 
 export { parseKernelTimingEvidence, auditKernelTimingSample } from "./plugins/benchmarks/protocols/kernel/timing.js";
 export type { KernelTimingEvidence, KernelTimingSample, KernelTimingRow } from "./plugins/benchmarks/protocols/kernel/timing.js";
+
+export type * from "./core/contracts/plugin-extension.js";

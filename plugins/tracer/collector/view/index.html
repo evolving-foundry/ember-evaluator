@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title data-i18n="Trajectory Dashboard">Trajectory Dashboard</title>
+<!-- VIEW_CSS -->
+</head>
+<body>
+<header>
+  <h1 data-i18n="Trajectory Dashboard">Trajectory Dashboard</h1>
+  <button id="openDir" data-online data-i18n="Open Directory" data-i18n-title="Open a directory dialog and import a run directory from anywhere">Open Directory</button>
+  <button id="snapBtn" data-online data-i18n="Export Snapshot" data-i18n-title="Download a single-file HTML snapshot: inline the current epoch's conclusion, metrics and all traces; opens offline, easy to archive and share">Export Snapshot</button>
+  <label class="epochpick">epoch
+    <select id="epochSel"><option value="" data-i18n="All">All</option></select>
+  </label>
+  <div id="meta"></div>
+  <button id="langBtn" data-i18n-title="Switch language" title="Switch language"></button>
+</header>
+<main>
+  <div id="tabs">
+    <button class="tab on" data-t="traj" data-i18n="Trajectory">Trajectory</button>
+    <button class="tab" data-t="met" data-i18n="Metrics">Metrics</button>
+    <button class="tab" data-t="fb" data-i18n="Feedback">Feedback</button>
+  </div>
+  <div id="panes">
+    <section id="pane-traj" class="pane on">
+      <div id="bar">
+        <div class="barrow"><div id="views">
+          <button class="viewbtn on" data-v="waterfall" data-i18n="Waterfall" data-i18n-title="Original step order, including tool results and every event">Waterfall</button>
+          <button class="viewbtn" data-v="agg" data-i18n="Aggregate" data-i18n-title="Merge calls by function name: count / cumulative time / active range, sorted by cumulative time">Aggregate</button>
+          <button class="viewbtn" data-v="exp" data-i18n="Expanded" data-i18n-title="One row per call, indented by ancestry">Expanded</button>
+        </div>
+        <input id="filter" data-i18n-ph="Filter: function / tool / status (including error)" placeholder="Filter: function / tool / status (including error)">
+        <span id="fcount"></span>
+        <button id="toggleRail" data-i18n="Traces">Traces</button>
+        <button id="toggleDet" data-i18n="Details">Details</button>
+        </div>
+        <div class="barrow"><div id="summary"></div></div>
+      </div>
+      <div id="body">
+        <div id="trajrail">
+          <div class="railhead"><span data-i18n="Traces">Traces</span> <span class="cnt" id="railCount">0</span></div>
+          <div id="trajList"></div>
+          <div id="railfoot"><button id="analyze" data-i18n="AI Analysis">AI Analysis</button></div>
+        </div>
+        <div id="splitRail" class="splitter"></div>
+        <div id="wfNames"><div class="wf-head"></div><div class="wf-scroll" id="namesBody"></div></div>
+        <div id="splitName" class="splitter"></div>
+        <div id="wfTracks"><div id="axis"></div><div class="wf-scroll" id="tracksBody"></div>
+          <div id="wftools">
+            <button id="expandAll" data-i18n="Expand All">Expand All</button>
+            <button id="collapseAll" data-i18n="Collapse All">Collapse All</button>
+            <button id="resetZoom" data-i18n="Reset View">Reset View</button>
+            <span id="zwin" class="hint"></span>
+            <button id="helpbtn" class="copybtn" data-i18n="? Shortcuts" data-i18n-title="View all shortcuts (?)">? Shortcuts</button>
+          </div>
+        </div>
+        <div id="splitDet" class="splitter"></div>
+        <div id="details"><div class="emptyfull"><div class="empty"><b data-i18n="No step selected">No step selected</b><span data-i18n="Click a bar on the left to inspect its metrics and tool calls">Click a bar on the left to inspect its metrics and tool calls</span></div></div></div>
+      </div>
+      <div id="profview"></div>
+    </section>
+    <section id="pane-met" class="pane"><div id="metpane" class="metrics"></div></section>
+    <section id="pane-fb" class="pane"><div id="fbpane" class="metrics"></div></section>
+  </div>
+</main>
+<aside id="aiback"></aside><aside id="aipanel"><div class="aihead"><b data-i18n="AI Analysis">AI Analysis</b><button id="aiClose" data-i18n="Close">Close</button></div><div id="aibody"><div class="note" data-i18n="Click &quot;AI Analysis&quot; to view the conclusion text">Click "AI Analysis" to view the conclusion text</div></div></aside>
+<div id="helpbox"><div class="hc"><h3 data-i18n="Shortcuts">Shortcuts</h3><table>
+  <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td data-i18n="Previous / next step">Previous / next step</td></tr>
+  <tr><td><kbd>Enter</kbd></td><td data-i18n="Expand or collapse children of the current step">Expand or collapse children of the current step</td></tr>
+  <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td data-i18n="Jump to first / last step">Jump to first / last step</td></tr>
+  <tr><td><kbd>e</kbd></td><td data-i18n="Show failed steps only">Show failed steps only</td></tr>
+  <tr><td><kbd>/</kbd></td><td data-i18n="Focus the filter box">Focus the filter box</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+wheel</td><td data-i18n="Zoom the timeline at the cursor">Zoom the timeline at the cursor</td></tr>
+  <tr><td data-i18n="Drag">Drag</td><td data-i18n="Pan the timeline (double-click to reset)">Pan the timeline (double-click to reset)</td></tr>
+  <tr><td><kbd>W</kbd> <kbd>S</kbd> <kbd>A</kbd> <kbd>D</kbd></td><td data-i18n="Zoom / pan the timeline">Zoom / pan the timeline</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td data-i18n="Close overlays / clear filter and selection">Close overlays / clear filter and selection</td></tr>
+</table><div class="hint" style="margin-top:8px" data-i18n="Press Esc or click empty space to close">Press Esc or click empty space to close</div></div></div>
+<!-- VIEW_JS -->
+</body>
+</html>

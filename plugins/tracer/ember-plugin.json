@@ -1,0 +1,17 @@
+{
+  "id": "tracer",
+  "entry": "./dist/index.js",
+  "cli": "./dist/cli-register.js",
+  "flags": [
+    {
+      "command": "run",
+      "flag": "--tracer [url]",
+      "description": "Mirror the run into tracer; the optional URL overrides the Collector endpoint",
+      "config": "url"
+    }
+  ],
+  "build": {
+    "tsconfig": "./tsconfig.json",
+    "install": ["dist", { "from": "collector/view", "to": "dist/collector/view" }, { "from": "collector/schemas", "to": "dist/collector/schemas" }]
+  }
+}

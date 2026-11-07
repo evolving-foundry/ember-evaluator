@@ -82,6 +82,12 @@ ember-evaluator --help
 
 The help output confirms installation. See the [installation guide](docs/users/installation.md) for details, or use the [management container](docs/users/deployment/container-toolbox.md) on Linux servers.
 
+To run the CLI against the TypeScript sources instead of a build, use `pnpm dev`. A fresh checkout needs no manual build: the first command that loads the plugin registry packages the Agent runtime once (`tsc` plus `package-runtime`) before starting.
+
+```bash
+pnpm dev run --tracer http://127.0.0.1:8787 playbook/gsm8k/gsm8k-quick-start.yaml
+```
+
 #### 2. Install the skill
 
 Run this from the project where you want to use the skill, then select your coding agent.
@@ -147,6 +153,42 @@ ember-evaluator run playbook/terminalbench/terminalbench-4.0.yaml --network play
 ```
 
 Prepare Docker, model settings, and task selection using the [Terminal-Bench quick start](docs/users/quick-start/terminalbench.md). The example selects all tasks; only published tasks and platforms are available, and other downloads retain their defaults. See [how to use --network](docs/users/network.md#1-choose-a-network-file) to select mirrors, combine settings, or set a default file.
+
+## 🛰️ Tracer: Trajectory Visualization, Feedback, and Operations
+
+The bundled `tracer` plugin streams every attempt into a local Collector: a small HTTP service that renders agent trajectories and profiling metrics, produces deterministic feedback with optional LLM attribution, and exports files for downstream RSI tooling. The configured store stays authoritative, and transport failures never block an evaluation.
+
+Enable it for a run; the plugin starts the Collector on demand:
+
+```bash
+ember-evaluator run playbook/gsm8k/gsm8k-quick-start.yaml --tracer
+```
+
+The plugin ships inside the runtime: `pnpm build` compiles `plugins/tracer` into `dist/external-plugins/tracer`, so no separate install or interpreter is required. The Collector runs as a Node child process using the bundled `node:sqlite`.
+
+Manage the Collector with four subcommands:
+
+| Command | Purpose |
+| --- | --- |
+| `ember-evaluator tracer serve [--url <url>] [--db <path>] [--spool <path>] [--port <n>] [--timeout <ms>]` | Start the Collector, or reuse a healthy one; writes `tracer.pid` next to the database |
+| `ember-evaluator tracer status [--url <url>] [--db <path>] [--port <n>]` | Print JSON status; exits non-zero when the Collector is unhealthy |
+| `ember-evaluator tracer logs [--log <path>] [--lines <n>] [--follow]` | Print the tail of `collector.log`, optionally following new output |
+| `ember-evaluator tracer stop [--url <url>] [--db <path>] [--port <n>]` | Stop the process recorded in `tracer.pid` (SIGTERM, escalating to SIGKILL after 5 seconds) |
+
+`--url`, `--db`, and `--spool` are accepted by every subcommand; `--port` applies to all but `logs`.
+
+Defaults are `http://127.0.0.1:8787`, `.cache/tracer/trace.db`, `.cache/tracer/spool`, and `.cache/tracer/collector.log`. Override them with `TRACER_URL`, `TRACER_DB`, `TRACER_SPOOL`, `TRACER_LOG`, `TRACER_COLLECTOR`, or `TRACER_TOKEN`. Set `TRACER_DB` to an older `plugins/tracer/trace.db` to keep existing history. The Collector is a child process and inherits environment variables when it starts; after changing them run `ember-evaluator tracer stop` and then `ember-evaluator tracer serve` again.
+
+LLM analysis is optional; without a provider the Collector runs rules-only and the feedback page marks the LLM section as unconfigured. Enable it with an OpenAI-compatible `/chat/completions` service:
+
+```bash
+export TRACER_LLM_BASE_URL="https://your-model-service.example/v1"
+export TRACER_LLM_MODEL="your-model-id"
+export TRACER_LLM_API_KEY="your-api-key"
+ember-evaluator tracer serve
+```
+
+`TRACER_LLM_BASE_URL`, `TRACER_LLM_MODEL`, and `TRACER_LLM_API_KEY` fall back to `MODEL_ENDPOINT`, `MODEL_NAME`, and `MODEL_API_KEY`. `TRACER_LLM_TIMEOUT` defaults to 120 seconds and `TRACER_LLM_MAX_TOKENS` to 8000, which reasoning models need. The Collector reads these variables when it starts, so set them before `ember-evaluator tracer serve` or restart it afterwards.
 
 ## 📖 Guides
 

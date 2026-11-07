@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { bootstrap } from "../../bootstrap.js";
 import { openPluginRegistry, type PluginRegistry } from "../../plugin-runtime.js";
-import { DEFAULT_METRICS, type LoadedConfig } from "../../config/schema.js";
+import { expectRecord, DEFAULT_METRICS, type LoadedConfig } from "../../config/schema.js";
 import { PACKAGE_RUNTIME_ID, loadPackageDigest } from "../../core/package-provenance.js";
 import { fingerprintConfig } from "../../core/run-manifest.js";
 import { assertSolverProvenance, resolveSolverProvenance } from "../../core/solver-provenance.js";
@@ -47,6 +47,7 @@ async function executeRegisteredNode(input: unknown, node: NodeConfig, token: st
       throw new TypeError("Invalid Ray node identity");
   const nodeId = envelope.nodeId as string,
     hostname = envelope.hostname as string;
+  await registry.loadRecordedPlugins(expectRecord(envelope.remote, "remote job").pluginVersions);
   const lookup = (role: string, name: string) => registry.ctx.evaluator.configTransport(role, name);
   const remote = validateRemoteJob(envelope.remote, lookup);
   if (remote.preparation && remote.preparation.nodeId !== nodeId)

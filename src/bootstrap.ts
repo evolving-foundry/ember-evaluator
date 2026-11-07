@@ -11,7 +11,7 @@ import type { PluginFactoryContext } from "./core/registry.js";
 import { fingerprintImageConfig } from "./core/image-config.js";
 import type { ConfigTransportLookup } from "./core/contracts/config-transport.js";
 
-export function createPluginRuntime(config: LoadedConfig, experimentDir: string, pluginPatchPath?: string, onWarning?: (message: string) => void, configTransport?: ConfigTransportLookup, network = new NetworkRuntime(config.network)) {
+export function createPluginRuntime(config: LoadedConfig, experimentDir: string, pluginPatchPath?: string, onWarning?: (message: string, level?: "info" | "warning") => void, configTransport?: ConfigTransportLookup, network = new NetworkRuntime(config.network)) {
   assertServiceBindings(config);
   const configDirectory = resolve(experimentDir);
   const services = Object.fromEntries(
@@ -57,19 +57,26 @@ async function createBenchmark(
   return benchmark;
 }
 
+export type BootstrapOptions = {
+  plugins?: import("./core/contracts/plugin-extension.js").PluginActivation[];
+  signal?: AbortSignal;
+};
+
 export async function bootstrap(
   config: LoadedConfig,
   experimentDir: string,
   patchPath?: string,
-  onWarning?: (message: string) => void,
+  onWarning?: (message: string, level?: "info" | "warning") => void,
   sharedRegistry?: PluginRegistry,
   imageConfigFingerprint?: string,
+  options: BootstrapOptions = {},
 ): Promise<RunComponents> {
   const reportingSelections = [
     ...config.experiment.metrics.map(selection => ({ role: "metrics" as const, name: selection.name })),
     { role: "reporter" as const, name: config.experiment.reporter.name },
   ];
-  const registry = sharedRegistry ?? await openPluginRegistry(patchPath);
+  const registry = sharedRegistry ?? await openPluginRegistry(patchPath,
+    options.plugins === undefined ? {} : { plugins: options.plugins.map(plugin => plugin.id) });
   const { ctx, patch, pluginVersions } = registry;
   const reportingProviders = Object.fromEntries(reportingSelections.flatMap(selection => {
     const key = `${selection.role}:${selection.name}`;
@@ -77,6 +84,9 @@ export async function bootstrap(
     return provider === undefined ? [] : [[key, provider]];
   }));
   try {
+    const plugins = options.plugins ?? [];
+    await registry.loadPlugins(plugins.map(plugin => plugin.id));
+    const createDecorators = registry.prepareStoreDecorators(plugins);
     // Resolve names and validate every private config before any factory can
     // allocate a workspace, start a process, or perform model I/O.
     const createEnvironment = ctx.evaluator.prepare("environment", config.experiment.environment);
@@ -87,6 +97,7 @@ export async function bootstrap(
     const createScheduler = ctx.evaluator.prepare("scheduler", config.experiment.scheduler);
 
     const runtime = { ...createPluginRuntime(config, experimentDir, patch.patchPath ?? undefined, onWarning, (role, name) => ctx.evaluator.configTransport(role, name)),
+      ...(options.signal ? { signal: options.signal } : {}),
       ...(imageConfigFingerprint ? { imageConfigFingerprint } : {}) };
     registry.ctx.effect(() => () => runtime.network.dispose(), "Network client lifecycle");
     const benchmark = await createBenchmark(registry, config, runtime);
@@ -97,6 +108,8 @@ export async function bootstrap(
     for (const createMetric of createMetrics) metrics.push(await createMetric(reportingRuntime));
     const reporter = await createReporter(reportingRuntime);
     const store = await createStore(runtime);
+    let decorated = store;
+    for (const createDecorator of createDecorators) decorated = await (await createDecorator(runtime))(decorated);
     const scheduler = await createScheduler(runtime);
     let disposed = false;
 
@@ -106,7 +119,7 @@ export async function bootstrap(
       solver,
       metrics,
       reporter,
-      store,
+      store: decorated,
       scheduler,
       pluginVersions,
       pluginRuntime: {
@@ -114,6 +127,7 @@ export async function bootstrap(
         ...(patch.patchPath === null ? {} : { patchPath: patch.patchPath }),
         entries: structuredClone(patch.entries),
         reportingProviders,
+        ...(plugins.length === 0 ? {} : { plugins: structuredClone(plugins) }),
       },
       async dispose() {
         if (disposed) return;

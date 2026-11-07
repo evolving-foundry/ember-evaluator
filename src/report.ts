@@ -1,3 +1,4 @@
+import { readPluginCatalog, loadInstalledPlugin } from "./plugin-catalog.js";
 import { resolveRunStatus } from "./core/task-result-resolver.js";
 import { Context, type Plugin } from "@deepseek-ai/cordis";
 import { readFile } from "node:fs/promises";
@@ -65,11 +66,16 @@ async function loadReporting(manifest: RunManifest, runDir: string) {
     }
     for (const id of providers) {
       const entry = manifest.pluginRuntime?.entries.find(entry => entry.id === id);
-      if (!entry) throw new Error(`Missing reporting plugin entry: ${id}`);
-      const plugin = await resolvePlugin(entry, patchPath);
-      if (manifest.pluginVersions[entry.id] !== plugin.version)
-        throw new Error(`Plugin version differs from saved run: ${entry.id}`);
-      await ctx.plugin(plugin.plugin as Plugin);
+      if (entry) {
+        const plugin = await resolvePlugin(entry, patchPath);
+        if (manifest.pluginVersions[id] !== plugin.version) throw new Error(`Plugin version differs from saved run: ${id}`);
+        await ctx.plugin(plugin.plugin as Plugin);
+      } else {
+        const plugin = readPluginCatalog().find(plugin => plugin.id === id);
+        if (!plugin) throw new Error(`Missing installed reporting plugin: ${id}`);
+        if (manifest.pluginVersions[id] !== plugin.version) throw new Error(`Plugin version differs from saved run: ${id}`);
+        await ctx.plugin(await loadInstalledPlugin(plugin) as Plugin);
+      }
     }
     const createMetrics = selections.map(selection => ctx.evaluator.prepare("metrics", selection));
     const createReporter = ctx.evaluator.prepare("reporter", reporter);
