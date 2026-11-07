@@ -1,6 +1,6 @@
 # 仓库开发规范
 
-本文件适用于整个仓库。文档的目录分工和维护规则见 [docs/AGENTS.md](docs/AGENTS.md)。
+本文件适用于整个仓库。模块调用关系、依赖检查范围和资源所有权见[源码架构与执行流程](docs/development/architecture.md)，文档的目录分工和维护规则见 [docs/AGENTS.md](docs/AGENTS.md)。
 
 ## 仓库目录结构
 
@@ -10,10 +10,10 @@ src/
 ├── cli.ts                  # 进程入口、信号和退出码
 ├── cli/                    # 命令参数、终端输出与进度展示
 ├── application/            # SDK、配置/插件装配、运行、报告、预热、补测与诊断
-│   ├── plugins/            # Cordis 注册表、插件发现与组件创建
+│   ├── plugins/            # Cordis 注册表、显式插件加载与组件创建
 │   ├── retry-control/      # 请求文件事务、认领与 IPC 接入
 │   └── ray/                # Jobs、结果下载、worker 装配和进程入口
-├── config/                 # YAML 读取、展开、纯解析、校验和脱敏
+├── config/                 # YAML/patch 读取、展开、校验和脱敏
 ├── core/                   # 不依赖具体组件的公共契约和评测流程
 │   ├── contracts/          # 八类组件、任务、结果、工厂和配置契约
 │   ├── execution/          # run 编排、attempt 执行与队列
@@ -63,7 +63,7 @@ docs/                       # 用户指南、设计、任务与经验记录，�
 | `.scratch/` / `.superpowers/` | 本地临时材料和工具工作文件，不提交 |
 | `.cache/` / `results/` / `coverage/` | 本地缓存、默认示例结果和覆盖率输出，不提交；实际结果路径由配置决定 |
 
-公共契约放 `core/contracts`，可替换组件放 `plugins`，运行时安装与桥接放 `runtimes`，共用 I/O 工具放 `infrastructure`。应用层装配配置和插件；CLI 处理用户交互。core 只依赖 core；config 不导入 application、plugins、runtimes 或 infrastructure；infrastructure/runtimes/plugins 只能使用 config 中明确列出的纯解析模块。通过 `pnpm check:dependencies` 检查静态、类型、动态导入、再导出及执行循环，违规清单必须为空。核心执行流程不增加按 Benchmark 名称或类别分支的业务逻辑。
+公共契约放 `core/contracts`，可替换组件放 `plugins`，运行时安装与桥接放 `runtimes`，共用 I/O 工具放 `infrastructure`。应用层装配配置和插件；application/plugins/load-module.ts 负责插件模块定位、版本读取和导入，open-registry.ts 负责注册表创建与注册。config/plugin-patch.ts 只读取和校验 patch，不导入插件。CLI 处理用户交互。core 只依赖 core；config 不导入 application、plugins、runtimes 或 infrastructure；infrastructure/runtimes/plugins 只能使用 config 中明确列出的纯解析模块。通过 `pnpm check:dependencies` 检查静态、类型、动态导入、再导出及执行循环，违规清单必须为空。核心执行流程不增加按 Benchmark 名称或类别分支的业务逻辑。
 
 ## 代码开发规范
 
@@ -107,7 +107,7 @@ pnpm test --run
 - 插件默认配置通过 `ctx.evaluator.registerProfile()` 注册声明式 Profile，类型从包根导入。Profile 属于配置元数据，不增加执行组件类别；继承、版本和场景由解析层展开，避免在 Loader 或 Engine 中新增按 Benchmark 名称分支的默认值。内置 Harbor Profile YAML 随构建发布并纳入摘要，外部 Profile 随显式 patch 插件发布。
 - 配置校验与实例创建分开。`validate` 校验类型、范围和未知字段，并给出明确错误；校验阶段不启动进程、访问模型或分配运行资源。模块导入和注册阶段也不启动评测工作。
 - 工厂通过 `(config, runtime)` 获取组件参数、模型和运行时认证，使用 `runtime.resolvePath()` 解析相对实验目录的路径。不要硬编码模型、key、用户目录或机器地址，也不要用全局可变状态串联实验。
-- 内置组件在对应角色的 index.ts 注册，Benchmark 在 agent-harness、inference-engine 或 operator 的 index.ts 注册，src/plugins/index.ts 只组合角色入口；外部插件由 run --patch <path> 显式加载，省略参数时不扫描默认文件，--dry-run 也使用相同参数。CLI 的 patch 路径相对当前工作目录解析；patch 的本地 JavaScript 模块路径和 npm 包从 patch 文件目录解析。当前 patch 仅支持 insert，条目使用 id 和 name；TypeScript 入口必须先编译。
+- 内置组件在对应角色的 index.ts 注册，Metrics 和 Reporter 分别在 metrics/index.ts 和 reporters/index.ts 注册；Benchmark 在 agent-harness、inference-engine 或 operator 的 index.ts 注册，src/plugins/index.ts 只组合注册入口。外部插件由 run --patch <path> 显式加载，省略参数时不扫描默认文件，--dry-run 也使用相同参数。CLI 的 patch 路径相对当前工作目录解析；patch 的本地 JavaScript 模块路径和 npm 包从 patch 文件目录解析。当前 patch 仅支持 insert，条目使用 id 和 name；TypeScript 入口必须先编译。
 - Ray 节点不接收协调端的本机 patch 路径；节点配置通过 EVALUATOR_NODE_CONFIG 的 pluginPatchPath 指向节点本地预装 patch，并以 patch 内容摘要和插件版本校验一致性。Ray Jobs 协调端通过部署环境变量 EVALUATOR_PLUGIN_PATCH_PATH 加载容器内预装 patch。
 - 区分 patch 模块标识与组件注册名：patch 的 `id` 用于标识模块，patch 的 `name` 用于定位模块；实验中的 `{ name, config }` 选择组件并提供参数。不要为每个新插件增加专属 CLI 加载逻辑。
 - 遵循求解与验证边界：Solver 只接收公开任务和执行环境，不能读取答案、隐藏测试或 verifier 私有材料；Benchmark 负责准备与验证，Scheduler 负责调度，Store 负责持久化，Metrics/Reporter 基于已保存结果工作。

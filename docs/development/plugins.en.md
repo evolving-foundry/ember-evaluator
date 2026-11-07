@@ -8,9 +8,9 @@ Covers eight component interfaces, runnable metric plugins, explicit patches, an
 
 ## Source and Registration Locations
 
-Built-in components register in each role's index.ts. Benchmarks have three registration entries: agent-harness, inference-engine and operator. application/plugins owns Cordis, patch loading and component creation; config reads and validates configuration. External plugins continue importing public contracts from ember-evaluator. See [Benchmark development](benchmarks.en.md#where-to-add-new-behavior) for implementation locations and lifecycle limits.
+Built-in components register in each role's index.ts; Metrics and Reporter use metrics/index.ts and reporters/index.ts respectively. Benchmarks have three registration entries: agent-harness, inference-engine and operator. application/plugins/open-registry.ts creates the Cordis registry and registers plugins, load-module.ts locates and imports modules and reads versions, create-components.ts creates components using an existing registry, and bootstrap.ts provides the public entry that opens and disposes its own registry. config/plugin-patch.ts only reads patches, validates entries, and computes patch digests; it does not execute plugin modules. External plugins import public contracts from ember-evaluator, not internal directories. See [Source architecture and execution flow](architecture.en.md) for calls and resource ownership, and [Benchmark development](benchmarks.en.md#where-to-add-new-behavior) for implementation locations and lifecycle limits.
 
-Run `pnpm check:dependencies` to check imports, boundary violations and executable module cycles. The migration exception list is empty. Core cannot import application/config/plugins/runtimes/infrastructure, and internal modules cannot bypass these rules through package-root imports.
+Run `pnpm check:dependencies` to check imports, boundary violations, and executable module cycles. See [dependency rules](architecture.en.md#allowed-source-dependencies) for allowed relationships and coverage limits. Plugins use explicit patches; manifest discovery and plugin-declared CLI commands are not supported.
 
 ### Published Process Entries
 

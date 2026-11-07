@@ -33,7 +33,7 @@ Ember Evaluator 用一份 YAML 配置模型、Agent、Benchmark 和执行环境�
 
 ![Evaluator 从 YAML 配置到任务执行、验证、结果保存和报告生成的整体架构](imgs/01-framework-project-overview-v2.png.png)
 
-模型与 Agent 负责求解，Benchmark 负责验证，Store 保存结果和证据。各模块的职责、调用流程和源码入口见 `src/` 目录。
+模型与 Agent 负责求解，Benchmark 负责验证，Store 保存结果和证据。模块职责、依赖关系和资源释放责任见[源码架构与执行流程](docs/development/architecture.md)。
 
 ## ⚙️ 功能介绍
 

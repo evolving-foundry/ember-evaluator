@@ -8,9 +8,9 @@
 
 ## 源码与注册位置
 
-仓库内组件在各角色的 index.ts 注册；Benchmark 再分 agent-harness、inference-engine、operator 三个注册入口。application/plugins 负责 Cordis、patch 加载与组件创建，config 只读取与校验配置。外部插件仍从 ember-evaluator 包根导入公共接口，不依赖这些内部目录。新增 Benchmark 的具体位置和流程限制见[Benchmark 开发指南](benchmarks.md#新需求的修改入口)。
+仓库内组件在各角色的 index.ts 注册，Metrics 和 Reporter 分别使用 metrics/index.ts 和 reporters/index.ts；Benchmark 再分 agent-harness、inference-engine、operator 三个注册入口。application/plugins/open-registry.ts 创建 Cordis 注册表并注册插件，load-module.ts 定位和导入插件模块、读取版本，create-components.ts 使用已有注册表创建组件，bootstrap.ts 提供自行创建和释放注册表的公开入口；config/plugin-patch.ts 只读取 patch、校验条目和计算摘要，不执行插件模块。外部插件仍从 ember-evaluator 包根导入公共接口，不依赖这些内部目录。完整调用关系和资源所有权见[源码架构与执行流程](architecture.md)，新增 Benchmark 的具体位置和流程限制见[Benchmark 开发指南](benchmarks.md#新需求的修改入口)。
 
-运行 `pnpm check:dependencies` 检查导入、目录依赖和可执行模块循环。当前迁移违规清单为空。core 不得引用 application/config/plugins/runtimes/infrastructure，内部模块也不能通过包根导入绕过规则。
+运行 `pnpm check:dependencies` 检查导入、目录依赖和可执行模块循环；允许关系和未覆盖范围见[依赖规则](architecture.md#允许的源码依赖)。插件使用显式 patch 加载，不支持 manifest 自动发现或插件声明 CLI 命令。
 
 ### 发布进程入口
 

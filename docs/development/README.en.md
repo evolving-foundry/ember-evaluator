@@ -12,6 +12,6 @@ These guides are for developers modifying Evaluator or writing plugins. For inst
 | Write plugins: implement contracts, register profiles, manage resources, and run regression tests | [Benchmark development](benchmarks.en.md) |
 | Throw structured errors and preserve diagnostics | [Plugin error handling](diagnostics.en.md) |
 | Check Office Ray slots and the AgentX bridge protocol | [Runtime and concurrency validation](runtime-validation.en.md) |
-| Find module relationships, execution order, and implementation entry points | `src/` and the [user documentation](../users/README.md) |
+| Find directory responsibilities, dependency rules, execution order, and resource ownership | [Source architecture and execution flow](architecture.en.md) |
 
 Store intermediate designs and implementation records in `docs/design/` and `docs/tasks/` under the [documentation rules](../AGENTS.md). Keep fixture usage and controlled validation here; user guides describe current operations, results, and limitations.

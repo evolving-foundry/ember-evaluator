@@ -33,7 +33,7 @@ It supports math and knowledge questions, code changes, terminal operations, off
 
 ![Evaluator architecture from YAML configuration through execution, verification, result storage, and reporting](imgs/01-framework-project-overview-v2.png.png)
 
-Models and agents solve tasks, benchmarks verify them, and stores save results and evidence. See `src/` for module responsibilities, execution flows, and implementation entry points.
+Models and agents solve tasks, benchmarks verify them, and stores save results and evidence. See [Source architecture and execution flow](docs/development/architecture.en.md) for module responsibilities, dependencies, and resource ownership.
 
 ## ⚙️ Features
 

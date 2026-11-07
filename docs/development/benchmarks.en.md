@@ -8,6 +8,8 @@ Obtain [task specifications](benchmark-evaluation-requirements.en.md#2-complete-
 
 ## Choose an Implementation Location
 
+See [Source architecture and execution flow](architecture.en.md) for directory responsibilities, calls, and dependency limits. This guide owns the implementation locations for task conversion, scoring, Profiles, and protocols.
+
 Benchmarks are grouped by evaluation target: agent-harness, inference-engine and operator. All three use the existing engine and component contracts. Source clients organize external downloads. Determine whether new behavior is record reading, task conversion, existing-protocol configuration, or a new protocol:
 
 | Approach | Scope | Code changes |
