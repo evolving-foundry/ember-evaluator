@@ -1,18 +1,9 @@
-import { isErrorCode, type ErrorCode } from "../errors/registry.js";
 import { collectAttemptAccounting } from "../results/attempt-accounting.js";
 import { DEFAULT_TASK_TIMEOUT_SECONDS } from "../policies/timeouts.js";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import type { RunComponents } from "../contracts/components.js";
 import type { PreparedTask, SourceLock, PhaseTimeoutOverrides } from "../contracts/task.js";
-import type {
-  EnvironmentSession,
-  EnvironmentSpec,
-  RuntimeInstallation,
-  TransferArtifact,
-} from "../contracts/environment.js";
-import type { PreparedSolver } from "../contracts/solver.js";
-import type { VerificationRuntimeSession } from "../contracts/verification-runtime.js";
 import { withPreparationTimeout, DEFAULT_PREPARATION_TIMEOUT_SECONDS } from "../preparation/preparation-timeout.js";
 import { materializeVerificationRuntime } from "../preparation/verification-runtime.js";
 import type { DispatchEntry } from "../preparation/task-preparation.js";
@@ -28,18 +19,17 @@ import {
 import { archiveStep, clearStepOutputs, combineStepTrajectories, sumStepSolves } from "../artifacts/step-evidence.js";
 import { buildFileManifest } from "../artifacts/artifacts.js";
 import { readTrajectoryPrefix } from "../artifacts/trajectory-recovery.js";
-import { redactDiagnostic, redactEvidence } from "../errors/diagnostics.js";
-import { assertJsonValue } from "../validation/input.js";
+import { redactDiagnostic } from "../errors/diagnostics.js";
 import { VerificationError } from "../errors/verification-error.js";
 import { PhaseTimeoutError } from "../policies/phase-timeout.js";
 import type { ProgressListener } from "../progress/progress.js";
 import { LiveOperation } from "../progress/live-progress.js";
-import type { ActivityListener } from "../contracts/activity.js";
-import { finalizeAttemptOutcome, assertEvaluationVerdict, timeoutCancellation, applyAttemptFailure, isAgentTimeout } from "../results/evaluation-outcome.js";
-import { classifyError, normalizeFailure, type ErrorContext } from "../errors/classify.js";
+import { finalizeAttemptOutcome, timeoutCancellation, applyAttemptFailure, isAgentTimeout } from "../results/evaluation-outcome.js";
+import { classifyError, normalizeFailure } from "../errors/classify.js";
 import { EvaluatorError } from "../errors/evaluator-error.js";
-import { assertSolveResult, assertVerifyResult } from "../results/record-validation.js";
 import { readCollectOutput } from "../artifacts/collect-output.js";
+import { AttemptResources, type RecordAttemptFailure, type RunAttemptStage } from "./attempt-resources.js";
+import { createAttemptStep, expectedStepArtifact, recoverStepEvidence, runAttemptStep, type AttemptStep } from "./run-attempt-step.js";
 
 export type RunTaskOptions = PhaseTimeoutOverrides & {
   timeoutSeconds?: number;
@@ -52,22 +42,8 @@ export type RunTaskOptions = PhaseTimeoutOverrides & {
   includeTaskAnswer?: boolean;
 };
 
-async function bounded<T>(operation: () => Promise<T>, signal: AbortSignal): Promise<T> {
-  signal.throwIfAborted();
-  let cancel!: () => void;
-  const aborted = new Promise<never>((_resolve, reject) => {
-    cancel = () => reject(signal.reason);
-    signal.addEventListener("abort", cancel, { once: true });
-  });
-  try {
-    return await Promise.race([operation(), aborted]);
-  } finally {
-    signal.removeEventListener("abort", cancel);
-  }
-}
-
 class UnsupportedRuntimeInstallationError extends Error {
-  readonly code: ErrorCode = "ENV_RUNTIME_INSTALL_FAILED";
+  readonly code = "ENV_RUNTIME_INSTALL_FAILED";
   constructor() {
     super("The selected environment does not support solver runtime installation");
   }
@@ -139,33 +115,14 @@ export async function runTask(
   };
   const preparationElapsedMs = { solve: 0, verify: 0 };
   let phase: Phase = "prepare";
-  let activity: ActivityListener | undefined;
-  const currentPhase = (): Phase => phase;
   let prepared: PreparedTask | undefined;
   let multiTask: PreparedTask | undefined;
+  let step: AttemptStep | undefined;
   let activeStep: AttemptStepResult | undefined;
   let stepErrorStart = 0;
-  const archivedSteps = new Set<string>();
-  let solveSession: EnvironmentSession | undefined;
-  let solverHandle: PreparedSolver | undefined;
+  let stepArchived = false;
   let solveStarted = false;
-  let exported = false;
-  let resourceAdmissionClosed = false;
-  const sessions: EnvironmentSession[] = [];
-  const preparedSolvers: PreparedSolver[] = [];
-  const verificationSessions: VerificationRuntimeSession[] = [];
-  let verificationSession: VerificationRuntimeSession | undefined;
-  const pending = new Set<Promise<unknown>>();
-  const transferArtifactName = (spec: PreparedTask["transfer"]): string | null => {
-    if (spec === null) return null;
-    switch (spec.kind) {
-      case "git-patch": return "model.patch";
-      case "artifacts": return "artifacts.tar";
-      default: return "workspace.tar";
-    }
-  };
-  let transferTarget: string | null = null;
-  const failure = (at: Phase, error: unknown, fallback?: ErrorCode, context = "", cancellation?: ErrorContext["cancellation"]) => {
+  const failure: RecordAttemptFailure = (at, error, fallback, context = "", cancellation) => {
     let item: Failure;
     if (at === "prepare" && preparation.state === "failed") {
       item = normalizeFailure(preparation.failure, options.sensitiveValues);
@@ -183,21 +140,8 @@ export async function runTask(
     if (item.code === "NETWORK_FAILURE") (item.details ??= {}).logPath = "result.json";
     record.errors.push(item);
   };
-  const transferWarnings = (artifact: TransferArtifact, at: Phase) => {
-    for (const warning of artifact.warnings ?? []) {
-      if (!isErrorCode(warning.code)) throw new EvaluatorError("SOLVER_PROTOCOL_INVALID", "Transfer warning uses an unregistered error code");
-      (record.warnings ??= []).push({
-        phase: at,
-        code: warning.code,
-        message: redactDiagnostic(warning.message, options.sensitiveValues),
-      });
-    }
-  };
-  const stage = async <T>(
-    at: Phase,
-    work: (signal: AbortSignal) => Promise<T>,
-    activeSignal = taskSignal,
-  ): Promise<T> => {
+  const resources = new AttemptResources(components, record, paths, dependenciesReady, cleanupTimeoutMs, failure, options.sensitiveValues);
+  const stage: RunAttemptStage = async (at, work, activeSignal = taskSignal) => {
     phase = at;
     const start = performance.now();
     const labels: Partial<Record<Phase, string>> = {
@@ -212,8 +156,8 @@ export async function runTask(
     };
     progress(at, labels[at] ?? "Starting");
     let limit: number | undefined;
-    if (at === "solve") limit = options.solveTimeoutSeconds ?? prepared?.phaseTimeoutSeconds?.solve;
-    else if (at === "verify") limit = options.verifyTimeoutSeconds ?? prepared?.phaseTimeoutSeconds?.verify;
+    if (at === "solve") limit = options.solveTimeoutSeconds ?? (step?.task ?? prepared)?.phaseTimeoutSeconds?.solve;
+    else if (at === "verify") limit = options.verifyTimeoutSeconds ?? (step?.task ?? prepared)?.phaseTimeoutSeconds?.verify;
     if (limit !== undefined && (!Number.isFinite(limit) || limit <= 0))
       throw new TypeError(`Invalid ${at} phase time limit`);
     const phaseDeadline = limit === undefined ? null : AbortSignal.timeout(limit * 1000);
@@ -221,18 +165,8 @@ export async function runTask(
     const operation = new LiveOperation(options.onProgress, { phase: at, message: labels[at] ?? at,
       taskId: job.taskId, attemptId: job.attemptId }, options.sensitiveValues, undefined,
       `${job.runId}/${job.taskId}/${job.attemptId}/${at}`, at === "environment");
-    const previousActivity = activity;
-    activity = operation.activity;
     try {
-      const result = await bounded(() => {
-        const operation = work(stageSignal);
-        pending.add(operation);
-        void operation.then(
-          () => pending.delete(operation),
-          () => pending.delete(operation),
-        );
-        return operation;
-      }, stageSignal);
+      const result = await resources.runOperation(() => work(stageSignal, operation.activity), stageSignal);
       operation.finish();
       return result;
     } catch (error) {
@@ -240,124 +174,34 @@ export async function runTask(
       if (phaseDeadline?.aborted && !activeSignal.aborted) throw new PhaseTimeoutError(at);
       throw error;
     } finally {
-      activity = previousActivity;
       record.phaseDurationMs[at] = (record.phaseDurationMs[at] ?? 0) + performance.now() - start;
     }
   };
-  const environment = async (
-    which: "solve" | "verify",
-    stageSignal: AbortSignal,
-    installation?: RuntimeInstallation,
-  ) => {
-    const spec = which === "solve" ? prepared!.solveEnv : prepared!.verifyEnv!;
-    const environmentSpec: EnvironmentSpec =
-      which === "solve" && !dependenciesReady
-        ? {
-            ...spec,
-            runtime: [...spec.runtime, ...components.solver.requirements()],
-            ...(installation === undefined ? {} : { installation }),
-          }
-        : spec;
-    const componentActivity = activity;
-    const session = await components.environment.prepare(environmentSpec, paths, which, stageSignal,
-      which === "verify" && componentActivity ? event => componentActivity({ activity: event.activity ?? true }) : componentActivity);
-    if (resourceAdmissionClosed) {
-      // The record already reports unconfirmed cleanup if an adapter outlives
-      // the budget; still reclaim a late resource without mutating the record.
-      const lateCleanupSignal = AbortSignal.timeout(cleanupTimeoutMs);
-      void bounded(() => session.dispose(lateCleanupSignal), lateCleanupSignal).catch(() => {});
-    } else {
-      sessions.push(session);
-      record.environments[which] = structuredClone(session.metadata);
-    }
-    return session;
+  const prepareEnvironment = <T>(purpose: "solve" | "verify", task: PreparedTask, work: (signal: AbortSignal) => Promise<T>) => {
+    if (dependenciesReady) return work(taskSignal);
+    phase = "environment";
+    const started = performance.now();
+    return withPreparationTimeout(purpose,
+      options.environmentTimeoutSeconds ?? task.preparationTimeoutSeconds?.[purpose] ?? DEFAULT_PREPARATION_TIMEOUT_SECONDS,
+      options.preparationConcurrency ?? 1, taskSignal, work,
+      timing => progress("environment", `${purpose} preparation timeout ${timing.timeoutSeconds}s (base ${timing.baseSeconds}s × ${timing.multiplier}; concurrency ${timing.concurrency})`), preparationElapsedMs[purpose])
+      .finally(() => { preparationElapsedMs[purpose] += performance.now() - started; });
   };
-  const prepareSolver = async (session: EnvironmentSession, stageSignal: AbortSignal) => {
-    const handle = await components.solver.prepare!(session, { key, paths, signal: stageSignal, ...(activity ? { activity } : {}) });
-    if (resourceAdmissionClosed) {
-      if (handle.dispose) {
-        const lateCleanupSignal = AbortSignal.timeout(cleanupTimeoutMs);
-        void bounded(() => handle.dispose!(lateCleanupSignal), lateCleanupSignal).catch(() => {});
-      }
-    } else {
-      preparedSolvers.push(handle);
-    }
-    return handle;
-  };
-  const quiesceSolve = async (quiesceSignal: AbortSignal) => {
-    if (!solveSession) return;
-    if (solverHandle?.dispose && preparedSolvers.includes(solverHandle)) {
-      await bounded(() => solverHandle!.dispose!(quiesceSignal), quiesceSignal);
-      preparedSolvers.splice(preparedSolvers.indexOf(solverHandle), 1);
-    }
-    if (dependenciesReady && !solveSession.quiesce)
-      throw new Error("Batch execution requires EnvironmentSession.quiesce()");
-    await solveSession.quiesce?.(quiesceSignal);
-  };
-  let transitioned = false;
-  let collected = false;
-  const finishSolve = async (parentSignal: AbortSignal) => {
-    if (!prepared || !solveSession || (prepared.verificationMode !== "shared" && !prepared.collect?.length)) return;
-    if (!transitioned) {
-      await stage("transfer", async stageSignal => {
-        if (solverHandle?.dispose && preparedSolvers.includes(solverHandle)) {
-          await solverHandle.dispose(stageSignal);
-          preparedSolvers.splice(preparedSolvers.indexOf(solverHandle), 1);
-        }
-        if (!solveSession!.transitionToVerification)
-          throw new Error("Environment does not support verification phase transitions");
-        await solveSession!.transitionToVerification(
-          prepared!.verificationMode === "shared" ? prepared!.verificationNetwork : undefined,
-          stageSignal,
-        );
-      }, parentSignal);
-      transitioned = true;
-    }
-    if (!collected) {
-      collected = true;
-      for (const [index, hook] of (prepared.collect ?? []).entries()) {
-        await stage("collect", async stageSignal => {
-          const active = AbortSignal.any([stageSignal, AbortSignal.timeout(Math.ceil(hook.timeoutSeconds * 1000))]);
-          const startService = solveSession!.startService;
-          if (hook.service && hook.service !== "main" && !startService)
-            throw new Error(`Environment cannot collect from service ${hook.service}`);
-          const handle = hook.service && hook.service !== "main" && startService
-            ? await startService.call(solveSession, hook.service, { ...hook, input: null }, active)
-            : await solveSession!.start({ ...hook, input: null }, active);
-          const logPath = `collect/${String(index + 1).padStart(3, "0")}`;
-          const exit = await readCollectOutput(handle, join(paths.root, logPath), active, options.sensitiveValues);
-          if (exit.code !== 0 || exit.signal !== null) {
-            const stream = exit.stderr.trim() ? "stderr" : "stdout";
-            const detail = exit[stream].trim().slice(-800);
-            throw new Error(`Collect hook ${index + 1} (service=${hook.service ?? "main"}) failed: ${exit.code ?? exit.signal}; logs=${logPath}${detail ? `; ${stream}: ${detail}` : ""}`);
-          }
-        }, parentSignal);
-      }
-    }
-  };
+  const stepContext = { benchmark: components.benchmark, resources, record, paths, stage, failure, prepareEnvironment,
+    taskSignal, dependenciesReady, secrets: options.sensitiveValues, onProgress: options.onProgress };
   try {
     if (preparation.state === "failed") {
       const error = new Error(preparation.failure.message);
       Object.assign(error, { code: preparation.failure.code });
       throw error;
     }
-    prepared = await stage("prepare", () => preparation.state === "on-demand"
-      ? components.benchmark.prepare(job.ref, source, taskSignal, activity)
+    prepared = await stage("prepare", (active, activity) => preparation.state === "on-demand"
+      ? components.benchmark.prepare(job.ref, source, active, activity)
       : Promise.resolve(preparation.task));
     if (prepared.input.id !== job.taskId) throw new TypeError("Prepared task identity differs from locked selection");
-    const prepareEnvironment = <T>(purpose: "solve" | "verify", work: (signal: AbortSignal) => Promise<T>) => {
-      if (dependenciesReady) return work(taskSignal);
-      phase = "environment";
-      const started = performance.now();
-      return withPreparationTimeout(purpose,
-        options.environmentTimeoutSeconds ?? prepared?.preparationTimeoutSeconds?.[purpose] ?? DEFAULT_PREPARATION_TIMEOUT_SECONDS,
-        options.preparationConcurrency ?? 1, taskSignal, work,
-        timing => progress("environment", `${purpose} preparation timeout ${timing.timeoutSeconds}s (base ${timing.baseSeconds}s × ${timing.multiplier}; concurrency ${timing.concurrency})`), preparationElapsedMs[purpose])
-        .finally(() => { preparationElapsedMs[purpose] += performance.now() - started; });
-    };
     if (!dependenciesReady && components.benchmark.verificationRuntime)
-      prepared = await prepareEnvironment("verify", preparationSignal =>
-        stage("environment", stageSignal => materializeVerificationRuntime(prepared!, components.benchmark, stageSignal, activity), preparationSignal));
+      prepared = await prepareEnvironment("verify", prepared, preparationSignal =>
+        stage("environment", (active, activity) => materializeVerificationRuntime(prepared!, components.benchmark, active, activity), preparationSignal));
     if (dependenciesReady && components.benchmark.verificationRuntime && prepared.verificationRuntime === undefined)
       throw new Error("Prepared task lacks its verification runtime receipt");
     if (prepared.steps) {
@@ -376,12 +220,11 @@ export async function runTask(
       throw new TypeError("Shared verification must reuse the solve environment without state transfer");
     if (prepared.artifactCollection && prepared.transfer)
       throw new TypeError("Use one declared artifact snapshot or environment transfer");
-    const artifactName = transferArtifactName(prepared.transfer ?? prepared.artifactCollection ?? null);
-    if (artifactName !== null) transferTarget = join(paths.artifacts, artifactName);
+    step = createAttemptStep(prepared);
     const solverEnvironment = prepared.solveEnv;
-    await prepareEnvironment("solve", async preparationSignal => {
+    await prepareEnvironment("solve", prepared, async preparationSignal => {
       const installation = !dependenciesReady && components.solver.runtimeInstallation
-        ? await stage("install", async stageSignal => {
+        ? await stage("install", async (stageSignal, activity) => {
             const described = await components.solver.runtimeInstallation!(stageSignal);
             stageSignal.throwIfAborted();
             if (components.environment.supportsRuntimeInstallation !== true)
@@ -390,169 +233,54 @@ export async function runTask(
             return described;
           }, preparationSignal)
         : undefined;
-      await stage("environment", async stageSignal => {
-        solveSession = await environment("solve", stageSignal, installation);
-        stageSignal.throwIfAborted();
-        if (components.solver.prepare) solverHandle = await prepareSolver(solveSession, stageSignal);
-      }, preparationSignal);
+      await stage("environment", (active, activity) => resources.openSolve(solverEnvironment, installation, active, activity), preparationSignal);
     });
-    const prepareVerification = () => prepareEnvironment("verify", preparationSignal =>
-      stage("environment", stageSignal => environment("verify", stageSignal), preparationSignal));
-    for (const [stepIndex, step] of (multiTask?.steps ?? [{ name: "", task: prepared }]).entries()) {
+    for (const [index, descriptor] of (multiTask?.steps ?? [{ name: "", task: prepared }]).entries()) {
       if (multiTask) {
-        prepared = { ...step.task, solveEnv: { ...multiTask.solveEnv, network: step.task.solveEnv.network ?? "bridge",
-          ...(step.task.solveEnv.executionUsers ? { executionUsers: step.task.solveEnv.executionUsers } : {}) },
-          ...(stepIndex === 0 && multiTask.verificationRuntime !== undefined ? { verificationRuntime: multiTask.verificationRuntime } : {}) };
+        const task = { ...descriptor.task, solveEnv: { ...multiTask.solveEnv, network: descriptor.task.solveEnv.network ?? "bridge",
+          ...(descriptor.task.solveEnv.executionUsers ? { executionUsers: descriptor.task.solveEnv.executionUsers } : {}) },
+          ...(index === 0 && multiTask.verificationRuntime !== undefined ? { verificationRuntime: multiTask.verificationRuntime } : {}) };
+        step = createAttemptStep(task);
         stepErrorStart = record.errors.length;
-        activeStep = { name: step.name, solve: null, verdict: null, errors: [], startedAt: new Date().toISOString(),
-          finishedAt: new Date().toISOString(), evidencePath: `steps/${step.name}` };
+        stepArchived = false;
+        activeStep = { name: descriptor.name, solve: null, verdict: null, errors: [], startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(), evidencePath: `steps/${descriptor.name}` };
         record.solve = null;
         record.verdict = null;
-        exported = false;
-        transitioned = false;
-        collected = false;
-        verificationSession = undefined;
-        const name = transferArtifactName(prepared.transfer ?? prepared.artifactCollection ?? null);
-        transferTarget = name === null ? null : join(paths.artifacts, name);
-        progress("prepare", `Starting step ${stepIndex + 1}/${multiTask.steps!.length}: ${step.name}`);
-        if (stepIndex > 0) {
-          await stage("transfer", async stageSignal => {
+        progress("prepare", `Starting step ${index + 1}/${multiTask.steps!.length}: ${descriptor.name}`);
+        if (index > 0) {
+          await stage("transfer", async (active, activity) => {
             await clearStepOutputs(paths.root);
-            if (!solveSession!.transitionToSolve) throw new Error("Environment does not support returning to the solve phase");
-            await solveSession!.transitionToSolve(prepared!.solveEnv.network, stageSignal, prepared!.solveEnv.executionUsers);
-            if (components.solver.prepare) solverHandle = await prepareSolver(solveSession!, stageSignal);
+            active.throwIfAborted();
+            await resources.returnToSolve(task.solveEnv, active, activity);
           });
           if (components.benchmark.verificationRuntime)
-            prepared = await prepareEnvironment("verify", stageSignal => materializeVerificationRuntime(prepared!, components.benchmark, stageSignal, activity));
+            step.task = await prepareEnvironment("verify", task, active => materializeVerificationRuntime(task, components.benchmark, active));
         }
-        if (step.workdirFiles) await stage("prepare", async stageSignal => {
-          await solveSession!.upload(step.workdirFiles!, solveSession!.workdir, stageSignal);
-          if (step.setupScript) {
-            const exit = await readCollectOutput(await solveSession!.start({ executable: "bash", args: ["setup.sh"],
-              cwd: solveSession!.workdir, env: {}, input: null }, stageSignal), join(paths.root, "collect/setup"), stageSignal, options.sensitiveValues);
-            if (exit.code !== 0 || exit.signal !== null) throw new Error(`Step ${step.name} setup.sh failed: ${exit.code ?? exit.signal}`);
-          }
-        });
-      }
-      solveStarted = true;
-      try {
-        record.solve = await stage("solve", async stageSignal => {
-          const input = { id: prepared!.input.id, prompt: prepared!.input.prompt,
-            ...(prepared!.input.payload === undefined ? {} : { payload: structuredClone(prepared!.input.payload) }),
-            ...(prepared!.input.skillsDirectories === undefined ? {} : { skillsDirectories: [...prepared!.input.skillsDirectories] }),
-            ...(prepared!.input.mcpServers === undefined ? {} : { mcpServers: prepared!.input.mcpServers.map(server => ({ name: server.name, transport: server.transport, url: server.url })) }) };
-          const context = { key, paths, signal: stageSignal, ...(activity ? { activity } : {}), warning: (warning: { code: ErrorCode; message: string }) => {
-            if (!isErrorCode(warning.code)) throw new EvaluatorError("SOLVER_PROTOCOL_INVALID", "Solver warning uses an unregistered error code");
-            const item = { phase: "solve" as const, code: warning.code,
-              message: redactDiagnostic(warning.message, options.sensitiveValues) };
-            (record.warnings ??= []).push(item);
-            options.onProgress?.({ phase: "solve", message: `${item.code}: ${item.message}`, taskId: job.taskId,
-              attemptId: job.attemptId, warning: true });
-          } };
-          const solved = await (solverHandle ? solverHandle.solve(input, context) : components.solver.solve(input, solveSession!, context));
-          try { assertSolveResult(solved); }
-          catch (cause) { throw new EvaluatorError("SOLVER_PROTOCOL_INVALID", "Solver returned a malformed result", {}, { cause }); }
-          return solved;
-        });
-      } catch (error) {
-        if (!prepared.scoreAfterSolveFailure || taskSignal.aborted) throw error;
-        failure("solve", error, undefined, "", error instanceof PhaseTimeoutError ? "agent" : undefined);
-        // Preserve the missing reply and unknown usage; the native grader decides
-        // whether the workspace still earns a reward, including after a timeout.
-        record.solve = { finalText: "", usage: { inputTokens: null, outputTokens: null, totalTokens: null }, observations: { incomplete: true } };
-        await stage("transfer", async () => { await Promise.allSettled([...pending]); });
-      }
-      await finishSolve(taskSignal);
-      if (prepared.verificationMode !== "shared" && (solveSession!.quiesce || dependenciesReady))
-        await stage("transfer", quiesceSolve);
-      let verifier: EnvironmentSession | null = null;
-      if (prepared.verificationMode === "shared") {
-        verifier = solveSession!;
-        record.environments.verify = structuredClone(verifier.metadata);
-      }
-      if (prepared.artifactCollection) {
-        const artifact = await stage("collect", stageSignal =>
-          solveSession!.exportState(prepared!.artifactCollection!, transferTarget!, stageSignal),
-        );
-        exported = true;
-        transferWarnings(artifact, "collect");
-      }
-      let transferred: TransferArtifact | null = null;
-      if (prepared.transfer) {
-        transferred = await stage("transfer", () =>
-          solveSession!.exportState(prepared!.transfer!, transferTarget!, taskSignal),
-        );
-        exported = true;
-        transferWarnings(transferred, "transfer");
-      }
-      if (!multiTask && prepared.verificationMode !== "shared" && solveSession!.quiesce) {
-        await stage("cleanup", async cleanupSignal => {
-          await solveSession!.dispose(cleanupSignal);
-          sessions.splice(sessions.indexOf(solveSession!), 1);
-        });
-      }
-      if (prepared.verifyEnv) verifier = await prepareVerification();
-      if (transferred) await stage("transfer", () => verifier!.restoreState(transferred!, taskSignal));
-      if (components.benchmark.verificationRuntime) {
-        verificationSession = await stage("environment", async stageSignal => {
-          const runtimeActivity = activity;
-          const handle = await components.benchmark.verificationRuntime!.prepare(prepared!, prepared!.verificationRuntime!,
-            { key, paths, signal: stageSignal, ...(runtimeActivity ? { activity: event => runtimeActivity({ activity: event.activity ?? true }) } : {}) })
-            .catch(error => {
-              // A rejected allocation may finish its own cleanup after the stage
-              // has already returned cancellation. Do not lose that observation.
-              if (stageSignal.aborted && !resourceAdmissionClosed &&
-                ["CLEANUP_TIMEOUT", "CLEANUP_FAILED"].includes(classifyError(error, { phase: "environment" }).code))
-                failure("cleanup", error, "CLEANUP_TIMEOUT", "Verification runtime allocation: ");
-              throw error;
-            });
-          if (resourceAdmissionClosed) {
-            const lateCleanupSignal = AbortSignal.timeout(cleanupTimeoutMs);
-            void bounded(() => handle.dispose(lateCleanupSignal), lateCleanupSignal).catch(() => {});
-          } else {
-            verificationSessions.push(handle);
-            assertJsonValue(handle.metadata, "verification runtime metadata");
-            record.environments.verificationRuntime = redactEvidence(handle.metadata, options.sensitiveValues);
-          }
-          return handle;
-        });
-      }
-      try {
-        record.verdict = await stage("verify", async stageSignal => {
-          const verdict = await (verificationSession ? verificationSession.verify(record.solve!, verifier, stageSignal)
-            : components.benchmark.verify(prepared!, record.solve!, verifier, stageSignal)).catch(error => {
-            if (error instanceof VerificationError && !resourceAdmissionClosed) {
-              assertJsonValue(error.evidence, "verification failure evidence");
-              record.verdict = { passed: null, details: redactEvidence(error.evidence, options.sensitiveValues) };
-            }
-            throw error;
+        if ("workdirFiles" in descriptor && descriptor.workdirFiles) {
+          const { workdirFiles, setupScript } = descriptor;
+          await stage("prepare", async active => {
+            const session = resources.solveEnvironment;
+            await session.upload(workdirFiles, session.workdir, active);
+            if (!setupScript) return;
+            active.throwIfAborted();
+            const handle = await session.start({ executable: "bash", args: ["setup.sh"], cwd: session.workdir, env: {}, input: null }, active);
+            const exit = await readCollectOutput(handle, join(paths.root, "collect/setup"), active, options.sensitiveValues);
+            if (exit.code !== 0 || exit.signal !== null) throw new Error(`Step ${descriptor.name} setup.sh failed: ${exit.code ?? exit.signal}`);
           });
-          try { assertVerifyResult(verdict); }
-          catch (cause) { throw new EvaluatorError("VERIFY_RESULT_INVALID", "Benchmark returned a malformed verdict", {}, { cause }); }
-          assertEvaluationVerdict(record.evaluationKind, verdict);
-          return verdict;
-        });
-      } catch (error) {
-        if (!multiTask?.scoreAfterSolveFailure || taskSignal.aborted) throw error;
-        failure("verify", error);
-        record.verdict = null;
+        }
       }
+      try { await runAttemptStep(step, stepContext, multiTask); }
+      finally { solveStarted ||= step.solveStarted; }
       if (multiTask && activeStep) {
         activeStep.solve = record.solve;
         activeStep.verdict = record.verdict;
         activeStep.errors = record.errors.slice(stepErrorStart);
         activeStep.finishedAt = new Date().toISOString();
         record.steps!.push(activeStep);
-        // Stop all writers and restore host log ownership before copying evidence.
-        await stage("collect", async stageSignal => {
-          for (const session of sessions.filter(session => session !== solveSession)) {
-            await session.dispose(stageSignal);
-            sessions.splice(sessions.indexOf(session), 1);
-          }
-          await solveSession!.quiesce?.(stageSignal);
-          await archiveStep(paths.root, record, activeStep!);
-          archivedSteps.add(activeStep!.name);
-        });
+        await stage("cleanup", active => resources.finishStep(active));
+        await stage("collect", () => archiveStep(paths.root, record, activeStep!));
+        stepArchived = true;
         const decision = components.benchmark.evaluateSteps!(multiTask, record.steps!);
         record.verdict = decision.verdict;
         activeStep = undefined;
@@ -564,7 +292,7 @@ export async function runTask(
       "code" in signal.reason && signal.reason.code === "RAY_HEARTBEAT_TIMEOUT";
     const ownedDeadline = deadline.signal.aborted && taskSignal.reason === deadline.signal.reason || error instanceof PhaseTimeoutError;
     const cancellation = timeoutCancellation(record.evaluationKind, infrastructureCancellation,
-      signal.aborted, ownedDeadline, currentPhase());
+      signal.aborted, ownedDeadline, phase);
     failure(
       phase,
       error,
@@ -575,110 +303,8 @@ export async function runTask(
   } finally {
     clearTimeout(timer);
     const cleanupSignal = AbortSignal.timeout(cleanupTimeoutMs);
-    // Partial workspace evidence must be exported while its environment exists.
-    const evidenceSpec = prepared?.transfer ?? prepared?.artifactCollection;
-    if (solveSession && !exported && (evidenceSpec || prepared?.collect?.length)) {
-      try {
-        const artifact = await stage(
-          "collect",
-          async collectSignal => {
-            // Cancellation rejects bounded() before the solver has finished
-            // stopping its container. Do not race that stop with evidence export.
-            await Promise.allSettled([...pending]);
-            collectSignal.throwIfAborted();
-            if (solveStarted) {
-              try { await finishSolve(collectSignal); }
-              catch (error) {
-                failure("collect", error, "ARTIFACT_COLLECTION_INCOMPLETE", "Before evidence collection: ");
-              }
-            }
-            if (!evidenceSpec) return null;
-            // A failed hook must not discard existing files. Export still
-            // requires successful quiescence so writers cannot race the snapshot.
-            await quiesceSolve(collectSignal);
-            return solveSession!.exportState(evidenceSpec, transferTarget!, collectSignal);
-          },
-          cleanupSignal,
-        );
-        if (artifact) {
-          exported = true;
-          transferWarnings(artifact, "collect");
-        }
-      } catch (error) {
-        failure("collect", error, "ARTIFACT_COLLECTION_INCOMPLETE");
-      }
-    }
-    const disposeVerificationSessions = async () => {
-      const disposalSignal = AbortSignal.timeout(cleanupTimeoutMs);
-      await Promise.all(verificationSessions.splice(0).map(async handle => {
-        try { await stage("cleanup", () => handle.dispose(disposalSignal), disposalSignal); }
-        catch (error) { failure("cleanup", error, disposalSignal.aborted ? "CLEANUP_TIMEOUT" : "CLEANUP_FAILED", "Verification runtime: "); }
-      }));
-    };
-    const disposePreparedSolvers = async () => {
-      const disposalSignal = AbortSignal.timeout(cleanupTimeoutMs);
-      await Promise.all(
-        preparedSolvers
-          .splice(0)
-          .reverse()
-          .map(async handle => {
-            if (!handle.dispose) return;
-            try {
-              await stage("cleanup", () => handle.dispose!(disposalSignal), disposalSignal);
-            } catch (error) {
-              failure(
-                "cleanup",
-                error,
-                disposalSignal.aborted ? "CLEANUP_TIMEOUT" : "CLEANUP_FAILED",
-                "Prepared solver: ",
-              );
-            }
-          }),
-      );
-    };
-    const disposeSessions = async () => {
-      // Collection or pending preparation may already have exhausted the first
-      // cleanup budget. Every admitted batch still gets an independent bounded
-      // disposal opportunity; an expired signal must not suppress dispose().
-      const disposalSignal = AbortSignal.timeout(cleanupTimeoutMs);
-      // Start every disposal before waiting so one broken adapter cannot stop
-      // us from requesting cleanup of the other environment.
-      await Promise.all(
-        sessions
-          .splice(0)
-          .reverse()
-          .map(async session => {
-            try {
-              await stage("cleanup", () => session.dispose(disposalSignal), disposalSignal);
-            } catch (error) {
-              failure(
-                "cleanup",
-                error,
-                disposalSignal.aborted ? "CLEANUP_TIMEOUT" : "CLEANUP_FAILED",
-                `Environment session ${session.id}: `,
-              );
-            }
-          }),
-      );
-    };
-    await disposeVerificationSessions();
-    await disposePreparedSolvers();
-    await disposeSessions();
-    if (pending.size) {
-      try {
-        await bounded(() => Promise.allSettled([...pending]), cleanupSignal);
-      } catch (error) {
-        failure("cleanup", error, "CLEANUP_TIMEOUT");
-      }
-    }
-    // A preparation which honored cancellation by returning its resource can
-    // have registered a session while we waited for pending work to settle.
-    // Close admission before the final snapshot: arrivals during that drain
-    // must self-dispose and cannot mutate the result awaiting publication.
-    resourceAdmissionClosed = true;
-    await disposeVerificationSessions();
-    await disposePreparedSolvers();
-    await disposeSessions();
+    if (step) await recoverStepEvidence(step, stepContext, cleanupSignal);
+    await resources.close(stage, cleanupSignal);
   }
   if (multiTask && record.steps) {
     if (activeStep) {
@@ -687,7 +313,7 @@ export async function runTask(
       activeStep.errors = record.errors.slice(stepErrorStart);
       activeStep.finishedAt = new Date().toISOString();
       if (!record.steps.some(step => step.name === activeStep!.name)) record.steps.push(activeStep);
-      if (!archivedSteps.has(activeStep.name)) await archiveStep(paths.root, record, activeStep).catch(error => failure("collect", error, "ARTIFACT_COLLECTION_INCOMPLETE"));
+      if (!stepArchived) await archiveStep(paths.root, record, activeStep).catch(error => failure("collect", error, "ARTIFACT_COLLECTION_INCOMPLETE"));
     }
     if (record.steps.length) {
       record.solve = sumStepSolves(record.steps);
@@ -699,8 +325,8 @@ export async function runTask(
   // Hash after processes stop writing; store verifies the same inventory before
   // publishing result.json. Store allocation/publication errors remain global.
   const required = solveStarted ? [TRAJECTORY_EVIDENCE_PATH, "agent/session.jsonl"] : [];
-  const artifactName = transferArtifactName(prepared?.transfer ?? prepared?.artifactCollection ?? null);
-  if (solveSession && artifactName !== null) required.push(`artifacts/${artifactName}`);
+  const artifactName = step ? expectedStepArtifact(step) : null;
+  if (resources.hasSolveEnvironment && artifactName !== null) required.push(`artifacts/${artifactName}`);
   const collectionStart = performance.now();
   progress("collect", "Collecting trajectory and artifacts");
   const files = await buildFileManifest(paths.root, required);
@@ -725,14 +351,15 @@ export async function runTask(
     else failure("collect", new Error("Task evidence is missing or partial"), "ARTIFACT_COLLECTION_INCOMPLETE");
   }
   record.phaseDurationMs.collect = (record.phaseDurationMs.collect ?? 0) + performance.now() - collectionStart;
-  if (options.includeTaskAnswer === true && prepared) {
-    const answer = components.benchmark.discloseAnswer?.(prepared);
-    record.task = answer === null || answer === undefined ? { prompt: prepared.input.prompt } : { prompt: prepared.input.prompt, answer };
+  const lastTask = step?.task ?? prepared;
+  if (options.includeTaskAnswer === true && lastTask) {
+    const answer = components.benchmark.discloseAnswer?.(lastTask);
+    record.task = answer === null || answer === undefined ? { prompt: lastTask.input.prompt } : { prompt: lastTask.input.prompt, answer };
   }
   record.finishedAt = new Date().toISOString();
   record.durationMs = performance.now() - started;
   await collectAttemptAccounting(paths.root, record);
-  finalizeAttemptOutcome(record, multiTask?.scoreAfterSolveFailure ?? prepared?.scoreAfterSolveFailure);
+  finalizeAttemptOutcome(record, multiTask?.scoreAfterSolveFailure ?? lastTask?.scoreAfterSolveFailure);
   progress("store", "Saving attempt result");
   await components.store.commit(record, files).catch(cause => {
     throw new EvaluatorError("STORE_WRITE_FAILED", "Cannot persist attempt result", {}, { cause });

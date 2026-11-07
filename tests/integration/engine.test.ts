@@ -425,6 +425,38 @@ test("a solver that ignores abort cannot prevent disposal or exceed the cleanup 
   expect(result.errors).toContainEqual(expect.objectContaining({ code: "CLEANUP_TIMEOUT" }));
 });
 
+test("cancellation during the solve-to-verify handoff waits for the same disposal", async () => {
+  const { components, events } = await taskFixture({ transfer: true });
+  const controller = new AbortController();
+  const prepare = components.environment.prepare;
+  const releasing = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const dispose = vi.fn(async () => { releasing.resolve(); await release.promise; });
+  components.environment.prepare = async (...args) => {
+    const session = await prepare(...args);
+    if (args[2] === "solve") {
+      session.quiesce = async () => {};
+      session.dispose = dispose;
+    }
+    return session;
+  };
+  let cleanupPhases = 0;
+  const running = runTask(onDemand(job), components, source, controller.signal, {
+    cleanupTimeoutMs: 500,
+    onProgress: event => {
+      if (event.phase === "cleanup" && !event.transient && ++cleanupPhases === 2) release.resolve();
+    },
+  });
+  await releasing.promise;
+  controller.abort();
+  const record = await running;
+  expect(record.executionStatus).toBe("cancelled");
+  expect(record.collection.artifacts).toBe("complete");
+  expect(dispose).toHaveBeenCalledTimes(1);
+  expect(events).not.toContain("verify.environment");
+  expect(events.at(-1)).toBe("commit");
+});
+
 async function latePreparationFixture() {
   const value = await taskFixture({ transfer: true });
   const original = value.components.environment.prepare;

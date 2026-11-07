@@ -141,6 +141,40 @@ test("a verifier handle returned after cancellation and cleanup deadline is stil
   expect(record.environments.verificationRuntime).toBeUndefined();
 });
 
+test("each step closes its private verifier before the next step can use the solve environment", async () => {
+  const { components, root, runtime, events } = await fixture();
+  const prepareTask = components.benchmark.prepare.bind(components.benchmark);
+  components.benchmark.prepare = async (...args) => {
+    const task = await prepareTask(...args);
+    return { ...task, steps: ["first", "second"].map(name => ({
+      name, task: { ...task, input: { ...task.input, prompt: name }, verificationMode: "shared" },
+    })) };
+  };
+  components.benchmark.evaluateSteps = (_task, steps) => ({ continue: steps.length < 2, verdict: steps.at(-1)!.verdict! });
+  const prepareEnvironment = components.environment.prepare;
+  components.environment.prepare = async (...args) => {
+    const session = await prepareEnvironment(...args);
+    session.transitionToVerification = async () => {};
+    session.transitionToSolve = async () => { events.push("next.solve"); };
+    return session;
+  };
+  runtime.prepare = async task => ({
+    metadata: {},
+    async verify() {
+      events.push(`verify:${task.input.prompt}`);
+      return { passed: true, score: 1, details: {} };
+    },
+    async dispose() { events.push(`close:${task.input.prompt}`); },
+  });
+  await components.store.create(join(root, "runs"), { ...storeRun, source, taskIds: ["a"] }, {});
+  const record = await runTask(onDemand(job), components, source, new AbortController().signal);
+  expect(record).toMatchObject({ executionStatus: "completed", cleanupStatus: "cleaned" });
+  expect(record.steps?.map(step => step.verdict?.score)).toEqual([1, 1]);
+  expect(events.filter(event => /^(verify:|close:|next\.solve|solve\.cleanup)/u.test(event))).toEqual([
+    "verify:first", "close:first", "next.solve", "verify:second", "close:second", "solve.cleanup",
+  ]);
+});
+
 test("ready tasks missing verifier receipts fail without rerunning preparation or the model", async () => {
   const { components, root, runtime, inputs } = await fixture();
   await components.store.create(join(root, "runs"), { ...storeRun, source, taskIds: ["a"] }, {});

@@ -100,8 +100,10 @@ test("a solver failure still executes collect once and exports partial evidence"
   const value = await setup(false);
   const solve = value.components.solver.solve.bind(value.components.solver);
   value.components.solver.solve = async (...args) => { await solve(...args); throw new Error("solver failed"); };
-  const record = await value.run(); expect(record.verdict).toBeNull();
-  expect(value.events.filter(event => event === "hook")).toHaveLength(1); expect(value.events).toContain("export");
+  const record = await value.run();
+  expect(record).toMatchObject({ executionStatus: "failed", verdict: null, collection: { artifacts: "complete" } });
+  expect(value.events.filter(event => ["hook", "export", "solve.cleanup", "commit"].includes(event)))
+    .toEqual(["hook", "export", "solve.cleanup", "commit"]);
 });
 
 test.each(["hook", "transition", "quiesce"] as const)("a timeout preserves its score and exports only after quiescence when %s fails", async failure => {

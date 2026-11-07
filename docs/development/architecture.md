@@ -56,6 +56,8 @@ CLI `run` 和 SDK `Evaluator.run()` 使用 [application/run.ts](../../src/applic
 4. core 处理来源、选题、恢复和准备，通过 Scheduler 调度，[run-task.ts](../../src/core/execution/run-task.ts) 执行 attempt。
 5. application 保存指标与报告，并在退出时关闭注册表，通过 Cordis effect 释放组件资源；失败和取消也进入清理流程。
 
+`runTask()` 准备任务、推进步骤、归档证据并保存结果。[run-attempt-step.ts](../../src/core/execution/run-attempt-step.ts) 执行单步求解、收集、传输和验证，失败后在求解环境关闭前补收集产物。[attempt-resources.ts](../../src/core/execution/attempt-resources.ts) 创建并释放环境会话、Solver 句柄和私有验证器，负责求解与验证之间的环境切换。多步任务在归档本步证据前关闭本步的私有验证器和独立验证环境，再把求解环境交给下一步。
+
 `createRunComponents` 和 `createBenchmark` 必须接收已有注册表，不负责打开或关闭注册表。前者返回不含 `dispose()` 的 `RunComponents`，后者直接返回 Benchmark；工厂创建的资源一直由该注册表管理，装配失败也由注册表所有者的 `finally` 清理。
 
 公开 [bootstrap](../../src/application/plugins/bootstrap.ts) 自行打开注册表，失败时关闭，成功时返回 `BootstrappedComponents`（组件字段加 `dispose()`）。其签名为 `bootstrap(config, directory, patchPath?, onWarning?, imageConfigFingerprint?)`，调用方在 `finally` 中调用返回值的 `dispose()`。重复释放由注册表处理。
