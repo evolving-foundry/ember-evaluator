@@ -138,6 +138,101 @@ async function validateBuildContext(
 
 type ResolvedBaseImage = { reference: string; pinnedReference: string; id: string };
 
+type DockerPreparationReceipt = {
+  kind: "docker";
+  platform?: ContainerPlatform;
+  platformResolution?: DockerMetadata["platformResolution"];
+  launchImage: string;
+  gatewayImage: string | null;
+  gatewayDigest: string | null;
+  baseImage: ResolvedBaseImage;
+  runtime: PreparedRuntimeImage;
+  solverImage: Awaited<ReturnType<DockerSolverRuntime["prepare"]>> | null;
+  serviceImages?: Record<string, string>;
+};
+
+type DockerMount = { source: string; target: string };
+type DockerContainerLaunch = {
+  image: string;
+  platform: ContainerPlatform;
+  labels: Record<string, string>;
+  environment: Record<string, string>;
+  mounts: DockerMount[];
+  volumeMounts: DockerMount[];
+  forwardedEnv: string[];
+  isolatedGateway: boolean;
+  prepared: boolean;
+};
+
+function readDockerPreparationReceipt(prepared: EnvironmentSpec["prepared"]): DockerPreparationReceipt | undefined {
+  if (prepared === undefined) return undefined;
+  if (!prepared || typeof prepared !== "object" || Array.isArray(prepared) || prepared.kind !== "docker")
+    throw new DockerEnvironmentError("ENV_PREPARATION_FAILED", "Invalid Docker preparation receipt");
+  return prepared as DockerPreparationReceipt;
+}
+
+async function prepareLogMounts(
+  paths: AttemptPaths, phase: "solve" | "verify", agent: string, verifier: string, sharedLogs: boolean | undefined,
+): Promise<DockerMount[]> {
+  const mounts: DockerMount[] = [];
+  if (sharedLogs === true) {
+    // A shared log root lets the agent stage evidence outside /logs/agent
+    // (e.g. /logs/artifacts) for the verifier; per-phase mounts shadow their
+    // own subdirectories.
+    const shared = await writable(join(paths.root, "logs"), "shared log directory");
+    mounts.push({ source: shared, target: "/logs" });
+  }
+  mounts.push(
+    phase === "solve" ? { source: agent, target: "/logs/agent" } : { source: verifier, target: "/logs/verifier" },
+  );
+  // The directory is empty during solve. No hidden grading material is placed
+  // here until the Benchmark starts verification in a shared environment.
+  if (phase === "solve") mounts.push({ source: verifier, target: "/logs/verifier" });
+  return mounts;
+}
+
+function containerCreateArgs(spec: EnvironmentSpec, launch: DockerContainerLaunch): string[] {
+  const { image: launchImage, platform, labels, environment: containerEnv, forwardedEnv, isolatedGateway, mounts, volumeMounts, prepared } = launch;
+  const createArgs = [
+    "create",
+    // Reap orphaned solver children and forward shutdown through a native
+    // PID 1, including when the task's Node runtime is emulated on ARM.
+    "--init",
+    "--platform",
+    platform,
+    ...Object.entries(labels).flatMap(([name, value]) => ["--label", `${name}=${value}`]),
+    ...Object.entries(containerEnv).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
+    "--add-host", "host.docker.internal:host-gateway",
+    ...(isolatedGateway ? [] : forwardedEnv),
+    ...(spec.extraHosts ?? []).flatMap(host => ["--add-host", host]),
+    ...mounts.map(mount => ["--mount", `type=bind,source=${mount.source},target=${mount.target}`]).flat(),
+    ...volumeMounts.map(mount => ["--mount", `type=volume,source=${mount.source},target=${mount.target},readonly`]).flat(),
+  ];
+  if (spec.network === "none" || isolatedGateway) createArgs.push("--network", "none");
+  if (spec.network === "host") createArgs.push("--network", "host");
+  if (spec.resources?.cpus !== undefined) createArgs.push("--cpus", String(spec.resources.cpus));
+  if (spec.resources?.memory !== undefined) createArgs.push("--memory", spec.resources.memory);
+  if (prepared) createArgs.push("--pull", "never");
+  createArgs.push("--entrypoint", EVALUATOR_NODE_EXECUTABLE, launchImage, PROCESS_HELPER, "idle");
+  return createArgs;
+}
+
+function composeMainOptions(spec: EnvironmentSpec, launch: DockerContainerLaunch): Record<string, JsonValue> {
+  const { image: launchImage, platform, labels: labelMap, environment: containerEnv, isolatedGateway, mounts, volumeMounts } = launch;
+  return {
+    image: launchImage, platform, init: true,
+    command: [EVALUATOR_NODE_EXECUTABLE, PROCESS_HELPER, "idle"], environment: containerEnv, labels: labelMap,
+    ...(spec.network === "none" || isolatedGateway ? { network_mode: "none" } : {}),
+    ...(spec.network === "host" ? { network_mode: "host" } : {}),
+    volumes: [
+      ...mounts.map(mount => ({ type: "bind", source: mount.source, target: mount.target })),
+      ...volumeMounts.map(mount => ({ type: "volume", source: mount.source, target: mount.target, read_only: true })),
+    ],
+    ...(spec.resources?.cpus === undefined ? {} : { cpus: spec.resources.cpus }),
+    ...(spec.resources?.memory === undefined ? {} : { mem_limit: spec.resources.memory }),
+  };
+}
+
 export type DockerEnvironmentOptions = {
   imageConfigFingerprint?: string;
   /** Fetch external base images before an uncached build; never allocate task containers here. */
@@ -510,7 +605,11 @@ export class DockerEnvironment implements Environment {
       const resolved = await this.baseImage(sidecar, platform, { runId: "preparation", taskId: scope.taskId, attemptId: randomUUID() }, signal, undefined, true, scope);
       serviceImages[name] = await this.addressableImage(resolved.pinnedReference, signal);
     }
-    return { ...spec, preparationTiming: { imageMs, runtimeMs, solverMs, cache }, prepared: { kind: "docker", platform, platformResolution: resolution, baseImage, runtime, solverImage: solverImage ?? null, launchImage, gatewayImage, gatewayDigest, serviceImages } };
+    const prepared: DockerPreparationReceipt = {
+      kind: "docker", platform, platformResolution: resolution, baseImage, runtime, solverImage: solverImage ?? null,
+      launchImage, gatewayImage, gatewayDigest, serviceImages,
+    };
+    return { ...spec, preparationTiming: { imageMs, runtimeMs, solverMs, cache }, prepared };
   }
   async prepare(
     spec: EnvironmentSpec,
@@ -525,6 +624,145 @@ export class DockerEnvironment implements Environment {
     session.dispose = async active => { try { await dispose(active); } finally { await release(); } };
     return session;
   }
+  private async verifyPreparedImages(receipt: DockerPreparationReceipt, platform: ContainerPlatform, digest: string, signal: AbortSignal): Promise<void> {
+    try {
+      const images = [{ reference: receipt.launchImage, digest }];
+      if (receipt.gatewayImage && receipt.gatewayDigest) images.push({ reference: receipt.gatewayImage, digest: receipt.gatewayDigest });
+      for (const image of images) {
+        const inspected = await this.command(["image", "inspect", "--platform", platform, image.reference, "--format", "{{.Id}}"], { signal });
+        if (inspected.stdout.trim() !== image.digest) throw new Error("Image identity changed");
+      }
+    } catch (cause) {
+      signal.throwIfAborted();
+      throw new DockerEnvironmentError("ENV_PREPARED_IMAGE_LOST", "Prepared image identity is unavailable; start a new preparation round", cause);
+    }
+  }
+
+  private async prepareLaunchEnvironment(spec: EnvironmentSpec, launchImage: string, signal: AbortSignal) {
+    // Keep runtime routes explicit. An unavailable proxy is an error, never an implicit direct fallback.
+    const runtimeEnvironment = this.network.environment("runtime", {}, "container");
+    const forwardedEnv = ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"]
+      .flatMap(key => ["--env", `${key}=${runtimeEnvironment[key] ?? ""}`]);
+    if (runtimeEnvironment.HTTP_PROXY || runtimeEnvironment.HTTPS_PROXY) forwardedEnv.push("--env", "NODE_USE_ENV_PROXY=1");
+    // "model-api" keeps the task container itself on --network none; only the
+    // gateway container holds external network, and isolated containers must
+    // not inherit host proxy settings that could bypass the policy.
+    const isolatedGateway = spec.network === "model-api" || typeof spec.network === "object";
+    const allowlist = typeof spec.network === "object" ? spec.network : undefined;
+    const modelPolicy = isolatedGateway
+      ? typeof this.modelEndpoint === "string" && this.modelEndpoint !== ""
+        ? parseModelEndpointPolicy(this.modelEndpoint)
+        : null
+      : undefined;
+    if (spec.network === "model-api" && modelPolicy === null)
+      throw new DockerEnvironmentError(
+        "CONFIG_INVALID",
+        'network "model-api" requires an explicit model endpoint',
+      );
+    const containerEnv = { ...this.containerEnv, ...parseDockerContainerEnv(spec.env) };
+    // Apply deployment package mirrors to both standalone and Compose main
+    // containers. Explicit task/config values win; model-only isolation stays.
+    if (!isolatedGateway) for (const key of ["NPM_CONFIG_REGISTRY", "PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL", "UV_DEFAULT_INDEX"]) {
+      const value = this.network.environment("runtime")[key];
+      if (containerEnv[key] === undefined && value !== undefined && value !== "") containerEnv[key] = value;
+    }
+    if (spec.resources?.cpus !== undefined)
+      containerEnv.NODE_OPTIONS = await cpuBudgetNodeOptions(this.command, launchImage, containerEnv.NODE_OPTIONS, signal);
+    if (isolatedGateway && allowlist) Object.assign(containerEnv, EGRESS_PROXY_ENV);
+    return { forwardedEnv, isolatedGateway, allowlist, modelPolicy, containerEnv };
+  }
+
+  private async stageContainerFiles(containerId: string, spec: EnvironmentSpec, workdir: string, stateRoot: string | undefined, signal: AbortSignal): Promise<void> {
+    if (stateRoot) {
+      await this.command(
+        [
+          "exec",
+          containerId,
+          EVALUATOR_NODE_EXECUTABLE,
+          PROCESS_HELPER,
+          "mkdir",
+          stateRoot,
+          stateRoot,
+          "directory",
+        ],
+        { signal },
+      );
+    }
+    await this.command(
+      ["exec", containerId, EVALUATOR_NODE_EXECUTABLE, PROCESS_HELPER, "mkdir", workdir, `${workdir}/.evaluator-placeholder`],
+      { signal },
+    );
+    for (const file of spec.initialFiles) {
+      const requested = resolve(file.source);
+      await assertLinkFree(requested, "initial file source");
+      const source = await realpath(requested);
+      const sourceStat = await lstat(source);
+      const destination = containerFileTarget(workdir, file.target);
+      await this.command(
+        [
+          "exec",
+          containerId,
+          EVALUATOR_NODE_EXECUTABLE,
+          PROCESS_HELPER,
+          "mkdir",
+          destination.root,
+          destination.target,
+          sourceStat.isDirectory() ? "directory" : "file",
+        ],
+        { signal },
+      );
+      await this.command(
+        ["cp", sourceStat.isDirectory() ? `${source}${sep}.` : source, `${containerId}:${destination.target}`],
+        { signal, maxBuffer: 8 * 1024 * 1024 },
+      );
+    }
+  }
+
+  private async prepareExecutionUsers(containerId: string, users: EnvironmentSpec["executionUsers"], signal: AbortSignal): Promise<void> {
+    for (const user of new Set(Object.values(users ?? {}))) {
+      if (!/^[a-z_][a-z0-9_-]*$/u.test(user)) throw new TypeError("Invalid environment execution user");
+      if (user === "root") continue;
+      // Match WorkBuddy ensure_agent_user: create the account and grant its
+      // workspace, leaving challenge ownership from the task image intact.
+      const setup = 'u="$1"; if ! id "$u" >/dev/null 2>&1; then if command -v useradd >/dev/null 2>&1; then useradd -m -s /bin/bash "$u"; elif command -v adduser >/dev/null 2>&1; then adduser -D -s /bin/sh "$u"; else exit 1; fi; fi; mkdir -p /workspace; chown -R "$u" /workspace; git config --system --add safe.directory /workspace 2>/dev/null || true; git config --system --add safe.directory "*" 2>/dev/null || true';
+      await this.command(["exec", "--user", "0", containerId, "sh", "-c", setup, "setup-user", user], { signal });
+    }
+  }
+
+  private async readContainerResources(containerId: string, spec: EnvironmentSpec, cpuVisibility: Awaited<ReturnType<typeof constrainDockerCpus>> | undefined, signal: AbortSignal): Promise<DockerMetadata["resources"]> {
+    const raw = JSON.parse((await this.command(["inspect", containerId], { signal })).stdout) as Array<{
+      HostConfig?: { NanoCpus?: number; Memory?: number };
+    }>;
+    const host = raw[0]?.HostConfig;
+    return {
+      requested: {
+        cpus: spec.resources?.cpus ?? null,
+        memory: spec.resources?.memory ?? null,
+        storage: spec.resources?.storage ?? null,
+      },
+      effective: {
+        cpus: host?.NanoCpus ? host.NanoCpus / 1_000_000_000 : null,
+        memoryBytes: host?.Memory || null,
+        storage: { enforced: false },
+        ...cpuVisibility,
+      },
+    };
+  }
+
+  private modelEndpointMapping(spec: EnvironmentSpec, isolatedGateway: boolean, policy: ReturnType<typeof parseModelEndpointPolicy> | null | undefined, gateway: GatewayHandle | undefined): DockerMetadata["modelEndpoint"] {
+    if (!this.modelEndpoint) return undefined;
+    if (gateway && policy) return {
+      baseUrl: `http://127.0.0.1:${MODEL_FORWARDER_PORT}${policy.pathPrefix}`,
+      originEndpoint: this.modelEndpoint,
+      gateway: { containerId: gateway.containerId, image: gateway.image, volume: gateway.volume },
+    };
+    if (!isolatedGateway && spec.network !== "none" && spec.network !== "host") {
+      const baseUrl = dockerHostModelEndpoint(this.modelEndpoint);
+      if (baseUrl !== this.modelEndpoint) return { baseUrl, originEndpoint: this.modelEndpoint };
+    }
+    return undefined;
+  }
+
   private async prepareObserved(
     spec: EnvironmentSpec, paths: AttemptPaths, phase: "solve" | "verify", signal: AbortSignal,
   ): Promise<EnvironmentSession> {
@@ -539,13 +777,10 @@ export class DockerEnvironment implements Environment {
     if (phase === "verify" && spec.installation)
       throw new DockerEnvironmentError("ENV_RUNTIME_INSTALL_FAILED", "verifier environments cannot install solver runtimes");
     if (spec.resources?.cpus !== undefined) cpuCountForBudget(spec.resources.cpus);
-    const prepared = spec.prepared;
-    if (prepared !== undefined && (!prepared || typeof prepared !== "object" || Array.isArray(prepared) || prepared.kind !== "docker"))
-      throw new DockerEnvironmentError("ENV_PREPARATION_FAILED", "Invalid Docker preparation receipt");
+    const receipt = readDockerPreparationReceipt(spec.prepared);
     const workdir = containerWorkdir(spec.workdir);
     const { resolution, platform, runtime: nodeRuntime, solverRuntime } = await this.platformContext(spec, signal);
-    if (prepared && typeof prepared === "object" && !Array.isArray(prepared)
-      && (prepared.platform ?? DOCKER_PLATFORM) !== platform)
+    if (receipt && (receipt.platform ?? DOCKER_PLATFORM) !== platform)
       throw new EvaluatorError("ENV_ARCH_UNSUPPORTED", "Prepared Docker platform differs from the resolved task platform");
     // Different container UIDs may write the log mounts; their host parent
     // remains private to the coordinator regardless of its startup umask.
@@ -555,7 +790,6 @@ export class DockerEnvironment implements Environment {
       writable(paths.verifier, "verifier output directory"),
       allocationKey(paths),
     ]);
-    const receipt = prepared as { launchImage: string; gatewayImage: string | null; gatewayDigest: string | null; baseImage: ResolvedBaseImage; runtime: PreparedRuntimeImage; solverImage: Awaited<ReturnType<DockerSolverRuntime["prepare"]>> | null; serviceImages?: Record<string, string> } | undefined;
     const scope: DockerImageScope = { taskId: key.taskId, phase };
     const baseImage = receipt?.baseImage ?? await this.baseImage(
       spec.image === null && !spec.build && this.defaultImage !== null ? { ...spec, image: this.defaultImage } : spec, platform,
@@ -565,128 +799,48 @@ export class DockerEnvironment implements Environment {
     const solverImage = receipt ? receipt.solverImage ?? undefined : spec.installation
       ? await solverRuntime.prepare(runtime.image, runtime.digest, spec.installation, signal, undefined, scope)
       : undefined;
-    if (receipt) {
-      const id = solverImage?.digest ?? runtime.digest;
-      try {
-        const images = [{ reference: receipt.launchImage, digest: id }];
-        if (receipt.gatewayImage && receipt.gatewayDigest) images.push({ reference: receipt.gatewayImage, digest: receipt.gatewayDigest });
-        for (const image of images) {
-          const inspected = await this.command(["image", "inspect", "--platform", platform, image.reference, "--format", "{{.Id}}"], { signal });
-          if (inspected.stdout.trim() !== image.digest) throw new Error("Image identity changed");
-        }
-      } catch (cause) {
-        signal.throwIfAborted();
-        throw new DockerEnvironmentError("ENV_PREPARED_IMAGE_LOST", "Prepared image identity is unavailable; start a new preparation round", cause);
-      }
-    }
+    if (receipt) await this.verifyPreparedImages(receipt, platform, solverImage?.digest ?? runtime.digest, signal);
     const labels = [
       ["run", key.runId],
       ["task", key.taskId],
       ["attempt", key.attemptId],
       ["phase", phase],
     ] as const;
-    const mounts: { source: string; target: string }[] = [];
-    if (spec.sharedLogs === true) {
-      // A shared log root lets the agent stage evidence outside /logs/agent
-      // (e.g. /logs/artifacts) for the verifier; per-phase mounts shadow their
-      // own subdirectories.
-      const shared = await writable(join(paths.root, "logs"), "shared log directory");
-      mounts.push({ source: shared, target: "/logs" });
-    }
-    mounts.push(
-      phase === "solve" ? { source: agent, target: "/logs/agent" } : { source: verifier, target: "/logs/verifier" },
-    );
-    // The directory is empty during solve. No hidden grading material is placed
-    // here until the Benchmark starts verification in a shared environment.
-    if (phase === "solve") mounts.push({ source: verifier, target: "/logs/verifier" });
-    // Keep runtime routes explicit. An unavailable proxy is an error, never an implicit direct fallback.
-    const runtimeEnvironment = this.network.environment("runtime", {}, "container");
-    const forwardedEnv = ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"]
-      .flatMap(key => ["--env", `${key}=${runtimeEnvironment[key] ?? ""}`]);
-    if (runtimeEnvironment.HTTP_PROXY || runtimeEnvironment.HTTPS_PROXY) forwardedEnv.push("--env", "NODE_USE_ENV_PROXY=1");
-    // "model-api" keeps the task container itself on --network none; only the
-    // gateway container holds external network, and isolated containers must
-    // not inherit host proxy settings that could bypass the policy.
-    const isolatedGateway = spec.network === "model-api" || typeof spec.network === "object";
-    const allowlist = typeof spec.network === "object" ? spec.network : undefined;
-    let gateway: GatewayHandle | undefined;
-    const volumeMounts: { source: string; target: string }[] = [];
-    const modelPolicy = isolatedGateway
-      ? typeof this.modelEndpoint === "string" && this.modelEndpoint !== ""
-        ? parseModelEndpointPolicy(this.modelEndpoint)
-        : null
-      : undefined;
-    if (spec.network === "model-api" && modelPolicy === null)
-      throw new DockerEnvironmentError(
-        "CONFIG_INVALID",
-        'network "model-api" requires an explicit model endpoint',
-      );
+    const mounts = await prepareLogMounts(paths, phase, agent, verifier, spec.sharedLogs);
     const launchImage = receipt ? receipt.launchImage : solverImage?.image ?? runtime.image;
-    const containerEnv = { ...this.containerEnv, ...parseDockerContainerEnv(spec.env) };
-    // Apply deployment package mirrors to both standalone and Compose main
-    // containers. Explicit task/config values win; model-only isolation stays.
-    if (!isolatedGateway) for (const key of ["NPM_CONFIG_REGISTRY", "PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL", "UV_DEFAULT_INDEX"]) {
-      const value = this.network.environment("runtime")[key];
-      if (containerEnv[key] === undefined && value !== undefined && value !== "") containerEnv[key] = value;
-    }
-    if (spec.resources?.cpus !== undefined)
-      containerEnv.NODE_OPTIONS = await cpuBudgetNodeOptions(this.command, launchImage, containerEnv.NODE_OPTIONS, signal);
-    if (isolatedGateway) {
-      if (allowlist) Object.assign(containerEnv, EGRESS_PROXY_ENV);
-      gateway = await createModelGateway(this.command, {
-        platform,
-        preparedImage: receipt?.gatewayImage ?? nodeRuntime.nodeImage,
-        ...(this.modelEndpoint ? { endpoint: this.modelEndpoint } : {}),
-        ...(allowlist ? { allowedHosts: allowlist.allowedHosts } : {}),
-        key,
-        phase,
-        // Only the gateway talks to the outside; it may use the coordinator's
-        // proxy for that egress, but never the npm registry variable.
-        proxyEnv: gatewayProxyEnv(forwardedEnv.filter(entry => entry !== "--env")),
-        signal,
-      });
-      volumeMounts.push({ source: gateway.volume, target: GATEWAY_SOCKET_TARGET });
-    }
-    const createArgs = [
-      "create",
-      // Reap orphaned solver children and forward shutdown through a native
-      // PID 1, including when the task's Node runtime is emulated on ARM.
-      "--init",
-      "--platform",
-      platform,
-      ...labels.flatMap(([name, value]) => ["--label", `ember.${name}=${value.replace(/[\u0000-\u001f\u007f]/gu, "_")}`]),
-      ...Object.entries(containerEnv).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
-      "--add-host", "host.docker.internal:host-gateway",
-      ...(isolatedGateway ? [] : forwardedEnv),
-      ...(spec.extraHosts ?? []).flatMap(host => ["--add-host", host]),
-      ...mounts.map(mount => ["--mount", `type=bind,source=${mount.source},target=${mount.target}`]).flat(),
-      ...volumeMounts.map(mount => ["--mount", `type=volume,source=${mount.source},target=${mount.target},readonly`]).flat(),
-    ];
-    if (spec.network === "none" || isolatedGateway) createArgs.push("--network", "none");
-    if (spec.network === "host") createArgs.push("--network", "host");
-    if (spec.resources?.cpus !== undefined) createArgs.push("--cpus", String(spec.resources.cpus));
-    if (spec.resources?.memory !== undefined) createArgs.push("--memory", spec.resources.memory);
-    if (receipt) createArgs.push("--pull", "never");
-    createArgs.push("--entrypoint", EVALUATOR_NODE_EXECUTABLE, launchImage, PROCESS_HELPER, "idle");
+    const { forwardedEnv, isolatedGateway, allowlist, modelPolicy, containerEnv } = await this.prepareLaunchEnvironment(spec, launchImage, signal);
+    let gateway: GatewayHandle | undefined;
     let containerId: string | null = null;
     let project: DockerComposeProject | undefined;
     try {
+      const volumeMounts: DockerMount[] = [];
+      if (isolatedGateway) {
+        gateway = await createModelGateway(this.command, {
+          platform,
+          preparedImage: receipt?.gatewayImage ?? nodeRuntime.nodeImage,
+          ...(this.modelEndpoint ? { endpoint: this.modelEndpoint } : {}),
+          ...(allowlist ? { allowedHosts: allowlist.allowedHosts } : {}),
+          key,
+          phase,
+          // Only the gateway talks to the outside; it may use the coordinator's
+          // proxy for that egress, but never the npm registry variable.
+          proxyEnv: gatewayProxyEnv(forwardedEnv.filter(entry => entry !== "--env")),
+          signal,
+        });
+        volumeMounts.push({ source: gateway.volume, target: GATEWAY_SOCKET_TARGET });
+      }
+      const launch: DockerContainerLaunch = {
+        image: launchImage, platform,
+        labels: Object.fromEntries(labels.map(([name, value]) => [`ember.${name}`, value.replace(/[\u0000-\u001f\u007f]/gu, "_")])),
+        environment: containerEnv, forwardedEnv, isolatedGateway, mounts, volumeMounts, prepared: receipt !== undefined,
+      };
+      const createArgs = containerCreateArgs(spec, launch);
       signal.throwIfAborted();
       // Docker create is intentionally allowed to return its ID after an
       // in-flight cancellation so the labeled partial resource can be removed.
       if (spec.services) {
         project = new DockerComposeProject(this.command, this.dockerExecutable, spec, paths, key, phase);
-        const labelMap = Object.fromEntries(labels.map(([name, value]) => [`ember.${name}`, value.replace(/[\u0000-\u001f\u007f]/gu, "_")]));
-        containerId = await project.create({ image: launchImage, platform, init: true,
-          command: [EVALUATOR_NODE_EXECUTABLE, PROCESS_HELPER, "idle"], environment: containerEnv, labels: labelMap,
-          ...(spec.network === "none" || isolatedGateway ? { network_mode: "none" } : {}),
-          ...(spec.network === "host" ? { network_mode: "host" } : {}),
-          volumes: [
-            ...mounts.map(mount => ({ type: "bind", source: mount.source, target: mount.target })),
-            ...volumeMounts.map(mount => ({ type: "volume", source: mount.source, target: mount.target, read_only: true })),
-          ],
-          ...(spec.resources?.cpus === undefined ? {} : { cpus: spec.resources.cpus }),
-          ...(spec.resources?.memory === undefined ? {} : { mem_limit: spec.resources.memory }) }, receipt?.serviceImages ?? {}, labelMap, signal);
+        containerId = await project.create(composeMainOptions(spec, launch), receipt?.serviceImages ?? {}, launch.labels, signal);
       } else containerId = (await this.command(createArgs)).stdout.trim();
       if (!/^[a-f0-9]{12,64}$/u.test(containerId))
         throw new DockerEnvironmentError("ENV_CONTAINER_START_FAILED", "Docker returned an invalid container ID");
@@ -696,67 +850,16 @@ export class DockerEnvironment implements Environment {
       const cpuVisibility = spec.resources?.cpus === undefined ? undefined
         : await constrainDockerCpus(this.command, containerId, spec.resources.cpus, signal);
       const runtimes = await preflightRuntimes(this.command, containerId, spec.runtime, signal, platform);
-      if (solverImage?.runtime.stateRoot) {
-        await this.command(
-          [
-            "exec",
-            containerId,
-            EVALUATOR_NODE_EXECUTABLE,
-            PROCESS_HELPER,
-            "mkdir",
-            solverImage.runtime.stateRoot,
-            solverImage.runtime.stateRoot,
-            "directory",
-          ],
-          { signal },
-        );
-      }
-      await this.command(
-        ["exec", containerId, EVALUATOR_NODE_EXECUTABLE, PROCESS_HELPER, "mkdir", workdir, `${workdir}/.evaluator-placeholder`],
-        { signal },
-      );
-      for (const file of spec.initialFiles) {
-        const requested = resolve(file.source);
-        await assertLinkFree(requested, "initial file source");
-        const source = await realpath(requested);
-        const sourceStat = await lstat(source);
-        const destination = containerFileTarget(workdir, file.target);
-        await this.command(
-          [
-            "exec",
-            containerId,
-            EVALUATOR_NODE_EXECUTABLE,
-            PROCESS_HELPER,
-            "mkdir",
-            destination.root,
-            destination.target,
-            sourceStat.isDirectory() ? "directory" : "file",
-          ],
-          { signal },
-        );
-        await this.command(
-          ["cp", sourceStat.isDirectory() ? `${source}${sep}.` : source, `${containerId}:${destination.target}`],
-          { signal, maxBuffer: 8 * 1024 * 1024 },
-        );
-      }
+      await this.stageContainerFiles(containerId, spec, workdir, solverImage?.runtime.stateRoot, signal);
       if (gateway) {
         // The loopback forwarder bridges container-local HTTP to the shared
         // gateway socket; it dies with the container on dispose or recovery.
         await startModelForwarder(this.command, containerId, signal);
       }
-      for (const user of new Set(Object.values(spec.executionUsers ?? {}))) {
-        if (!/^[a-z_][a-z0-9_-]*$/u.test(user)) throw new TypeError("Invalid environment execution user");
-        if (user === "root") continue;
-        // Match WorkBuddy ensure_agent_user: create the account and grant its
-        // workspace, leaving challenge ownership from the task image intact.
-        const setup = 'u="$1"; if ! id "$u" >/dev/null 2>&1; then if command -v useradd >/dev/null 2>&1; then useradd -m -s /bin/bash "$u"; elif command -v adduser >/dev/null 2>&1; then adduser -D -s /bin/sh "$u"; else exit 1; fi; fi; mkdir -p /workspace; chown -R "$u" /workspace; git config --system --add safe.directory /workspace 2>/dev/null || true; git config --system --add safe.directory "*" 2>/dev/null || true';
-        await this.command(["exec", "--user", "0", containerId, "sh", "-c", setup, "setup-user", user], { signal });
-      }
+      await this.prepareExecutionUsers(containerId, spec.executionUsers, signal);
       if (spec.healthcheck) await waitTaskHealth(this.command, containerId, spec.healthcheck, signal);
-      const raw = JSON.parse((await this.command(["inspect", containerId], { signal })).stdout) as Array<{
-        HostConfig?: { NanoCpus?: number; Memory?: number };
-      }>;
-      const host = raw[0]?.HostConfig;
+      const resources = await this.readContainerResources(containerId, spec, cpuVisibility, signal);
+      const modelEndpoint = this.modelEndpointMapping(spec, isolatedGateway, modelPolicy, gateway);
       const metadata: DockerMetadata = {
         ...(spec.executionUsers === undefined ? {} : { executionUsers: spec.executionUsers }),
         kind: "docker",
@@ -769,30 +872,8 @@ export class DockerEnvironment implements Environment {
         derivedImage: { reference: solverImage?.image ?? runtime.image, id: solverImage?.digest ?? runtime.digest },
         runtimes,
         ...(solverImage ? { installation: solverImage.runtime } : {}),
-        ...(gateway && modelPolicy
-          ? {
-              modelEndpoint: {
-                baseUrl: `http://127.0.0.1:${MODEL_FORWARDER_PORT}${modelPolicy.pathPrefix}`,
-                originEndpoint: this.modelEndpoint!,
-                gateway: { containerId: gateway.containerId, image: gateway.image, volume: gateway.volume },
-              },
-            }
-          : !isolatedGateway && spec.network !== "none" && spec.network !== "host" && this.modelEndpoint && dockerHostModelEndpoint(this.modelEndpoint) !== this.modelEndpoint
-            ? { modelEndpoint: { baseUrl: dockerHostModelEndpoint(this.modelEndpoint), originEndpoint: this.modelEndpoint } }
-            : {}),
-        resources: {
-          requested: {
-            cpus: spec.resources?.cpus ?? null,
-            memory: spec.resources?.memory ?? null,
-            storage: spec.resources?.storage ?? null,
-          },
-          effective: {
-            cpus: host?.NanoCpus ? host.NanoCpus / 1_000_000_000 : null,
-            memoryBytes: host?.Memory || null,
-            storage: { enforced: false },
-            ...cpuVisibility,
-          },
-        },
+        ...(modelEndpoint ? { modelEndpoint } : {}),
+        resources,
       };
       return new DockerSession(
         containerId,
@@ -807,13 +888,11 @@ export class DockerEnvironment implements Environment {
         project,
       );
     } catch (error) {
+      let failure = error;
       if (project) {
         try { await project.dispose(AbortSignal.timeout(30_000)); }
-        catch (cleanup) { throw new DockerEnvironmentError("CLEANUP_FAILED", "Task service group cleanup could not be confirmed", new AggregateError([error, cleanup])); }
-        throw error;
-      }
-      let failure = error;
-      if (containerId) {
+        catch (cleanup) { failure = new DockerEnvironmentError("CLEANUP_FAILED", "Task service group cleanup could not be confirmed", new AggregateError([error, cleanup])); }
+      } else if (containerId) {
         try { await rethrowPreparationFailure(this.command, containerId, error); }
         catch (error) { failure = error; }
       }
